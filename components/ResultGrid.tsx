@@ -76,6 +76,11 @@ export function ResultGrid({ result, title }: { result: DraftResult; title: stri
           {result.avoidOverrides} avoid preference{result.avoidOverrides === 1 ? '' : 's'} could not be satisfied without leaving a team short.
         </p>
       ) : null}
+      {(result.constraintOverrides ?? 0) > 0 ? (
+        <p className="mt-4 rounded-xl border border-[#b65a3a]/30 bg-[#f8d7c2] px-4 py-3 text-sm text-[#74301f]">
+          {result.constraintOverrides} roster rule{result.constraintOverrides === 1 ? '' : 's'} could not be satisfied because of team capacity or a conflicting rule.
+        </p>
+      ) : null}
     </section>
   );
 }

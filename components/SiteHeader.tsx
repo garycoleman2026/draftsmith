@@ -10,7 +10,7 @@ export function SiteHeader({ badge }: { badge?: string }) {
           </span>
           <span>
             <span className="fantasy-title block text-lg font-bold tracking-[0.01em] text-[#f5d98d]">Terry&apos;s Drafting</span>
-            <span className="block text-[11px] font-bold uppercase tracking-[0.13em] text-[#a99a78]">Captain-led team forge</span>
+            <span className="block text-[11px] font-bold uppercase tracking-[0.13em] text-[#a99a78]">Clan bingo team forge</span>
           </span>
         </Link>
         {badge ? (

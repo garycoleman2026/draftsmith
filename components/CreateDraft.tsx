@@ -2,11 +2,13 @@
 
 import { useRef, useState } from 'react';
 import { absoluteUrl, copyText, initials } from '../lib/client';
-import type { DraftType } from '../lib/types';
+import type { DraftType, RosterMode, SurveyQuestion } from '../lib/types';
 import { SiteHeader } from './SiteHeader';
+import { SurveyBuilder } from './SurveyBuilder';
 
 type CreatedDraft = {
   adminPath: string;
+  joinPath: string | null;
   captains: { name: string; teamIndex: number; path: string }[];
 };
 
@@ -26,6 +28,28 @@ const DRAFT_OPTIONS: { id: DraftType; title: string; description: string }[] = [
     title: 'Random draw',
     description: 'Shuffles the pool while still respecting avoid choices where possible.',
   },
+  {
+    id: 'live',
+    title: 'Live captain draft',
+    description: 'Captains take turns picking from their private links on a shared live board.',
+  },
+];
+
+const DEFAULT_SURVEY: SurveyQuestion[] = [
+  { label: 'Discord name', fieldType: 'short', required: true, options: [] },
+  { label: 'Expected playtime during the event (hours)', fieldType: 'number', required: true, options: [] },
+  {
+    label: 'How would you rate your game knowledge?',
+    fieldType: 'choice',
+    required: true,
+    options: ['Learning', 'Comfortable', 'Experienced', 'Expert'],
+  },
+  {
+    label: 'How would you rate your current gear?',
+    fieldType: 'choice',
+    required: true,
+    options: ['Developing', 'Mid-game', 'Late-game', 'End-game'],
+  },
 ];
 
 export function CreateDraft() {
@@ -33,6 +57,8 @@ export function CreateDraft() {
   const [title, setTitle] = useState("Terry's Clan Draft");
   const [draftType, setDraftType] = useState<DraftType>('balanced');
   const [teamCount, setTeamCount] = useState(3);
+  const [rosterMode, setRosterMode] = useState<RosterMode>('import');
+  const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>(DEFAULT_SURVEY);
   const [rawList, setRawList] = useState('');
   const [players, setPlayers] = useState<string[]>([]);
   const [captains, setCaptains] = useState<string[]>([]);
@@ -76,13 +102,21 @@ export function CreateDraft() {
     setStep('captains');
   }
 
+  function continueFromSetup() {
+    if (rosterMode === 'signup') {
+      void createDraft();
+      return;
+    }
+    continueToCaptains();
+  }
+
   function setCaptain(index: number, name: string) {
     setCaptains((current) => current.map((captain, itemIndex) => (itemIndex === index ? name : captain)));
     setError('');
   }
 
   async function createDraft() {
-    if (new Set(captains).size !== teamCount) {
+    if (rosterMode === 'import' && new Set(captains).size !== teamCount) {
       setError('Choose a different player for each captain spot.');
       return;
     }
@@ -92,7 +126,15 @@ export function CreateDraft() {
       const response = await fetch('/api/drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, draftType, teamCount, players, captainNames: captains }),
+        body: JSON.stringify({
+          title,
+          draftType,
+          teamCount,
+          rosterMode,
+          players,
+          captainNames: captains,
+          surveyQuestions,
+        }),
       });
       const data = (await response.json()) as CreatedDraft & { error?: string };
       if (!response.ok) throw new Error(data.error || 'The draft could not be created.');
@@ -123,11 +165,13 @@ export function CreateDraft() {
               {step === 'created' ? 'Ready to share' : 'New team draft'}
             </p>
             <h1 className="fantasy-title max-w-3xl text-4xl font-bold leading-[1.02] tracking-[-0.025em] text-[#f5df9b] drop-shadow-[0_3px_0_#26190c] sm:text-6xl">
-              {step === 'created' ? 'Send each captain their scroll.' : 'Forge fair teams from captain wisdom.'}
+              {step === 'created'
+                ? rosterMode === 'signup' ? 'Open the gates for signups.' : 'Send each captain their scroll.'
+                : 'Forge fair teams from captain wisdom.'}
             </h1>
           </div>
           <ol className="flex flex-wrap gap-2 text-xs font-bold" aria-label="Draft progress">
-            {['Setup', 'Captains', 'Share links'].map((label, index) => (
+            {['Setup', rosterMode === 'signup' ? 'Registration' : 'Captains', 'Share links'].map((label, index) => (
               <li
                 key={label}
                 className={
@@ -166,7 +210,7 @@ export function CreateDraft() {
 
               <fieldset className="mt-6">
                 <legend className="mb-2 text-sm font-bold">Draft type</legend>
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   {DRAFT_OPTIONS.map((option) => (
                     <label
                       key={option.id}
@@ -193,7 +237,7 @@ export function CreateDraft() {
               <fieldset className="mt-6">
                 <legend className="mb-2 text-sm font-bold">Number of teams</legend>
                 <div className="flex flex-wrap gap-2">
-                  {[2, 3, 4, 5, 6].map((count) => (
+                  {[2, 3, 4, 5, 6, 7, 8].map((count) => (
                     <button
                       key={count}
                       type="button"
@@ -211,7 +255,39 @@ export function CreateDraft() {
                 </div>
               </fieldset>
 
-              <div className="mt-6">
+              <fieldset className="mt-6">
+                <legend className="mb-2 text-sm font-bold">Build the roster</legend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {([
+                    ['import', 'Upload or paste', 'Bring a complete list, then choose captains now.'],
+                    ['signup', 'Public signup form', 'Share one link and collect custom participant profiles.'],
+                  ] as const).map(([mode, label, description]) => (
+                    <label
+                      className={`cursor-pointer rounded border p-4 ${
+                        rosterMode === mode
+                          ? 'border-[#45612f] bg-[#d9d6a8] shadow-[inset_0_0_0_2px_rgba(59,82,42,.18)]'
+                          : 'border-[#8b6a32]/55 bg-[#fff4d2]/55 hover:border-[#45612f]'
+                      }`}
+                      key={mode}
+                    >
+                      <input
+                        className="sr-only"
+                        type="radio"
+                        name="rosterMode"
+                        checked={rosterMode === mode}
+                        onChange={() => {
+                          setRosterMode(mode);
+                          setError('');
+                        }}
+                      />
+                      <span className="block font-black">{label}</span>
+                      <span className="mt-1.5 block text-xs leading-relaxed text-[#665b45]">{description}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {rosterMode === 'import' ? <div className="mt-6">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <label className="text-sm font-bold" htmlFor="player-list">Player list</label>
                   {importNote ? <span className="text-xs font-bold text-[#3f652f]">{importNote}</span> : null}
@@ -250,29 +326,44 @@ export function CreateDraft() {
                     Choose file
                   </button>
                 </div>
-              </div>
+              </div> : <SurveyBuilder questions={surveyQuestions} onChange={setSurveyQuestions} />}
 
               {error ? <p role="alert" className="mt-5 rounded-xl border border-[#d25839]/25 bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#9b3c26]">{error}</p> : null}
               <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[#173f35]/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="max-w-sm text-xs leading-relaxed text-[#6a7872]">Captain names come from this one player list. Rankings and avoids are entered through their private links.</p>
+                <p className="max-w-sm text-xs leading-relaxed text-[#6a7872]">
+                  {rosterMode === 'signup'
+                    ? 'You’ll receive a public registration link and choose captains from the completed signup roster.'
+                    : 'Captain names come from this one player list. Scores and avoids are entered through private links.'}
+                </p>
                 <button
                   className="gold-button px-5 py-3 text-sm"
                   type="button"
-                  onClick={continueToCaptains}
+                  disabled={busy}
+                  onClick={continueFromSetup}
                 >
-                  Choose captains →
+                  {busy ? 'Creating event…' : rosterMode === 'signup' ? 'Create signup link →' : 'Choose captains →'}
                 </button>
               </div>
             </section>
 
             <aside className="wood-panel p-6 sm:p-8">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[#d7ae50]">How it works</p>
-              <h2 className="fantasy-title mt-3 text-3xl font-bold leading-none">One list.<br />A scroll per captain.</h2>
+              <h2 className="fantasy-title mt-3 text-3xl font-bold leading-none">
+                {rosterMode === 'signup' ? <>One form.<br />A richer roster.</> : <>One list.<br />A scroll per captain.</>}
+              </h2>
               <div className="mt-8 space-y-6">
                 {[
-                  ['01', 'Pick captains', 'Choose one captain for each team from your uploaded list.'],
-                  ['02', 'Share private links', 'Captains paste their order and mark any avoids as yes or no.'],
-                  ['03', 'Run the draft', 'When every ranking is in, generate the teams and copy the result.'],
+                  ...(rosterMode === 'signup'
+                    ? [
+                        ['01', 'Design the form', 'Collect Discord, availability, experience, gear, and any custom answer.'],
+                        ['02', 'Share one signup link', 'Players add themselves to the event roster without an account.'],
+                        ['03', 'Choose captains later', 'Review profiles, set constraints, then open rankings or a live draft.'],
+                      ]
+                    : [
+                        ['01', 'Pick captains', 'Choose one captain for each team from your uploaded list.'],
+                        ['02', 'Share private links', 'Captains score players, mark avoids, or make live picks.'],
+                        ['03', 'Run the draft', 'Generate teams automatically or watch a live snake draft unfold.'],
+                      ]),
                 ].map(([number, itemTitle, copy]) => (
                   <div className="grid grid-cols-[38px_1fr] gap-3" key={number}>
                     <span className="text-sm font-black text-[#d7ae50]">{number}</span>
@@ -285,7 +376,7 @@ export function CreateDraft() {
               </div>
               <div className="mt-9 rounded border border-[#a4813b]/45 bg-black/20 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-[#bda873]">Privacy</p>
-                <p className="mt-2 text-sm leading-relaxed text-[#dfd2ae]">No player accounts are needed. Anyone with a private captain link can update only that captain’s ranking.</p>
+                <p className="mt-2 text-sm leading-relaxed text-[#dfd2ae]">No player accounts are needed. Anyone with a private captain link can update only that captain’s score sheet or live picks.</p>
               </div>
             </aside>
           </div>
@@ -343,45 +434,60 @@ export function CreateDraft() {
         {step === 'created' && created ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
             <section className="parchment-panel p-5 sm:p-8">
-              <div className="flex flex-col gap-3 border-b border-[#173f35]/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Captain links</p>
-                  <h2 className="fantasy-title mt-1 text-3xl font-bold">Copy, paste, send.</h2>
-                  <p className="mt-2 text-sm text-[#68766f]">Each private link opens that captain’s ranking area.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void copy(
-                      'all',
-                      created.captains
-                        .map((captain) => `${captain.name}: ${absoluteUrl(captain.path)}`)
-                        .join('\n'),
-                    )
-                  }
-                  className="scroll-button self-start px-4 py-2.5 text-xs"
-                >
-                  {copied === 'all' ? 'Copied all' : 'Copy all links'}
-                </button>
-              </div>
-              <div className="mt-5 space-y-3">
-                {created.captains.map((captain) => (
-                  <div className="parchment-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center" key={captain.path}>
-                    <span className="brand-rune grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#f4d77c]">{initials(captain.name)}</span>
+              {created.joinPath ? (
+                <>
+                  <div className="border-b border-[#173f35]/10 pb-6">
+                    <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Public signup link</p>
+                    <h2 className="fantasy-title mt-1 text-3xl font-bold">Share one link with the clan.</h2>
+                    <p className="mt-2 text-sm text-[#68766f]">Every signup flows into your organizer roster with their survey answers.</p>
+                  </div>
+                  <div className="parchment-card mt-5 flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
+                    <span className="brand-rune grid h-12 w-12 shrink-0 place-items-center rounded-full text-lg font-black text-[#f4d77c]">+</span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-black">{captain.name}</p>
-                      <p className="truncate text-xs text-[#718079]">{absoluteUrl(captain.path)}</p>
+                      <p className="font-black">Participant registration</p>
+                      <p className="truncate text-xs text-[#718079]">{absoluteUrl(created.joinPath)}</p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => void copy(captain.path, absoluteUrl(captain.path))}
+                      onClick={() => void copy('signup', absoluteUrl(created.joinPath!))}
                       className="iron-button px-4 py-2.5 text-xs"
                     >
-                      {copied === captain.path ? 'Copied' : 'Copy link'}
+                      {copied === 'signup' ? 'Copied' : 'Copy signup link'}
                     </button>
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3 border-b border-[#173f35]/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Captain links</p>
+                      <h2 className="fantasy-title mt-1 text-3xl font-bold">Copy, paste, send.</h2>
+                      <p className="mt-2 text-sm text-[#68766f]">Each private link opens that captain’s scoring or live-pick area.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void copy('all', created.captains.map((captain) => `${captain.name}: ${absoluteUrl(captain.path)}`).join('\n'))}
+                      className="scroll-button self-start px-4 py-2.5 text-xs"
+                    >
+                      {copied === 'all' ? 'Copied all' : 'Copy all links'}
+                    </button>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {created.captains.map((captain) => (
+                      <div className="parchment-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center" key={captain.path}>
+                        <span className="brand-rune grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#f4d77c]">{initials(captain.name)}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-black">{captain.name}</p>
+                          <p className="truncate text-xs text-[#718079]">{absoluteUrl(captain.path)}</p>
+                        </div>
+                        <button type="button" onClick={() => void copy(captain.path, absoluteUrl(captain.path))} className="iron-button px-4 py-2.5 text-xs">
+                          {copied === captain.path ? 'Copied' : 'Copy link'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </section>
             <aside className="wood-panel p-6 sm:p-8">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Organizer link</p>

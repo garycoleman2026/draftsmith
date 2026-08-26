@@ -7,11 +7,11 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://draftsmith-teams.companyscreeninginfo.chatgpt.site'),
-  title: 'Terry’s Drafting — Captain-led team forge',
-  description: 'Gather captain rankings, honour avoid choices, and forge fair teams.',
+  title: 'Terry’s Drafting — Clan bingo team drafts',
+  description: 'Build clan bingo teams with public signups, private captain scores, roster rules, and live picks.',
   openGraph: {
-    title: 'Terry’s Drafting — Captain-led team forge',
-    description: 'Gather captain rankings, honour avoid choices, and forge fair teams.',
+    title: 'Terry’s Drafting — Clan bingo team drafts',
+    description: 'Build clan bingo teams with public signups, private captain scores, roster rules, and live picks.',
     type: 'website',
     url: 'https://draftsmith-teams.companyscreeninginfo.chatgpt.site',
     images: [
@@ -19,14 +19,14 @@ export const metadata: Metadata = {
         url: 'https://draftsmith-teams.companyscreeninginfo.chatgpt.site/og.png',
         width: 1734,
         height: 907,
-        alt: 'Terry’s Drafting — Captain-led team forge',
+        alt: 'Terry’s Drafting — Clan bingo team drafts',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Terry’s Drafting — Captain-led team forge',
-    description: 'Gather captain rankings, honour avoid choices, and forge fair teams.',
+    title: 'Terry’s Drafting — Clan bingo team drafts',
+    description: 'Build clan bingo teams with public signups, private captain scores, roster rules, and live picks.',
     images: ['https://draftsmith-teams.companyscreeninginfo.chatgpt.site/og.png'],
   },
 };
