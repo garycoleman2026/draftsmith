@@ -96,27 +96,33 @@ export function LiveDraftBoard({
           {available.map((player) => {
             const rules = live.constraints.filter((rule) => rule.playerAId === player.id || rule.playerBId === player.id);
             return (
-              <article className="parchment-card grid grid-cols-[minmax(0,1fr)_auto] gap-3 p-4" key={player.id}>
-                <div className="min-w-0">
-                  <h3 className="truncate font-black">{player.name}</h3>
-                  {rules.length ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {rules.map((rule, index) => {
-                        const otherId = rule.playerAId === player.id ? rule.playerBId : rule.playerAId;
-                        return <span className={`rounded px-2 py-1 text-[10px] font-black ${rule.type === 'together' ? 'bg-[#d5d1a0] text-[#38562f]' : 'bg-[#e8b59e] text-[#843723]'}`} key={`${rule.type}-${otherId}-${index}`}>{rule.type === 'together' ? 'With' : 'Apart'}: {nameById(otherId)}</span>;
-                      })}
-                    </div>
-                  ) : <p className="mt-1 text-xs text-[#77694f]">No roster rules</p>}
+              <article className="parchment-card flex min-w-0 flex-col p-4" key={player.id}>
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-black">{player.name}</h3>
+                    {rules.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {rules.map((rule, index) => {
+                          const otherId = rule.playerAId === player.id ? rule.playerBId : rule.playerAId;
+                          return <span className={`rounded px-2 py-1 text-[10px] font-black ${rule.type === 'together' ? 'bg-[#d5d1a0] text-[#38562f]' : 'bg-[#e8b59e] text-[#843723]'}`} key={`${rule.type}-${otherId}-${index}`}>{rule.type === 'together' ? 'With' : 'Apart'}: {nameById(otherId)}</span>;
+                        })}
+                      </div>
+                    ) : <p className="mt-1 text-xs text-[#77694f]">No roster rules</p>}
+                  </div>
+                  <button
+                    type="button"
+                    className="gold-button shrink-0 whitespace-nowrap px-3 py-2 text-xs"
+                    disabled={!myTurn || Boolean(picking)}
+                    onClick={() => void pick(player)}
+                  >
+                    {picking === player.id ? 'Picking…' : 'Pick'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="gold-button self-start px-3 py-2 text-xs"
-                  disabled={!myTurn || Boolean(picking)}
-                  onClick={() => void pick(player)}
-                >
-                  {picking === player.id ? 'Picking…' : 'Pick'}
-                </button>
-                <PlayerIntel name={player.name} answers={player.answers} />
+                <PlayerIntel
+                  name={player.name}
+                  answers={player.answers}
+                  className="mt-4 border-t border-[#8b6a32]/25 pt-3"
+                />
               </article>
             );
           })}

@@ -20,7 +20,15 @@ type InsightData = {
   } | null;
 };
 
-export function PlayerIntel({ name, answers = [] }: { name: string; answers?: PlayerAnswer[] }) {
+export function PlayerIntel({
+  name,
+  answers = [],
+  className = 'col-span-full sm:col-start-2',
+}: {
+  name: string;
+  answers?: PlayerAnswer[];
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<InsightData | null>(null);
@@ -48,7 +56,7 @@ export function PlayerIntel({ name, answers = [] }: { name: string; answers?: Pl
   const womUrl = `https://wiseoldman.net/players/${encodeURIComponent(name)}`;
 
   return (
-    <div className="col-span-full sm:col-start-2">
+    <div className={className}>
       <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
         <button type="button" className="scroll-button px-2.5 py-1.5" onClick={() => void toggle()}>
           {open ? 'Hide player intel' : 'View player intel'}
