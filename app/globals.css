@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #f3efe4;
-  --foreground: #14251f;
+  --background: #15110c;
+  --foreground: #eadcb9;
 }
 
 @theme inline {
@@ -20,6 +20,158 @@ body {
   min-width: 320px;
 }
 
+.realm-bg {
+  background:
+    radial-gradient(circle at 15% 8%, rgba(80, 103, 55, 0.22), transparent 30rem),
+    radial-gradient(circle at 87% 24%, rgba(139, 92, 35, 0.16), transparent 28rem),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px),
+    linear-gradient(145deg, #1b1811 0%, #11100d 55%, #1b160f 100%);
+}
+
+.fantasy-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.018em;
+  text-shadow: 0 2px 0 rgba(56, 34, 12, 0.28);
+}
+
+.brand-rune {
+  border: 2px solid #a98334;
+  background: radial-gradient(circle at 36% 28%, #3f5a2a, #1f2d19 68%);
+  box-shadow:
+    inset 0 0 0 3px #151d11,
+    inset 0 0 0 4px rgba(226, 190, 94, 0.45),
+    0 3px 0 #080805;
+}
+
+.parchment-panel,
+.parchment-card {
+  color: #2d2316;
+  border: 2px solid #8b6a32;
+  border-radius: 7px;
+  background:
+    repeating-linear-gradient(0deg, rgba(83, 58, 23, 0.025) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 12% 8%, rgba(255, 252, 218, 0.78), transparent 24rem),
+    linear-gradient(145deg, #f5e9c2 0%, #dfc88f 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 248, 205, 0.45),
+    inset 0 0 24px rgba(105, 70, 22, 0.16),
+    0 7px 0 #352414,
+    0 18px 42px rgba(0, 0, 0, 0.3);
+}
+
+.parchment-card {
+  border-width: 1px;
+  background:
+    repeating-linear-gradient(0deg, rgba(83, 58, 23, 0.024) 0 1px, transparent 1px 4px),
+    linear-gradient(145deg, #f8edc9 0%, #ead7a6 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 250, 220, 0.5),
+    0 3px 0 rgba(63, 42, 19, 0.55);
+}
+
+.wood-panel {
+  color: #f1e1b6;
+  border: 2px solid #9d7932;
+  border-radius: 7px;
+  background:
+    repeating-linear-gradient(2deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 6px),
+    radial-gradient(circle at 20% 8%, rgba(66, 91, 45, 0.5), transparent 23rem),
+    linear-gradient(150deg, #26351f 0%, #182216 48%, #2a2115 100%);
+  box-shadow:
+    inset 0 0 0 3px #12180f,
+    inset 0 0 0 4px rgba(212, 170, 76, 0.34),
+    0 7px 0 #080805,
+    0 18px 42px rgba(0, 0, 0, 0.38);
+}
+
+.realm-field {
+  color: #241b10;
+  border: 1px solid #7e612d;
+  border-radius: 4px;
+  background: #f7ebc6;
+  box-shadow:
+    inset 0 2px 7px rgba(78, 52, 20, 0.18),
+    0 1px 0 rgba(255, 250, 222, 0.7);
+}
+
+.realm-field:focus {
+  border-color: #3f5d2b;
+  box-shadow:
+    inset 0 2px 7px rgba(78, 52, 20, 0.18),
+    0 0 0 3px rgba(63, 93, 43, 0.2);
+}
+
+.dark-field {
+  color: #f2e3b9;
+  border: 1px solid #947331;
+  border-radius: 4px;
+  background: rgba(8, 12, 7, 0.62);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.gold-button,
+.iron-button,
+.scroll-button {
+  border-radius: 4px;
+  font-weight: 900;
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+.gold-button {
+  color: #24180b;
+  border: 1px solid #e3bd5e;
+  background: linear-gradient(#d8ad4d, #a87527);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 239, 164, 0.72),
+    0 4px 0 #5e3c16;
+  text-shadow: 0 1px 0 rgba(255, 232, 150, 0.45);
+}
+
+.iron-button {
+  color: #f3e1ae;
+  border: 1px solid #a4823a;
+  background: linear-gradient(#30412b, #182218);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 3px 0 #080b07;
+}
+
+.scroll-button {
+  color: #342311;
+  border: 1px solid #82622a;
+  background: linear-gradient(#fff2c9, #d8bd80);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 3px 0 #765329;
+}
+
+.gold-button:hover:not(:disabled),
+.iron-button:hover:not(:disabled),
+.scroll-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.gold-button:disabled,
+.iron-button:disabled,
+.scroll-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.55);
+  opacity: 0.55;
+}
+
+.seal-badge {
+  color: #513b10;
+  border: 1px solid #9c7527;
+  border-radius: 999px;
+  background: #e8cd82;
+  box-shadow: inset 0 0 0 2px rgba(255, 246, 195, 0.5);
+}
+
+.etched-rule {
+  border-color: rgba(91, 62, 25, 0.25);
+}
+
 button,
 select,
 input,
@@ -33,6 +185,6 @@ select {
 }
 
 ::selection {
-  background: #f2e4ad;
-  color: #14251f;
+  background: #b78d37;
+  color: #15110c;
 }

@@ -1,18 +1,20 @@
+import Link from 'next/link';
+
 export function SiteHeader({ badge }: { badge?: string }) {
   return (
-    <header className="border-b border-[#14251f]/10 bg-[#f8f5ec]/90 backdrop-blur">
+    <header className="border-b border-[#9b792f]/50 bg-[#17120d]/95 shadow-[0_5px_18px_rgba(0,0,0,.38)] backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-        <a className="flex items-center gap-3" href="/">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#173f35] text-lg font-black text-[#f8f5ec] shadow-[3px_3px_0_#e16948]">
-            D
+        <Link className="flex items-center gap-3" href="/">
+          <span className="brand-rune grid h-11 w-11 place-items-center rounded-full text-xl font-black text-[#f4d77c]">
+            T
           </span>
           <span>
-            <span className="block font-black tracking-[-0.03em]">DraftSmith</span>
-            <span className="block text-xs font-medium text-[#597067]">Captain-ranked team maker</span>
+            <span className="fantasy-title block text-lg font-bold tracking-[0.01em] text-[#f5d98d]">Terry&apos;s Drafting</span>
+            <span className="block text-[11px] font-bold uppercase tracking-[0.13em] text-[#a99a78]">Captain-led team forge</span>
           </span>
-        </a>
+        </Link>
         {badge ? (
-          <span className="rounded-full border border-[#173f35]/15 bg-white/70 px-3 py-1.5 text-xs font-bold text-[#35574d]">
+          <span className="rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-xs font-bold text-[#ddc27b] shadow-inner">
             {badge}
           </span>
         ) : null}

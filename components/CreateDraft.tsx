@@ -30,7 +30,7 @@ const DRAFT_OPTIONS: { id: DraftType; title: string; description: string }[] = [
 
 export function CreateDraft() {
   const [step, setStep] = useState<'setup' | 'captains' | 'created'>('setup');
-  const [title, setTitle] = useState('Game Night Draft');
+  const [title, setTitle] = useState("Terry's Clan Draft");
   const [draftType, setDraftType] = useState<DraftType>('balanced');
   const [teamCount, setTeamCount] = useState(3);
   const [rawList, setRawList] = useState('');
@@ -114,16 +114,16 @@ export function CreateDraft() {
   const progressStep = step === 'setup' ? 1 : step === 'captains' ? 2 : 3;
 
   return (
-    <main className="min-h-screen bg-[#f3efe4] text-[#14251f]">
+    <main className="realm-bg min-h-screen text-[#eadcb9]">
       <SiteHeader badge={step === 'created' ? 'Draft saved' : 'Setup'} />
       <section className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 sm:pt-12">
         <div className="mb-8 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-[#d25839]">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-[#c69b3c]">
               {step === 'created' ? 'Ready to share' : 'New team draft'}
             </p>
-            <h1 className="max-w-3xl text-4xl font-black leading-[0.98] tracking-[-0.045em] sm:text-6xl">
-              {step === 'created' ? 'Send each captain their link.' : 'Turn captain picks into fair teams.'}
+            <h1 className="fantasy-title max-w-3xl text-4xl font-bold leading-[1.02] tracking-[-0.025em] text-[#f5df9b] drop-shadow-[0_3px_0_#26190c] sm:text-6xl">
+              {step === 'created' ? 'Send each captain their scroll.' : 'Forge fair teams from captain wisdom.'}
             </h1>
           </div>
           <ol className="flex flex-wrap gap-2 text-xs font-bold" aria-label="Draft progress">
@@ -132,8 +132,8 @@ export function CreateDraft() {
                 key={label}
                 className={
                   index + 1 <= progressStep
-                    ? 'rounded-full bg-[#173f35] px-3 py-2 text-white'
-                    : 'rounded-full border border-[#173f35]/15 bg-white/55 px-3 py-2 text-[#5c6e67]'
+                    ? 'rounded border border-[#b18a36] bg-[#5d431f] px-3 py-2 text-[#fff0bd] shadow-[inset_0_1px_0_rgba(255,255,255,.15)]'
+                    : 'rounded border border-[#6e6043] bg-[#211a12]/80 px-3 py-2 text-[#9e9276]'
                 }
               >
                 {index + 1}&nbsp; {label}
@@ -144,19 +144,19 @@ export function CreateDraft() {
 
         {step === 'setup' ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
-            <section className="rounded-[28px] border border-[#173f35]/12 bg-[#fffdf7] p-5 shadow-[0_20px_55px_rgba(23,63,53,.08)] sm:p-8">
+            <section className="parchment-panel p-5 sm:p-8">
               <div className="mb-7 flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Draft settings</p>
-                  <h2 className="mt-1 text-2xl font-black tracking-[-0.03em]">Build the player pool</h2>
+                  <h2 className="fantasy-title mt-1 text-2xl font-bold">Build the player pool</h2>
                 </div>
-                <span className="rounded-xl bg-[#f2e4ad] px-3 py-2 text-xs font-black text-[#5a4510]">Step 1 of 3</span>
+                <span className="seal-badge px-3 py-2 text-xs font-black">Step 1 of 3</span>
               </div>
 
               <label className="grid gap-2 text-sm font-bold">
                 Draft name
                 <input
-                  className="h-12 rounded-xl border border-[#173f35]/20 bg-white px-4 font-semibold outline-none focus:border-[#e16948] focus:ring-4 focus:ring-[#e16948]/10"
+                  className="realm-field h-12 px-4 font-semibold outline-none"
                   maxLength={80}
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
@@ -170,10 +170,10 @@ export function CreateDraft() {
                   {DRAFT_OPTIONS.map((option) => (
                     <label
                       key={option.id}
-                      className={`cursor-pointer rounded-2xl border p-4 transition ${
+                      className={`cursor-pointer rounded border p-4 transition ${
                         draftType === option.id
-                          ? 'border-[#173f35] bg-[#e7eee9] shadow-[0_0_0_3px_rgba(23,63,53,.08)]'
-                          : 'border-[#173f35]/13 bg-white hover:border-[#173f35]/35'
+                          ? 'border-[#45612f] bg-[#d9d6a8] shadow-[inset_0_0_0_2px_rgba(59,82,42,.18)]'
+                          : 'border-[#8b6a32]/55 bg-[#fff4d2]/55 hover:border-[#45612f]'
                       }`}
                     >
                       <input
@@ -184,7 +184,7 @@ export function CreateDraft() {
                         onChange={() => setDraftType(option.id)}
                       />
                       <span className="block font-black">{option.title}</span>
-                      <span className="mt-1.5 block text-xs leading-relaxed text-[#68766f]">{option.description}</span>
+                      <span className="mt-1.5 block text-xs leading-relaxed text-[#665b45]">{option.description}</span>
                     </label>
                   ))}
                 </div>
@@ -199,10 +199,10 @@ export function CreateDraft() {
                       type="button"
                       aria-pressed={teamCount === count}
                       onClick={() => setTeamCount(count)}
-                      className={`grid h-11 min-w-12 place-items-center rounded-xl border text-sm font-black transition ${
+                      className={`grid h-11 min-w-12 place-items-center rounded border text-sm font-black transition ${
                         teamCount === count
-                          ? 'border-[#173f35] bg-[#173f35] text-white'
-                          : 'border-[#173f35]/15 bg-white text-[#173f35] hover:border-[#173f35]/40'
+                          ? 'iron-button border-[#344b29] text-[#f3e1ae]'
+                          : 'scroll-button text-[#342311]'
                       }`}
                     >
                       {count}
@@ -214,17 +214,17 @@ export function CreateDraft() {
               <div className="mt-6">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <label className="text-sm font-bold" htmlFor="player-list">Player list</label>
-                  {importNote ? <span className="text-xs font-bold text-[#2d6f5e]">{importNote}</span> : null}
+                  {importNote ? <span className="text-xs font-bold text-[#3f652f]">{importNote}</span> : null}
                 </div>
                 <textarea
                   id="player-list"
-                  className="min-h-48 w-full resize-y rounded-2xl border border-[#173f35]/20 bg-white p-4 font-mono text-sm leading-7 outline-none placeholder:text-[#87938e] focus:border-[#e16948] focus:ring-4 focus:ring-[#e16948]/10"
+                  className="realm-field min-h-48 w-full resize-y p-4 font-mono text-sm leading-7 outline-none placeholder:text-[#8a7656]"
                   value={rawList}
                   onChange={(event) => importPlayers(event.target.value)}
                   placeholder={'Paste one player per line\nAlex\nJamie\nMorgan\nTaylor'}
                 />
                 <div
-                  className="mt-3 flex flex-col gap-3 rounded-2xl border-2 border-dashed border-[#9aa8a1] bg-[#f8f5ec] p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="mt-3 flex flex-col gap-3 rounded border-2 border-dashed border-[#8b6a32]/70 bg-[#f6e7bd]/60 p-4 sm:flex-row sm:items-center sm:justify-between"
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(event) => {
                     event.preventDefault();
@@ -233,7 +233,7 @@ export function CreateDraft() {
                 >
                   <div>
                     <p className="text-sm font-black">Or upload the list once</p>
-                    <p className="mt-0.5 text-xs text-[#68766f]">CSV or TXT · the first column becomes the player name</p>
+                    <p className="mt-0.5 text-xs text-[#665b45]">CSV or TXT · the first column becomes the player name</p>
                   </div>
                   <input
                     ref={fileInput}
@@ -245,7 +245,7 @@ export function CreateDraft() {
                   <button
                     type="button"
                     onClick={() => fileInput.current?.click()}
-                    className="rounded-xl border border-[#173f35]/15 bg-white px-4 py-2.5 text-xs font-black text-[#173f35] hover:border-[#173f35]/35"
+                    className="scroll-button px-4 py-2.5 text-xs"
                   >
                     Choose file
                   </button>
@@ -256,7 +256,7 @@ export function CreateDraft() {
               <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[#173f35]/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <p className="max-w-sm text-xs leading-relaxed text-[#6a7872]">Captain names come from this one player list. Rankings and avoids are entered through their private links.</p>
                 <button
-                  className="rounded-xl bg-[#e16948] px-5 py-3 text-sm font-black text-white shadow-[0_4px_0_#a43e27] transition hover:-translate-y-0.5"
+                  className="gold-button px-5 py-3 text-sm"
                   type="button"
                   onClick={continueToCaptains}
                 >
@@ -265,9 +265,9 @@ export function CreateDraft() {
               </div>
             </section>
 
-            <aside className="rounded-[28px] bg-[#173f35] p-6 text-[#f8f5ec] sm:p-8">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#ef9a78]">How it works</p>
-              <h2 className="mt-3 text-3xl font-black leading-none tracking-[-0.04em]">One list.<br />A link per captain.</h2>
+            <aside className="wood-panel p-6 sm:p-8">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#d7ae50]">How it works</p>
+              <h2 className="fantasy-title mt-3 text-3xl font-bold leading-none">One list.<br />A scroll per captain.</h2>
               <div className="mt-8 space-y-6">
                 {[
                   ['01', 'Pick captains', 'Choose one captain for each team from your uploaded list.'],
@@ -275,44 +275,44 @@ export function CreateDraft() {
                   ['03', 'Run the draft', 'When every ranking is in, generate the teams and copy the result.'],
                 ].map(([number, itemTitle, copy]) => (
                   <div className="grid grid-cols-[38px_1fr] gap-3" key={number}>
-                    <span className="text-sm font-black text-[#ef9a78]">{number}</span>
+                    <span className="text-sm font-black text-[#d7ae50]">{number}</span>
                     <div>
                       <h3 className="font-black">{itemTitle}</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-[#c4d2cd]">{copy}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-[#cfc3a5]">{copy}</p>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-9 rounded-2xl border border-white/10 bg-white/7 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#9db5ac]">Privacy</p>
-                <p className="mt-2 text-sm leading-relaxed text-[#d4dfdb]">No player accounts are needed. Anyone with a private captain link can update only that captain’s ranking.</p>
+              <div className="mt-9 rounded border border-[#a4813b]/45 bg-black/20 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#bda873]">Privacy</p>
+                <p className="mt-2 text-sm leading-relaxed text-[#dfd2ae]">No player accounts are needed. Anyone with a private captain link can update only that captain’s ranking.</p>
               </div>
             </aside>
           </div>
         ) : null}
 
         {step === 'captains' ? (
-          <section className="mx-auto max-w-4xl rounded-[28px] border border-[#173f35]/12 bg-[#fffdf7] p-5 shadow-[0_20px_55px_rgba(23,63,53,.08)] sm:p-8">
+          <section className="parchment-panel mx-auto max-w-4xl p-5 sm:p-8">
             <div className="flex flex-col gap-3 border-b border-[#173f35]/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Captain seats</p>
-                <h2 className="mt-1 text-3xl font-black tracking-[-0.04em]">Who leads each team?</h2>
+                <h2 className="fantasy-title mt-1 text-3xl font-bold">Who leads each team?</h2>
                 <p className="mt-2 text-sm text-[#68766f]">Captains are fixed to separate teams and won’t rank one another.</p>
               </div>
-              <span className="self-start rounded-xl bg-[#f2e4ad] px-3 py-2 text-xs font-black text-[#5a4510]">{players.length} players · {teamCount} teams</span>
+              <span className="seal-badge self-start px-3 py-2 text-xs font-black">{players.length} players · {teamCount} teams</span>
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {Array.from({ length: teamCount }, (_, index) => (
-                <label className="rounded-2xl border border-[#173f35]/13 bg-white p-4" key={index}>
+                <label className="parchment-card p-4" key={index}>
                   <span className="mb-3 flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-full bg-[#dce8df] text-xs font-black text-[#173f35]">{index + 1}</span>
+                    <span className="brand-rune grid h-9 w-9 place-items-center rounded-full text-xs font-black text-[#f4d77c]">{index + 1}</span>
                     <span>
                       <span className="block text-xs font-black uppercase tracking-[0.1em] text-[#7a8781]">Team {index + 1}</span>
                       <span className="block font-black">Captain</span>
                     </span>
                   </span>
                   <select
-                    className="h-12 w-full rounded-xl border border-[#173f35]/20 bg-white px-3 font-bold outline-none focus:border-[#e16948] focus:ring-4 focus:ring-[#e16948]/10"
+                    className="realm-field h-12 w-full px-3 font-bold outline-none"
                     value={captains[index] || ''}
                     onChange={(event) => setCaptain(index, event.target.value)}
                   >
@@ -327,12 +327,12 @@ export function CreateDraft() {
             </div>
             {error ? <p role="alert" className="mt-5 rounded-xl border border-[#d25839]/25 bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#9b3c26]">{error}</p> : null}
             <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[#173f35]/10 pt-6 sm:flex-row sm:justify-between">
-              <button type="button" onClick={() => setStep('setup')} className="rounded-xl border border-[#173f35]/15 bg-white px-5 py-3 text-sm font-black text-[#173f35]">← Back</button>
+              <button type="button" onClick={() => setStep('setup')} className="scroll-button px-5 py-3 text-sm">← Back</button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void createDraft()}
-                className="rounded-xl bg-[#e16948] px-5 py-3 text-sm font-black text-white shadow-[0_4px_0_#a43e27] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+                className="gold-button px-5 py-3 text-sm"
               >
                 {busy ? 'Creating links…' : 'Create captain links →'}
               </button>
@@ -342,11 +342,11 @@ export function CreateDraft() {
 
         {step === 'created' && created ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="rounded-[28px] border border-[#173f35]/12 bg-[#fffdf7] p-5 shadow-[0_20px_55px_rgba(23,63,53,.08)] sm:p-8">
+            <section className="parchment-panel p-5 sm:p-8">
               <div className="flex flex-col gap-3 border-b border-[#173f35]/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Captain links</p>
-                  <h2 className="mt-1 text-3xl font-black tracking-[-0.04em]">Copy, paste, send.</h2>
+                  <h2 className="fantasy-title mt-1 text-3xl font-bold">Copy, paste, send.</h2>
                   <p className="mt-2 text-sm text-[#68766f]">Each private link opens that captain’s ranking area.</p>
                 </div>
                 <button
@@ -359,15 +359,15 @@ export function CreateDraft() {
                         .join('\n'),
                     )
                   }
-                  className="self-start rounded-xl border border-[#173f35]/15 bg-white px-4 py-2.5 text-xs font-black text-[#173f35]"
+                  className="scroll-button self-start px-4 py-2.5 text-xs"
                 >
                   {copied === 'all' ? 'Copied all' : 'Copy all links'}
                 </button>
               </div>
               <div className="mt-5 space-y-3">
                 {created.captains.map((captain) => (
-                  <div className="flex flex-col gap-3 rounded-2xl border border-[#173f35]/12 bg-white p-4 sm:flex-row sm:items-center" key={captain.path}>
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#dce8df] text-sm font-black text-[#173f35]">{initials(captain.name)}</span>
+                  <div className="parchment-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center" key={captain.path}>
+                    <span className="brand-rune grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black text-[#f4d77c]">{initials(captain.name)}</span>
                     <div className="min-w-0 flex-1">
                       <p className="font-black">{captain.name}</p>
                       <p className="truncate text-xs text-[#718079]">{absoluteUrl(captain.path)}</p>
@@ -375,7 +375,7 @@ export function CreateDraft() {
                     <button
                       type="button"
                       onClick={() => void copy(captain.path, absoluteUrl(captain.path))}
-                      className="rounded-xl bg-[#173f35] px-4 py-2.5 text-xs font-black text-white"
+                      className="iron-button px-4 py-2.5 text-xs"
                     >
                       {copied === captain.path ? 'Copied' : 'Copy link'}
                     </button>
@@ -383,20 +383,20 @@ export function CreateDraft() {
                 ))}
               </div>
             </section>
-            <aside className="rounded-[28px] bg-[#173f35] p-6 text-white sm:p-8">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#ef9a78]">Organizer link</p>
-              <h2 className="mt-3 text-2xl font-black tracking-[-0.03em]">Keep this one for yourself.</h2>
-              <p className="mt-3 text-sm leading-relaxed text-[#c5d3ce]">Track captain progress, run the draft, and copy the final teams from your organizer board.</p>
+            <aside className="wood-panel p-6 sm:p-8">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Organizer link</p>
+              <h2 className="fantasy-title mt-3 text-2xl font-bold">Keep this one for yourself.</h2>
+              <p className="mt-3 text-sm leading-relaxed text-[#cfc3a5]">Track captain progress, run the draft, and copy the final teams from your organizer board.</p>
               <a
                 href={created.adminPath}
-                className="mt-6 block rounded-xl bg-[#e16948] px-5 py-3 text-center text-sm font-black text-white shadow-[0_4px_0_#9f3c26]"
+                className="gold-button mt-6 block px-5 py-3 text-center text-sm"
               >
                 Open organizer board →
               </a>
               <button
                 type="button"
                 onClick={() => void copy('admin', absoluteUrl(created.adminPath))}
-                className="mt-3 w-full rounded-xl border border-white/15 px-5 py-3 text-sm font-black text-white"
+                className="iron-button mt-3 w-full px-5 py-3 text-sm"
               >
                 {copied === 'admin' ? 'Organizer link copied' : 'Copy organizer link'}
               </button>

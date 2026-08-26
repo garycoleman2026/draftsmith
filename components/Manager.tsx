@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { absoluteUrl, copyText, initials } from '../lib/client';
 import { DRAFT_TYPE_LABELS, type DraftResult, type DraftType } from '../lib/types';
 import { ResultGrid } from './ResultGrid';
@@ -48,9 +49,12 @@ export function Manager({ token }: { token: string }) {
   }, [token]);
 
   useEffect(() => {
-    void load();
+    const firstLoad = window.setTimeout(() => void load(), 0);
     const interval = window.setInterval(() => void load(true), 15000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(firstLoad);
+      window.clearInterval(interval);
+    };
   }, [load]);
 
   async function runDraft() {
@@ -77,12 +81,12 @@ export function Manager({ token }: { token: string }) {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f3efe4] text-[#14251f]">
+      <main className="realm-bg min-h-screen text-[#eadcb9]">
         <SiteHeader badge="Organizer" />
         <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
-          <div className="h-9 w-72 animate-pulse rounded-xl bg-[#173f35]/10" />
+          <div className="h-9 w-72 animate-pulse rounded bg-[#d2a94e]/20" />
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            {[0, 1, 2].map((item) => <div className="h-40 animate-pulse rounded-3xl bg-white/70" key={item} />)}
+            {[0, 1, 2].map((item) => <div className="h-40 animate-pulse rounded border border-[#8b6a32]/50 bg-[#d8c28a]/20" key={item} />)}
           </div>
         </div>
       </main>
@@ -91,13 +95,13 @@ export function Manager({ token }: { token: string }) {
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-[#f3efe4] text-[#14251f]">
+      <main className="realm-bg min-h-screen text-[#eadcb9]">
         <SiteHeader badge="Organizer" />
         <section className="mx-auto max-w-xl px-5 py-20 text-center">
           <p className="text-5xl">↗</p>
-          <h1 className="mt-5 text-3xl font-black tracking-[-0.04em]">Organizer link unavailable</h1>
-          <p className="mt-3 text-[#68766f]">{error || 'Check that the whole private organizer link was copied.'}</p>
-          <a className="mt-7 inline-block rounded-xl bg-[#173f35] px-5 py-3 text-sm font-black text-white" href="/">Start a new draft</a>
+          <h1 className="fantasy-title mt-5 text-3xl font-bold text-[#f5df9b]">Organizer link unavailable</h1>
+          <p className="mt-3 text-[#b5a888]">{error || 'Check that the whole private organizer link was copied.'}</p>
+          <Link className="gold-button mt-7 inline-block px-5 py-3 text-sm" href="/">Start a new draft</Link>
         </section>
       </main>
     );
@@ -110,14 +114,14 @@ export function Manager({ token }: { token: string }) {
     .join('\n');
 
   return (
-    <main className="min-h-screen bg-[#f3efe4] text-[#14251f]">
+    <main className="realm-bg min-h-screen text-[#eadcb9]">
       <SiteHeader badge="Organizer board" />
       <section className="mx-auto max-w-7xl px-5 pb-20 pt-8 sm:px-8 sm:pt-12">
         <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#d25839]">Organizer board</p>
-            <h1 className="mt-3 text-4xl font-black leading-none tracking-[-0.045em] sm:text-6xl">{data.draft.title}</h1>
-            <p className="mt-3 text-sm font-semibold text-[#63736c]">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">Organizer board</p>
+            <h1 className="fantasy-title mt-3 text-4xl font-bold leading-none text-[#f5df9b] sm:text-6xl">{data.draft.title}</h1>
+            <p className="mt-3 text-sm font-semibold text-[#b5a888]">
               {DRAFT_TYPE_LABELS[data.draft.draftType]} · {data.draft.teamCount} teams · {data.players.length} players
             </p>
           </div>
@@ -125,14 +129,14 @@ export function Manager({ token }: { token: string }) {
             <button
               type="button"
               onClick={() => void load()}
-              className="rounded-xl border border-[#173f35]/15 bg-white/70 px-4 py-2.5 text-xs font-black text-[#173f35]"
+              className="scroll-button px-4 py-2.5 text-xs"
             >
               Refresh status
             </button>
             <button
               type="button"
               onClick={() => void copy('admin', window.location.href)}
-              className="rounded-xl border border-[#173f35]/15 bg-white/70 px-4 py-2.5 text-xs font-black text-[#173f35]"
+              className="scroll-button px-4 py-2.5 text-xs"
             >
               {copied === 'admin' ? 'Link copied' : 'Copy organizer link'}
             </button>
@@ -140,17 +144,17 @@ export function Manager({ token }: { token: string }) {
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="rounded-[28px] border border-[#173f35]/12 bg-[#fffdf7] p-5 shadow-[0_20px_55px_rgba(23,63,53,.08)] sm:p-8">
+          <section className="parchment-panel p-5 sm:p-8">
             <div className="flex flex-col gap-3 border-b border-[#173f35]/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e7d77]">Captain rankings</p>
-                <h2 className="mt-1 text-3xl font-black tracking-[-0.04em]">{readyCount} of {data.captains.length} ready</h2>
+                <h2 className="fantasy-title mt-1 text-3xl font-bold">{readyCount} of {data.captains.length} ready</h2>
                 <p className="mt-2 text-sm text-[#68766f]">Send each captain only the link next to their name.</p>
               </div>
               <button
                 type="button"
                 onClick={() => void copy('all', allCaptainLinks)}
-                className="self-start rounded-xl bg-[#173f35] px-4 py-2.5 text-xs font-black text-white"
+                className="iron-button self-start px-4 py-2.5 text-xs"
               >
                 {copied === 'all' ? 'Copied all links' : 'Copy all links'}
               </button>
@@ -158,9 +162,9 @@ export function Manager({ token }: { token: string }) {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {data.captains.map((captain) => (
-                <article className="rounded-2xl border border-[#173f35]/12 bg-white p-4" key={captain.id}>
+                <article className="parchment-card p-4" key={captain.id}>
                   <div className="flex items-center gap-3">
-                    <span className="grid h-11 w-11 place-items-center rounded-full bg-[#dce8df] text-sm font-black text-[#173f35]">{initials(captain.name)}</span>
+                    <span className="brand-rune grid h-11 w-11 place-items-center rounded-full text-sm font-black text-[#f4d77c]">{initials(captain.name)}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-black">{captain.name}</p>
                       <p className={`mt-0.5 text-xs font-bold ${captain.submittedAt ? 'text-[#2d6f5e]' : 'text-[#9a6e1a]'}`}>
@@ -172,7 +176,7 @@ export function Manager({ token }: { token: string }) {
                     <button
                       type="button"
                       onClick={() => void copy(captain.id, absoluteUrl(captain.path))}
-                      className="flex-1 rounded-xl border border-[#173f35]/15 px-3 py-2 text-xs font-black text-[#173f35]"
+                      className="scroll-button flex-1 px-3 py-2 text-xs"
                     >
                       {copied === captain.id ? 'Copied' : 'Copy link'}
                     </button>
@@ -180,7 +184,7 @@ export function Manager({ token }: { token: string }) {
                       href={captain.path}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-xl border border-[#173f35]/15 px-3 py-2 text-xs font-black text-[#173f35]"
+                      className="scroll-button px-3 py-2 text-xs"
                     >
                       Open ↗
                     </a>
@@ -190,33 +194,33 @@ export function Manager({ token }: { token: string }) {
             </div>
           </section>
 
-          <aside className="rounded-[28px] bg-[#173f35] p-6 text-white sm:p-8">
+          <aside className="wood-panel p-6 sm:p-8">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#ef9a78]">Run the draft</p>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Run the draft</p>
               <span className={`rounded-full px-3 py-1 text-[11px] font-black ${allReady ? 'bg-[#b9e3cd] text-[#174536]' : 'bg-white/10 text-[#c3d2cc]'}`}>
                 {allReady ? 'Ready' : `${data.captains.length - readyCount} waiting`}
               </span>
             </div>
-            <h2 className="mt-4 text-3xl font-black leading-none tracking-[-0.04em]">
+            <h2 className="fantasy-title mt-4 text-3xl font-bold leading-none">
               {data.result ? 'Run it again?' : allReady ? 'Everyone has weighed in.' : 'Rankings come first.'}
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-[#c5d3ce]">
+            <p className="mt-4 text-sm leading-relaxed text-[#cfc3a5]">
               {data.result
                 ? 'Rerunning replaces the current result using the latest captain rankings.'
                 : 'The button unlocks when every captain has submitted a complete ranked list.'}
             </p>
             <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-[#ef9a78] transition-all" style={{ width: `${(readyCount / data.captains.length) * 100}%` }} />
+              <div className="h-full rounded-full bg-[#d6ad4e] transition-all" style={{ width: `${(readyCount / data.captains.length) * 100}%` }} />
             </div>
             <button
               type="button"
               disabled={!allReady || running}
               onClick={() => void runDraft()}
-              className="mt-6 w-full rounded-xl bg-[#e16948] px-5 py-3.5 text-sm font-black text-white shadow-[0_4px_0_#9f3c26] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-[#60776f] disabled:shadow-none disabled:hover:translate-y-0"
+              className="gold-button mt-6 w-full px-5 py-3.5 text-sm"
             >
               {running ? 'Building teams…' : data.result ? 'Run draft again' : 'Run the draft →'}
             </button>
-            <p className="mt-4 text-xs leading-relaxed text-[#9fb5ad]">Avoid choices are treated as hard preferences. They are overridden only if every available team would otherwise be blocked.</p>
+            <p className="mt-4 text-xs leading-relaxed text-[#b8aa87]">Avoid choices are treated as hard preferences. They are overridden only if every available team would otherwise be blocked.</p>
           </aside>
         </div>
 
