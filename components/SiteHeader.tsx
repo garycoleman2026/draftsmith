@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AccountNav } from './AccountNav';
 
 export function SiteHeader({ badge }: { badge?: string }) {
   return (
@@ -13,11 +14,14 @@ export function SiteHeader({ badge }: { badge?: string }) {
             <span className="block text-[11px] font-bold uppercase tracking-[0.13em] text-[#a99a78]">Clan bingo team forge</span>
           </span>
         </Link>
-        {badge ? (
-          <span className="rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-xs font-bold text-[#ddc27b] shadow-inner">
-            {badge}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {badge ? (
+            <span className="hidden rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-xs font-bold text-[#ddc27b] shadow-inner sm:inline-flex">
+              {badge}
+            </span>
+          ) : null}
+          <AccountNav />
+        </div>
       </div>
     </header>
   );

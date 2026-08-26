@@ -2,6 +2,7 @@ import { getTargetTeamSizes } from './draft';
 
 export type RosterRule = {
   type: 'together' | 'apart';
+  enforcement?: 'hard' | 'soft';
   playerAId: string;
   playerBId: string;
 };
@@ -26,10 +27,11 @@ export function validateRosterRules(input: {
     if (aRoot !== bRoot) parent.set(bRoot, aRoot);
   };
 
-  for (const rule of input.rules) {
+  const hardRules = input.rules.filter((rule) => (rule.enforcement ?? 'hard') === 'hard');
+  for (const rule of hardRules) {
     if (rule.type === 'together') union(rule.playerAId, rule.playerBId);
   }
-  for (const rule of input.rules) {
+  for (const rule of hardRules) {
     if (rule.type === 'apart' && find(rule.playerAId) === find(rule.playerBId)) {
       return 'That rule conflicts with an existing together group.';
     }

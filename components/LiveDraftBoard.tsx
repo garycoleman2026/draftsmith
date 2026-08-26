@@ -1,12 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PlayerAnswer } from '../lib/types';
 import { PlayerIntel } from './PlayerIntel';
 
 type LivePlayer = { id: string; name: string; answers?: PlayerAnswer[] };
 type LiveState = {
   started: boolean;
+  order: 'snake' | 'linear' | 'random' | 'third_round_reversal';
+  pickSeconds: number;
+  autoPick: boolean;
+  paused: boolean;
+  turnStartedAt: string | null;
   currentCaptain: { id: string; name: string; teamIndex: number; turnNumber: number } | null;
   captains: { id: string; playerId: string; name: string; teamIndex: number }[];
   picks: { captainId: string; playerId: string; playerName: string; pickNumber: number; turnNumber: number }[];
@@ -30,6 +35,7 @@ export function LiveDraftBoard({
   const [search, setSearch] = useState('');
   const [picking, setPicking] = useState('');
   const [error, setError] = useState('');
+  const [now, setNow] = useState(() => Date.now());
   const playerById = useMemo(() => new Map(players.map((player) => [player.id, player] as const)), [players]);
   const captainPlayerById = useMemo(
     () => new Map(live.captains.map((captain) => [captain.playerId, { id: captain.playerId, name: captain.name }] as const)),
@@ -41,6 +47,20 @@ export function LiveDraftBoard({
     .filter((player): player is LivePlayer => Boolean(player))
     .filter((player) => player.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const myTurn = live.currentCaptain?.id === captainId;
+  const remainingSeconds = live.pickSeconds && live.turnStartedAt
+    ? Math.max(0, Math.ceil((Date.parse(live.turnStartedAt) + live.pickSeconds * 1000 - now) / 1000))
+    : null;
+
+  useEffect(() => {
+    if (!live.started || !live.pickSeconds || live.paused || !live.currentCaptain) return;
+    const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    const tick = live.autoPick ? window.setInterval(() => {
+      void fetch(`/api/rank/${encodeURIComponent(token)}/pick`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'tick' }),
+      }).then(() => onRefresh());
+    }, 3000) : null;
+    return () => { window.clearInterval(clock); if (tick) window.clearInterval(tick); };
+  }, [live.started, live.pickSeconds, live.paused, live.currentCaptain, live.autoPick, token, onRefresh]);
 
   async function pick(player: LivePlayer) {
     setPicking(player.id);
@@ -80,9 +100,10 @@ export function LiveDraftBoard({
           <div>
             <p className="text-sm font-black uppercase tracking-[0.12em] text-[#6e603f]">Available player pool</p>
             <h2 className="fantasy-title mt-1 text-3xl font-bold">
-              {myTurn ? 'Your pick.' : live.currentCaptain ? `${live.currentCaptain.name} is choosing.` : 'Draft complete.'}
+              {live.paused ? 'Draft paused.' : myTurn ? 'Your pick.' : live.currentCaptain ? `${live.currentCaptain.name} is choosing.` : 'Draft complete.'}
             </h2>
             <p className="mt-2 text-xs text-[#6d6048]">The board refreshes automatically. Together rules select the connected group in one turn.</p>
+            {remainingSeconds !== null ? <p className="mt-2 text-sm font-black text-[#7d3a23]">{remainingSeconds}s remaining{live.autoPick ? ' · auto-pick armed' : ''}</p> : null}
           </div>
           <input
             className="realm-field h-11 w-full px-3 text-sm font-semibold outline-none sm:w-56"
@@ -97,7 +118,7 @@ export function LiveDraftBoard({
             const rules = live.constraints.filter((rule) => rule.playerAId === player.id || rule.playerBId === player.id);
             return (
               <article className="parchment-card flex min-w-0 flex-col p-4" key={player.id}>
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <h3 className="truncate font-black">{player.name}</h3>
                     {rules.length ? (
@@ -112,7 +133,7 @@ export function LiveDraftBoard({
                   <button
                     type="button"
                     className="gold-button shrink-0 whitespace-nowrap px-3 py-2 text-xs"
-                    disabled={!myTurn || Boolean(picking)}
+                    disabled={!myTurn || live.paused || Boolean(picking)}
                     onClick={() => void pick(player)}
                   >
                     {picking === player.id ? 'Picking…' : 'Pick'}

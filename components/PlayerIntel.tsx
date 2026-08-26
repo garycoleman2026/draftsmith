@@ -17,7 +17,10 @@ type InsightData = {
     updatedAt: string | null;
     weeklyExperience: number | null;
     weeklyEhp: number | null;
+    raidsScore: number | null;
+    bossHighlights: { name: string; kills: number }[];
   } | null;
+  cache: { state: 'fresh' | 'refreshed' | 'stale'; fetchedAt: string; expiresAt: string };
 };
 
 export function PlayerIntel({
@@ -89,8 +92,11 @@ export function PlayerIntel({
                 <Stat label="7-day XP" value={data.wiseOldMan?.weeklyExperience} compact />
                 <Stat label="7-day EHP" value={data.wiseOldMan?.weeklyEhp} decimals={2} />
                 <Stat label="Overall rank" value={data.official?.rank} compact />
+                <Stat label="Raid KC" value={data.wiseOldMan?.raidsScore} compact />
               </div>
             ) : null}
+            {data?.cache ? <p className={`mt-2 text-[10px] font-bold ${data.cache.state === 'stale' ? 'text-[#8f3522]' : 'text-[#6b5b3c]'}`}>{data.cache.state === 'stale' ? 'Showing stale fallback' : 'Cached'} · checked {new Date(data.cache.fetchedAt).toLocaleString()}</p> : null}
+            {data?.wiseOldMan?.bossHighlights?.length ? <p className="mt-2 text-[11px] text-[#5f5239]">Top boss KC: {data.wiseOldMan.bossHighlights.slice(0, 4).map((boss) => `${boss.name} ${boss.kills}`).join(' · ')}</p> : null}
           </div>
         </div>
       ) : null}

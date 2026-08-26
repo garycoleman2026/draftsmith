@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { absoluteUrl, copyText, initials } from '../lib/client';
-import type { DraftType, RosterMode, SurveyQuestion } from '../lib/types';
+import type { BalancePreset, DraftType, LiveOrder, QuestionVisibility, RosterMode, SurveyQuestion } from '../lib/types';
+import { validateRsn } from '../lib/validation';
 import { SiteHeader } from './SiteHeader';
 import { SurveyBuilder } from './SurveyBuilder';
 
 type CreatedDraft = {
+  id: string;
   adminPath: string;
   joinPath: string | null;
   captains: { name: string; teamIndex: number; path: string }[];
@@ -36,19 +38,25 @@ const DRAFT_OPTIONS: { id: DraftType; title: string; description: string }[] = [
 ];
 
 const DEFAULT_SURVEY: SurveyQuestion[] = [
-  { label: 'Discord name', fieldType: 'short', required: true, options: [] },
-  { label: 'Expected playtime during the event (hours)', fieldType: 'number', required: true, options: [] },
+  { label: 'Discord name', fieldType: 'short', required: true, options: [], visibility: 'organizer' },
+  { label: 'Expected playtime during the event (hours)', fieldType: 'number', required: true, options: [], visibility: 'captains', balanceMetric: 'playtime', balanceWeight: 100 },
   {
     label: 'How would you rate your game knowledge?',
     fieldType: 'choice',
     required: true,
     options: ['Learning', 'Comfortable', 'Experienced', 'Expert'],
+    visibility: 'captains',
+    balanceMetric: 'knowledge',
+    balanceWeight: 40,
   },
   {
     label: 'How would you rate your current gear?',
     fieldType: 'choice',
     required: true,
     options: ['Developing', 'Mid-game', 'Late-game', 'End-game'],
+    visibility: 'captains',
+    balanceMetric: 'gear',
+    balanceWeight: 35,
   },
 ];
 
@@ -59,6 +67,18 @@ export function CreateDraft() {
   const [teamCount, setTeamCount] = useState(3);
   const [rosterMode, setRosterMode] = useState<RosterMode>('import');
   const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>(DEFAULT_SURVEY);
+  const [clans, setClans] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [clanId, setClanId] = useState('');
+  const [registrationCapacity, setRegistrationCapacity] = useState(120);
+  const [signupApprovalMode, setSignupApprovalMode] = useState(false);
+  const [registrationDeadline, setRegistrationDeadline] = useState('');
+  const [rankingDeadline, setRankingDeadline] = useState('');
+  const [answersVisibility, setAnswersVisibility] = useState<QuestionVisibility>('captains');
+  const [balancePreset, setBalancePreset] = useState<BalancePreset>('consensus');
+  const [liveOrder, setLiveOrder] = useState<LiveOrder>('snake');
+  const [livePickSeconds, setLivePickSeconds] = useState(0);
+  const [liveAutoPick, setLiveAutoPick] = useState(false);
+  const [invalidNames, setInvalidNames] = useState<string[]>([]);
   const [rawList, setRawList] = useState('');
   const [players, setPlayers] = useState<string[]>([]);
   const [captains, setCaptains] = useState<string[]>([]);
@@ -69,15 +89,32 @@ export function CreateDraft() {
   const [copied, setCopied] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/auth/session', { cache: 'no-store' })
+      .then((response) => response.json() as Promise<{ clans?: { id: string; name: string; role: string }[] }>)
+      .then((session) => {
+        if (!active || !session.clans) return;
+        const manageable = session.clans.filter((clan) => clan.role === 'owner' || clan.role === 'admin');
+        setClans(manageable);
+        if (manageable.length === 1) setClanId(manageable[0].id);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   function importPlayers(value: string) {
     setRawList(value);
     const parsed = parsePlayerNames(value);
     setPlayers(parsed.names);
+    setInvalidNames(parsed.invalid);
     setImportNote(
       parsed.names.length
         ? `${parsed.names.length} player${parsed.names.length === 1 ? '' : 's'} ready${
             parsed.duplicates ? ` · ${parsed.duplicates} duplicate${parsed.duplicates === 1 ? '' : 's'} removed` : ''
-          }`
+          }${parsed.invalid.length ? ` · ${parsed.invalid.length} invalid` : ''}`
         : '',
     );
     setError('');
@@ -93,6 +130,10 @@ export function CreateDraft() {
   }
 
   function continueToCaptains() {
+    if (invalidNames.length) {
+      setError(`Fix invalid in-game name${invalidNames.length === 1 ? '' : 's'}: ${invalidNames.slice(0, 5).join(', ')}`);
+      return;
+    }
     if (players.length < teamCount) {
       setError(`Add at least ${teamCount} players for ${teamCount} teams.`);
       return;
@@ -134,6 +175,17 @@ export function CreateDraft() {
           players,
           captainNames: captains,
           surveyQuestions,
+          clanId: clanId || null,
+          registrationCapacity,
+          signupApprovalMode,
+          registrationDeadline: localDateToIso(registrationDeadline),
+          rankingDeadline: localDateToIso(rankingDeadline),
+          answersVisibility,
+          balancePreset,
+          liveOrder,
+          livePickSeconds,
+          liveAutoPick,
+          website: '',
         }),
       });
       const data = (await response.json()) as CreatedDraft & { error?: string };
@@ -286,6 +338,83 @@ export function CreateDraft() {
                   ))}
                 </div>
               </fieldset>
+
+              <details className="mt-6 rounded border border-[#8b6a32]/45 bg-[#f6e7bd]/45 p-4">
+                <summary className="cursor-pointer list-none font-black">
+                  Fairness and event controls <span className="ml-1 text-xs font-semibold text-[#756748]">deadlines, balancing, live turns</span>
+                </summary>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {clans.length ? (
+                    <label className="grid gap-2 text-xs font-black">
+                      Save to clan workspace
+                      <select className="realm-field h-11 px-3 outline-none" value={clanId} onChange={(event) => setClanId(event.target.value)}>
+                        <option value="">Private organizer link only</option>
+                        {clans.map((clan) => <option key={clan.id} value={clan.id}>{clan.name}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
+                  <label className="grid gap-2 text-xs font-black">
+                    Balance preset
+                    <select className="realm-field h-11 px-3 outline-none" value={balancePreset} onChange={(event) => setBalancePreset(event.target.value as BalancePreset)}>
+                      <option value="consensus">Captain consensus</option>
+                      <option value="all_rounder">All-rounder</option>
+                      <option value="pvm">PvM weighted</option>
+                      <option value="skilling">Skilling weighted</option>
+                      <option value="raids">Raids weighted</option>
+                      <option value="custom">Custom survey weights</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-xs font-black">
+                    Ranking deadline <span className="font-semibold text-[#756748]">optional</span>
+                    <input className="realm-field h-11 px-3 outline-none" type="datetime-local" value={rankingDeadline} onChange={(event) => setRankingDeadline(event.target.value)} />
+                  </label>
+                  {rosterMode === 'signup' ? (
+                    <>
+                      <label className="grid gap-2 text-xs font-black">
+                        Registration capacity
+                        <input className="realm-field h-11 px-3 outline-none" type="number" min={teamCount} max={120} value={registrationCapacity} onChange={(event) => setRegistrationCapacity(Number(event.target.value) || teamCount)} />
+                      </label>
+                      <label className="grid gap-2 text-xs font-black">
+                        Registration deadline <span className="font-semibold text-[#756748]">optional</span>
+                        <input className="realm-field h-11 px-3 outline-none" type="datetime-local" value={registrationDeadline} onChange={(event) => setRegistrationDeadline(event.target.value)} />
+                      </label>
+                      <label className="grid gap-2 text-xs font-black">
+                        Default answer visibility
+                        <select className="realm-field h-11 px-3 outline-none" value={answersVisibility} onChange={(event) => setAnswersVisibility(event.target.value as QuestionVisibility)}>
+                          <option value="organizer">Organizer only</option>
+                          <option value="captains">Organizer and captains</option>
+                          <option value="public">Public event profile</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-3 rounded border border-[#8b6a32]/35 bg-[#fff2ca]/60 p-3 text-xs font-black sm:self-end">
+                        <input type="checkbox" checked={signupApprovalMode} onChange={(event) => setSignupApprovalMode(event.target.checked)} />
+                        Organizer approval required
+                      </label>
+                    </>
+                  ) : null}
+                  {draftType === 'live' ? (
+                    <>
+                      <label className="grid gap-2 text-xs font-black">
+                        Live pick order
+                        <select className="realm-field h-11 px-3 outline-none" value={liveOrder} onChange={(event) => setLiveOrder(event.target.value as LiveOrder)}>
+                          <option value="snake">Snake</option>
+                          <option value="linear">Linear</option>
+                          <option value="random">Randomized snake</option>
+                          <option value="third_round_reversal">Third-round reversal</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-2 text-xs font-black">
+                        Pick timer in seconds <span className="font-semibold text-[#756748]">0 disables</span>
+                        <input className="realm-field h-11 px-3 outline-none" type="number" min={0} max={900} value={livePickSeconds} onChange={(event) => setLivePickSeconds(Number(event.target.value) || 0)} />
+                      </label>
+                      <label className="flex items-center gap-3 rounded border border-[#8b6a32]/35 bg-[#fff2ca]/60 p-3 text-xs font-black sm:col-span-2">
+                        <input type="checkbox" checked={liveAutoPick} onChange={(event) => setLiveAutoPick(event.target.checked)} />
+                        Auto-pick from the captain’s private ranking when the timer expires
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+              </details>
 
               {rosterMode === 'import' ? <div className="mt-6">
                 <div className="mb-2 flex items-center justify-between gap-3">
@@ -522,19 +651,24 @@ function parsePlayerNames(value: string) {
   }
   const seen = new Set<string>();
   const names: string[] = [];
+  const invalid: string[] = [];
   let duplicates = 0;
   for (const line of lines) {
     const firstCell = readFirstCell(line).trim().replace(/^[-•]\s*/, '').replace(/\s+/g, ' ');
     if (!firstCell || /^(name|player|player name)$/i.test(firstCell)) continue;
+    if (validateRsn(firstCell)) {
+      invalid.push(firstCell);
+      continue;
+    }
     const key = firstCell.toLocaleLowerCase();
     if (seen.has(key)) {
       duplicates += 1;
       continue;
     }
     seen.add(key);
-    names.push(firstCell.slice(0, 80));
+    names.push(firstCell);
   }
-  return { names, duplicates };
+  return { names, duplicates, invalid };
 }
 
 function readFirstCell(line: string) {
@@ -552,4 +686,10 @@ function readFirstCell(line: string) {
     }
   }
   return value;
+}
+
+function localDateToIso(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }

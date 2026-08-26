@@ -1,5 +1,5 @@
-import { getTargetTeamSizes, snakeTeamPosition, type CaptainRow, type ConstraintRow, type PlayerRow } from './draft';
-import type { DraftResult } from './types';
+import { getTargetTeamSizes, liveTeamPosition, type CaptainRow, type ConstraintRow, type PlayerRow } from './draft';
+import type { DraftResult, LiveOrder } from './types';
 
 export type LivePickRow = {
   captain_id: string;
@@ -9,30 +9,70 @@ export type LivePickRow = {
   picked_at: string;
 };
 
+export type LiveTurnActionRow = {
+  captain_id: string;
+  turn_number: number;
+  action: 'pick' | 'pass' | 'skip' | 'auto';
+  player_ids_json?: string | null;
+  created_at: string;
+};
+
 export function getLiveTurn(input: {
   totalPlayers: number;
   captains: CaptainRow[];
   picks: LivePickRow[];
+  actions?: LiveTurnActionRow[];
+  order?: LiveOrder;
+  randomSeed?: string;
 }) {
-  const captains = [...input.captains].sort((a, b) => a.team_index - b.team_index);
+  const captains = getLiveCaptainOrder(input.captains, input.order, input.randomSeed);
   if (!captains.length) return null;
   const targetSizes = getTargetTeamSizes(input.totalPlayers, captains.length);
   const pickCountByCaptain = new Map<string, number>();
   for (const pick of input.picks) {
     pickCountByCaptain.set(pick.captain_id, (pickCountByCaptain.get(pick.captain_id) ?? 0) + 1);
   }
-  let turnNumber = input.picks.length
-    ? Math.max(...input.picks.map((pick) => pick.turn_number)) + 1
-    : 0;
+  const completedTurns = [
+    ...input.picks.map((pick) => pick.turn_number),
+    ...(input.actions ?? []).map((action) => action.turn_number),
+  ];
+  let turnNumber = completedTurns.length ? Math.max(...completedTurns) + 1 : 0;
   const maxChecks = input.totalPlayers * captains.length + captains.length + 10;
   for (let check = 0; check < maxChecks; check += 1) {
-    const position = snakeTeamPosition(turnNumber, captains.length);
+    const position = liveTeamPosition(
+      turnNumber,
+      captains.length,
+      input.order === 'random' ? 'snake' : input.order ?? 'snake',
+    );
     const captain = captains[position];
     const teamSize = 1 + (pickCountByCaptain.get(captain.id) ?? 0);
     if (teamSize < (targetSizes[position] ?? 1)) return { turnNumber, captain };
     turnNumber += 1;
   }
   return null;
+}
+
+export function getLiveCaptainOrder(captains: CaptainRow[], order?: LiveOrder, randomSeed?: string) {
+  const ordered = [...captains].sort((a, b) => a.team_index - b.team_index);
+  return order === 'random' ? stableShuffle(ordered, randomSeed ?? 'live-draft') : ordered;
+}
+
+function stableShuffle<T>(values: T[], seedValue: string) {
+  const copy = [...values];
+  let state = 2166136261;
+  for (const character of seedValue) {
+    state ^= character.charCodeAt(0);
+    state = Math.imul(state, 16777619);
+  }
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
 }
 
 export function getTogetherGroupIds(
@@ -46,6 +86,7 @@ export function getTogetherGroupIds(
   while (changed) {
     changed = false;
     for (const constraint of constraints) {
+      if ((constraint.enforcement ?? 'hard') !== 'hard') continue;
       if (constraint.constraint_type !== 'together') continue;
       if (connected.has(constraint.player_a_id) && !connected.has(constraint.player_b_id)) {
         connected.add(constraint.player_b_id);
@@ -68,6 +109,7 @@ export function hasApartConflict(
   const combined = new Set([...currentTeamIds, ...incomingIds]);
   return constraints.some(
     (constraint) =>
+      (constraint.enforcement ?? 'hard') === 'hard' &&
       constraint.constraint_type === 'apart' &&
       combined.has(constraint.player_a_id) &&
       combined.has(constraint.player_b_id),

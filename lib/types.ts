@@ -1,6 +1,12 @@
 export type DraftType = 'balanced' | 'snake' | 'random' | 'live';
 export type RosterMode = 'import' | 'signup';
 export type SurveyFieldType = 'short' | 'long' | 'number' | 'choice';
+export type QuestionVisibility = 'organizer' | 'captains' | 'public';
+export type BalanceMetric = 'playtime' | 'pvm' | 'skilling' | 'raids' | 'gear' | 'knowledge';
+export type BalancePreset = 'consensus' | 'all_rounder' | 'pvm' | 'skilling' | 'raids' | 'custom';
+export type ConstraintEnforcement = 'hard' | 'soft';
+export type LiveOrder = 'snake' | 'linear' | 'random' | 'third_round_reversal';
+export type DraftLifecycle = 'registration' | 'rankings' | 'live' | 'complete' | 'archived';
 
 export type SurveyQuestion = {
   id?: string;
@@ -8,6 +14,9 @@ export type SurveyQuestion = {
   fieldType: SurveyFieldType;
   required: boolean;
   options: string[];
+  visibility?: QuestionVisibility;
+  balanceMetric?: BalanceMetric | null;
+  balanceWeight?: number;
 };
 
 export type PlayerAnswer = {
@@ -29,6 +38,7 @@ export type ResultPlayer = {
   name: string;
   averageRank?: number | null;
   averageScore: number | null;
+  compositeScore?: number | null;
 };
 
 export type ResultTeam = {
@@ -37,6 +47,18 @@ export type ResultTeam = {
   players: ResultPlayer[];
   averageRank?: number | null;
   averageScore: number | null;
+  compositeStrength?: number | null;
+};
+
+export type FairnessReport = {
+  objectiveScore: number;
+  strengthSpread: number;
+  standardDeviation: number;
+  teamStrengths: { teamIndex: number; strength: number; size: number }[];
+  metricSpreads: Record<string, number>;
+  hardConstraintsSatisfied: boolean;
+  softViolations: number;
+  avoidViolations: number;
 };
 
 export type DraftResult = {
@@ -45,6 +67,9 @@ export type DraftResult = {
   teams: ResultTeam[];
   avoidOverrides: number;
   constraintOverrides: number;
+  seed?: string;
+  runNumber?: number;
+  fairness?: FairnessReport;
 };
 
 export const DRAFT_TYPE_LABELS: Record<DraftType, string> = {

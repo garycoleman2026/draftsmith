@@ -7,6 +7,7 @@ import { DRAFT_TYPE_LABELS, type DraftResult, type DraftType, type PlayerAnswer,
 import { PlayerIntel } from './PlayerIntel';
 import { ResultGrid } from './ResultGrid';
 import { SiteHeader } from './SiteHeader';
+import { AdvancedOrganizerTools } from './AdvancedOrganizerTools';
 
 type DashboardPlayer = {
   id: string;
@@ -15,6 +16,8 @@ type DashboardPlayer = {
   source: string;
   created_at: string | null;
   answers: PlayerAnswer[];
+  signup_status: 'approved' | 'pending' | 'waitlisted' | 'rejected' | 'withdrawn';
+  withdrawn_at: string | null;
 };
 
 type DashboardCaptain = {
@@ -22,13 +25,17 @@ type DashboardCaptain = {
   playerId: string;
   name: string;
   teamIndex: number;
-  path: string;
+  path: string | null;
   submittedAt: string | null;
+  rankingRevision: number;
+  rankingsFrozenAt: string | null;
 };
 
 type DashboardConstraint = {
   id: string;
   type: 'together' | 'apart';
+  enforcement: 'hard' | 'soft';
+  penalty: number;
   playerA: { id: string; name: string };
   playerB: { id: string; name: string };
 };
@@ -39,16 +46,31 @@ type DashboardLive = {
   picks: { captainId: string; playerId: string; playerName: string; pickNumber: number; turnNumber: number; pickedAt: string }[];
   availablePlayerIds: string[];
   currentCaptain: { id: string; name: string; teamIndex: number; turnNumber: number } | null;
+  order: 'snake' | 'linear' | 'random' | 'third_round_reversal';
+  pickSeconds: number;
+  autoPick: boolean;
+  paused: boolean;
+  actions: { captain_id: string; turn_number: number; action: string; created_at: string }[];
 };
 
 type DashboardData = {
   draft: {
+    id: string;
     title: string;
     draftType: DraftType;
     teamCount: number;
     rosterMode: RosterMode;
     status: string;
     createdAt: string;
+    registrationCapacity: number;
+    signupApprovalMode: boolean;
+    registrationDeadline: string | null;
+    rankingDeadline: string | null;
+    answersVisibility: 'organizer' | 'captains' | 'public';
+    balancePreset: string;
+    publicPath: string | null;
+    clanId: string | null;
+    archivedAt: string | null;
   };
   joinPath: string | null;
   registrationOpen: boolean;
@@ -57,6 +79,8 @@ type DashboardData = {
   captains: DashboardCaptain[];
   constraints: DashboardConstraint[];
   live: DashboardLive | null;
+  runs: { id: string; run_number: number; source: string; seed: string; created_at: string; fairness: Record<string, unknown> }[];
+  audit: { event_type: string; actor_type: string; created_at: string; metadata: Record<string, unknown> }[];
   result: DraftResult | null;
 };
 
@@ -64,6 +88,7 @@ export function Manager({ token }: { token: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [captainSelection, setCaptainSelection] = useState<string[]>([]);
   const [ruleType, setRuleType] = useState<'together' | 'apart'>('together');
+  const [ruleEnforcement, setRuleEnforcement] = useState<'hard' | 'soft'>('hard');
   const [playerAId, setPlayerAId] = useState('');
   const [playerBId, setPlayerBId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -71,6 +96,7 @@ export function Manager({ token }: { token: string }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [copied, setCopied] = useState('');
+  const [issuedLinks, setIssuedLinks] = useState<Record<string, string>>({});
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -103,25 +129,27 @@ export function Manager({ token }: { token: string }) {
     };
   }, [load]);
 
-  async function mutate(action: string, path: string, init: RequestInit, message: string) {
+  async function mutate<T = { error?: string }>(action: string, path: string, init: RequestInit, message: string): Promise<T | null> {
     setWorking(action);
     setError('');
     setSuccess('');
     try {
       const response = await fetch(path, init);
-      const next = (await response.json()) as { error?: string };
+      const next = (await response.json()) as T & { error?: string };
       if (!response.ok) throw new Error(next.error || 'That change could not be saved.');
       await load(true);
       setSuccess(message);
+      return next;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'That change could not be saved.');
+      return null;
     } finally {
       setWorking('');
     }
   }
 
   async function saveCaptains() {
-    await mutate(
+    const next = await mutate<{ captains: DashboardCaptain[] }>(
       'captains',
       `/api/manage/${encodeURIComponent(token)}/captains`,
       {
@@ -131,6 +159,17 @@ export function Manager({ token }: { token: string }) {
       },
       'Captain seats saved. Fresh private links are ready below.',
     );
+    if (next) setIssuedLinks(Object.fromEntries(next.captains.flatMap((captain) => captain.path ? [[captain.id, captain.path]] : [])));
+  }
+
+  async function issueCaptainLinks(captainId?: string) {
+    const next = await mutate<{ links: { captainId: string; path: string }[] }>(
+      captainId ? `link-${captainId}` : 'links',
+      `/api/manage/${encodeURIComponent(token)}/captains/links`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ captainId }) },
+      captainId ? 'A fresh private captain link is ready.' : 'Fresh private links are ready for every captain.',
+    );
+    if (next) setIssuedLinks((current) => ({ ...current, ...Object.fromEntries(next.links.map((link) => [link.captainId, link.path])) }));
   }
 
   async function addConstraint() {
@@ -140,7 +179,7 @@ export function Manager({ token }: { token: string }) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: ruleType, playerAId, playerBId }),
+        body: JSON.stringify({ type: ruleType, enforcement: ruleEnforcement, playerAId, playerBId }),
       },
       'Roster rule added.',
     );
@@ -237,11 +276,15 @@ export function Manager({ token }: { token: string }) {
   }
 
   const isLive = data.draft.draftType === 'live';
+  const activePlayers = data.players.filter((player) => player.signup_status === 'approved' && !player.withdrawn_at);
   const readyCount = data.captains.filter((captain) => captain.submittedAt).length;
   const captainsReady = data.captains.length === data.draft.teamCount;
-  const allReady = captainsReady && readyCount === data.captains.length;
+  const allReady = captainsReady && (data.draft.draftType === 'random' || readyCount === data.captains.length);
   const captainSelectionValid = captainSelection.length === data.draft.teamCount && captainSelection.every(Boolean) && new Set(captainSelection).size === data.draft.teamCount;
-  const allCaptainLinks = data.captains.map((captain) => `${captain.name}: ${absoluteUrl(captain.path)}`).join('\n');
+  const allCaptainLinks = data.captains.flatMap((captain) => {
+    const path = issuedLinks[captain.id] ?? captain.path;
+    return path ? [`${captain.name}: ${absoluteUrl(path)}`] : [];
+  }).join('\n');
   const joinUrl = data.joinPath ? absoluteUrl(data.joinPath) : '';
 
   return (
@@ -314,7 +357,7 @@ export function Manager({ token }: { token: string }) {
                     onChange={(event) => setCaptainSelection((current) => current.map((value, slot) => slot === index ? event.target.value : value))}
                   >
                     <option value="">Select a captain</option>
-                    {data.players.map((player) => (
+                    {activePlayers.map((player) => (
                       <option value={player.id} disabled={captainSelection.some((selected, slot) => slot !== index && selected === player.id)} key={player.id}>{player.name}</option>
                     ))}
                   </select>
@@ -332,18 +375,19 @@ export function Manager({ token }: { token: string }) {
               <h2 className="fantasy-title mt-1 text-3xl font-bold">Keep together or apart.</h2>
               <p className="mt-2 text-sm text-[#68766f]">Together rules can chain into groups. Live drafts enforce the whole group as one pick.</p>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <select className="realm-field h-11 px-3 text-sm font-bold outline-none" value={ruleType} disabled={Boolean(data.live?.started)} onChange={(event) => setRuleType(event.target.value as 'together' | 'apart')}>
                 <option value="together">Keep together</option>
                 <option value="apart">Keep apart</option>
               </select>
+              <select className="realm-field h-11 px-3 text-sm font-bold outline-none" value={ruleEnforcement} disabled={Boolean(data.live?.started)} onChange={(event) => setRuleEnforcement(event.target.value as 'hard' | 'soft')}><option value="hard">Hard rule · never break</option><option value="soft">Soft preference · penalize</option></select>
               <select className="realm-field h-11 min-w-0 px-3 text-sm font-bold outline-none" value={playerAId} disabled={Boolean(data.live?.started)} onChange={(event) => setPlayerAId(event.target.value)}>
                 <option value="">First player</option>
-                {data.players.map((player) => <option value={player.id} key={player.id}>{player.name}</option>)}
+                {activePlayers.map((player) => <option value={player.id} key={player.id}>{player.name}</option>)}
               </select>
               <select className="realm-field h-11 min-w-0 px-3 text-sm font-bold outline-none" value={playerBId} disabled={Boolean(data.live?.started)} onChange={(event) => setPlayerBId(event.target.value)}>
                 <option value="">Second player</option>
-                {data.players.map((player) => <option value={player.id} key={player.id}>{player.name}</option>)}
+                {activePlayers.map((player) => <option value={player.id} key={player.id}>{player.name}</option>)}
               </select>
             </div>
             <button type="button" disabled={!playerAId || !playerBId || playerAId === playerBId || working === 'constraint' || Boolean(data.live?.started)} onClick={() => void addConstraint()} className="iron-button mt-3 px-4 py-2.5 text-xs">
@@ -352,7 +396,7 @@ export function Manager({ token }: { token: string }) {
             <div className="mt-5 space-y-2">
               {data.constraints.map((constraint) => (
                 <div className={`flex items-center gap-3 rounded border px-3 py-2.5 text-sm font-bold ${constraint.type === 'together' ? 'border-[#78905f]/45 bg-[#dce1b9]' : 'border-[#b76549]/45 bg-[#edc4ae]'}`} key={constraint.id}>
-                  <span className="min-w-0 flex-1">{constraint.playerA.name} <span className="text-[10px] uppercase tracking-[0.08em]">{constraint.type}</span> {constraint.playerB.name}</span>
+                  <span className="min-w-0 flex-1">{constraint.playerA.name} <span className="text-[10px] uppercase tracking-[0.08em]">{constraint.type}</span> {constraint.playerB.name} <span className="ml-1 rounded bg-black/10 px-1.5 py-0.5 text-[9px] uppercase">{constraint.enforcement}</span></span>
                   <button type="button" disabled={working === `remove-${constraint.id}` || Boolean(data.live?.started)} onClick={() => void removeConstraint(constraint.id)} className="rounded border border-current px-2 py-1 text-[10px] uppercase">Remove</button>
                 </div>
               ))}
@@ -369,13 +413,15 @@ export function Manager({ token }: { token: string }) {
                 <h2 className="fantasy-title mt-1 text-3xl font-bold">{isLive ? `${data.live?.picks.length ?? 0} live picks made` : `${readyCount} of ${data.captains.length} ready`}</h2>
                 <p className="mt-2 text-sm text-[#68766f]">Send each captain only the private link next to their name.</p>
               </div>
-              <button type="button" disabled={!data.captains.length} onClick={() => void copy('all', allCaptainLinks)} className="iron-button self-start px-4 py-2.5 text-xs">
-                {copied === 'all' ? 'Copied all links' : 'Copy all links'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={!data.captains.length || working === 'links'} onClick={() => void issueCaptainLinks()} className="iron-button self-start px-4 py-2.5 text-xs">{working === 'links' ? 'Issuing…' : 'Issue fresh links'}</button>
+                <button type="button" disabled={!allCaptainLinks} onClick={() => void copy('all', allCaptainLinks)} className="iron-button self-start px-4 py-2.5 text-xs">{copied === 'all' ? 'Copied all links' : 'Copy issued links'}</button>
+              </div>
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {data.captains.map((captain) => {
                 const captainPicks = data.live?.picks.filter((pick) => pick.captainId === captain.id) ?? [];
+                const captainPath = issuedLinks[captain.id] ?? captain.path;
                 return (
                   <article className="parchment-card p-4" key={captain.id}>
                     <div className="flex items-center gap-3">
@@ -389,8 +435,9 @@ export function Manager({ token }: { token: string }) {
                     </div>
                     {captainPicks.length ? <p className="mt-3 text-xs leading-relaxed text-[#67583e]">{captainPicks.map((pick) => pick.playerName).join(' · ')}</p> : null}
                     <div className="mt-4 flex gap-2">
-                      <button type="button" onClick={() => void copy(captain.id, absoluteUrl(captain.path))} className="scroll-button flex-1 px-3 py-2 text-xs">{copied === captain.id ? 'Copied' : 'Copy link'}</button>
-                      <a href={captain.path} target="_blank" rel="noreferrer" className="scroll-button px-3 py-2 text-xs">Open ↗</a>
+                      {captainPath ? <><button type="button" onClick={() => void copy(captain.id, absoluteUrl(captainPath))} className="scroll-button flex-1 px-3 py-2 text-xs">{copied === captain.id ? 'Copied' : 'Copy link'}</button>
+                      <a href={captainPath} target="_blank" rel="noreferrer" className="scroll-button px-3 py-2 text-xs">Open ↗</a></> :
+                        <button type="button" disabled={working === `link-${captain.id}`} onClick={() => void issueCaptainLinks(captain.id)} className="scroll-button flex-1 px-3 py-2 text-xs">{working === `link-${captain.id}` ? 'Issuing…' : 'Issue private link'}</button>}
                     </div>
                   </article>
                 );
@@ -446,6 +493,8 @@ export function Manager({ token }: { token: string }) {
             ))}
           </div>
         </details>
+
+        <AdvancedOrganizerTools token={token} data={data} onRefresh={() => load(true)} onMessage={(message, isError) => { if (isError) setError(message); else setSuccess(message); }} />
 
         {data.result ? <div className="mt-12 scroll-mt-6" id="results"><ResultGrid result={data.result} title={data.draft.title} /></div> : null}
       </section>

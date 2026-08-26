@@ -1,5 +1,10 @@
+import { createHashedCredential, resolveSignupDraftId } from '../../../../lib/access-tokens';
+import { recordAudit, requestId } from '../../../../lib/audit';
 import { ensureSchema, getDatabase, json } from '../../../../lib/db';
+import { enforceRateLimit, RateLimitError, rateLimitResponse } from '../../../../lib/rate-limit';
 import type { DraftType, SurveyFieldType } from '../../../../lib/types';
+import { cleanRsn, hasBotTrap, isExpired, MAX_ROSTER_SIZE, normalizeRsn, validateRsn } from '../../../../lib/validation';
+import { scheduleDiscordEvent } from '../../../../lib/discord-webhooks';
 
 type DraftRow = {
   id: string;
@@ -7,6 +12,10 @@ type DraftRow = {
   draft_type: DraftType;
   team_count: number;
   registration_open: number;
+  registration_capacity: number;
+  signup_approval_mode: number;
+  registration_deadline: string | null;
+  clan_id: string | null;
 };
 type QuestionRow = {
   id: string;
@@ -18,12 +27,15 @@ type QuestionRow = {
 };
 
 async function findDraft(token: string) {
+  const draftId = await resolveSignupDraftId(token);
+  if (!draftId) return null;
   return getDatabase()
     .prepare(
-      `SELECT id, title, draft_type, team_count, registration_open
-       FROM drafts WHERE signup_token = ?`,
+      `SELECT id, title, draft_type, team_count, registration_open,
+              registration_capacity, signup_approval_mode, registration_deadline, clan_id
+       FROM drafts WHERE id = ?`,
     )
-    .bind(token)
+    .bind(draftId)
     .first<DraftRow>();
 }
 
@@ -46,7 +58,7 @@ export async function GET(
         .bind(draft.id)
         .all<QuestionRow>(),
       db
-        .prepare('SELECT COUNT(*) AS count FROM players WHERE draft_id = ?')
+        .prepare("SELECT COUNT(*) AS count FROM players WHERE draft_id = ? AND withdrawn_at IS NULL")
         .bind(draft.id)
         .first<{ count: number }>(),
     ]);
@@ -56,6 +68,9 @@ export async function GET(
         draftType: draft.draft_type,
         teamCount: draft.team_count,
         registrationOpen: Boolean(draft.registration_open),
+        registrationCapacity: draft.registration_capacity,
+        registrationDeadline: draft.registration_deadline,
+        approvalRequired: Boolean(draft.signup_approval_mode),
       },
       signupCount: countRow?.count ?? 0,
       questions: questions.results.map(mapQuestion),
@@ -73,25 +88,24 @@ export async function POST(
   try {
     await ensureSchema();
     const { token } = await context.params;
+    await enforceRateLimit({ request, scope: 'event-signup', limit: 8, windowSeconds: 3600 });
     const draft = await findDraft(token);
     if (!draft) return json({ error: 'This signup link is not valid.' }, { status: 404 });
-    if (!draft.registration_open) {
+    if (!draft.registration_open || isExpired(draft.registration_deadline)) {
       return json({ error: 'Registration is closed for this event.' }, { status: 409 });
     }
     const body = (await request.json()) as { name?: unknown; answers?: unknown };
-    const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
-    if (!name || name.length > 12 || !/^[A-Za-z0-9 _-]+$/.test(name)) {
-      return json(
-        { error: 'Enter a valid in-game name using up to 12 letters, numbers, spaces, - or _.' },
-        { status: 400 },
-      );
-    }
+    if (hasBotTrap(body as Record<string, unknown>)) return json({ error: 'Your signup could not be saved.' }, { status: 400 });
+    const name = typeof body.name === 'string' ? cleanRsn(body.name) : '';
+    const nameError = validateRsn(name);
+    if (nameError) return json({ error: nameError }, { status: 400 });
+    const normalizedName = normalizeRsn(name);
     const submittedAnswers =
       body.answers && typeof body.answers === 'object'
         ? (body.answers as Record<string, unknown>)
         : {};
     const db = getDatabase();
-    const [questions, existing, countRow] = await Promise.all([
+    const [questions, existing, countRow, approvedCountRow] = await Promise.all([
       db
         .prepare(
           `SELECT id, label, field_type, required, options_json, sort_order
@@ -100,17 +114,21 @@ export async function POST(
         .bind(draft.id)
         .all<QuestionRow>(),
       db
-        .prepare('SELECT id FROM players WHERE draft_id = ? AND name = ? COLLATE NOCASE')
-        .bind(draft.id, name)
+        .prepare('SELECT id FROM players WHERE draft_id = ? AND normalized_name = ?')
+        .bind(draft.id, normalizedName)
         .first<{ id: string }>(),
       db
-        .prepare('SELECT COUNT(*) AS count FROM players WHERE draft_id = ?')
+        .prepare('SELECT COUNT(*) AS count FROM players WHERE draft_id = ? AND withdrawn_at IS NULL')
+        .bind(draft.id)
+        .first<{ count: number }>(),
+      db
+        .prepare("SELECT COUNT(*) AS count FROM players WHERE draft_id = ? AND signup_status = 'approved' AND withdrawn_at IS NULL")
         .bind(draft.id)
         .first<{ count: number }>(),
     ]);
     if (existing) return json({ error: 'That in-game name is already registered.' }, { status: 409 });
-    if ((countRow?.count ?? 0) >= 120) {
-      return json({ error: 'This event has reached its 120-player limit.' }, { status: 409 });
+    if ((countRow?.count ?? 0) >= MAX_ROSTER_SIZE) {
+      return json({ error: `This event has reached its ${MAX_ROSTER_SIZE}-player limit.` }, { status: 409 });
     }
 
     const answers: { questionId: string; value: string }[] = [];
@@ -138,26 +156,69 @@ export async function POST(
     }
 
     const playerId = crypto.randomUUID();
+    const participantCredential = await createHashedCredential();
     const now = new Date().toISOString();
+    const signupStatus = (approvedCountRow?.count ?? 0) >= draft.registration_capacity
+      ? 'waitlisted'
+      : draft.signup_approval_mode
+        ? 'pending'
+        : 'approved';
     await db.batch([
       db
         .prepare(
-          `INSERT INTO players (id, draft_id, name, sort_order, source, created_at)
-           VALUES (?, ?, ?, ?, 'signup', ?)`,
+          `INSERT INTO players
+            (id, draft_id, name, normalized_name, sort_order, source, signup_status,
+             participant_token_hash, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'signup', ?, ?, ?, ?)`,
         )
-        .bind(playerId, draft.id, name, countRow?.count ?? 0, now),
+        .bind(
+          playerId,
+          draft.id,
+          name,
+          normalizedName,
+          countRow?.count ?? 0,
+          signupStatus,
+          participantCredential.hash,
+          now,
+          now,
+        ),
       ...answers.map((answer) =>
         db
           .prepare('INSERT INTO survey_answers (question_id, player_id, value) VALUES (?, ?, ?)')
           .bind(answer.questionId, playerId, answer.value),
       ),
-      db.prepare('UPDATE captains SET submitted_at = NULL WHERE draft_id = ?').bind(draft.id),
+      ...(signupStatus === 'approved'
+        ? [db.prepare('UPDATE captains SET submitted_at = NULL WHERE draft_id = ?').bind(draft.id)]
+        : []),
       db
-        .prepare("UPDATE drafts SET status = 'collecting', result_json = NULL, updated_at = ? WHERE id = ?")
+        .prepare("UPDATE drafts SET status = 'registration', result_json = NULL, updated_at = ? WHERE id = ?")
         .bind(now, draft.id),
     ]);
-    return json({ joined: true, name, signupCount: (countRow?.count ?? 0) + 1 }, { status: 201 });
+    await recordAudit(db, {
+      draftId: draft.id,
+      clanId: draft.clan_id,
+      actorType: 'participant',
+      actorReference: playerId,
+      eventType: 'registration.created',
+      metadata: { signupStatus },
+      requestId: requestId(request),
+    });
+    scheduleDiscordEvent(draft.id, 'registration.created', {
+      username: "Terry's Drafting",
+      embeds: [{ title: `${name} signed up`, description: `Status: **${signupStatus}**`, color: 0xd0a23d }],
+    });
+    return json(
+      {
+        joined: true,
+        name,
+        signupStatus,
+        signupCount: (countRow?.count ?? 0) + 1,
+        managePath: `/participant/${participantCredential.token}`,
+      },
+      { status: 201 },
+    );
   } catch (error) {
+    if (error instanceof RateLimitError) return rateLimitResponse(error);
     console.error('save signup failed', error);
     return json({ error: 'Your signup could not be saved. Please try again.' }, { status: 500 });
   }

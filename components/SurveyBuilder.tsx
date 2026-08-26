@@ -1,12 +1,21 @@
 'use client';
 
-import type { SurveyFieldType, SurveyQuestion } from '../lib/types';
+import type { BalanceMetric, QuestionVisibility, SurveyFieldType, SurveyQuestion } from '../lib/types';
 
 const FIELD_LABELS: Record<SurveyFieldType, string> = {
   short: 'Short answer',
   long: 'Long answer',
   number: 'Number',
   choice: 'Multiple choice',
+};
+
+const METRIC_LABELS: Record<BalanceMetric, string> = {
+  playtime: 'Expected playtime',
+  pvm: 'PvM strength',
+  skilling: 'Skilling strength',
+  raids: 'Raid experience',
+  gear: 'Gear readiness',
+  knowledge: 'Game knowledge',
 };
 
 export function SurveyBuilder({
@@ -31,7 +40,7 @@ export function SurveyBuilder({
           className="scroll-button px-3 py-2 text-xs"
           type="button"
           disabled={questions.length >= 12}
-          onClick={() => onChange([...questions, { label: 'New question', fieldType: 'short', required: false, options: [] }])}
+          onClick={() => onChange([...questions, { label: 'New question', fieldType: 'short', required: false, options: [], visibility: 'captains', balanceMetric: null, balanceWeight: 0 }])}
         >
           + Add question
         </button>
@@ -91,6 +100,27 @@ export function SurveyBuilder({
                   />
                 </label>
               ) : null}
+            </div>
+            <div className="mt-3 grid gap-3 border-t border-[#8b6a32]/20 pt-3 sm:grid-cols-3">
+              <label className="grid gap-1.5 text-xs font-bold text-[#5f523b]">
+                Who can see this?
+                <select className="realm-field h-10 px-2 text-sm outline-none" value={question.visibility ?? 'captains'} onChange={(event) => update(index, { visibility: event.target.value as QuestionVisibility })}>
+                  <option value="organizer">Organizer only</option>
+                  <option value="captains">Organizer and captains</option>
+                  <option value="public">Public profile</option>
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-xs font-bold text-[#5f523b]">
+                Optional balance metric
+                <select className="realm-field h-10 px-2 text-sm outline-none" value={question.balanceMetric ?? ''} onChange={(event) => update(index, { balanceMetric: (event.target.value || null) as BalanceMetric | null, balanceWeight: event.target.value ? Math.max(10, question.balanceWeight ?? 0) : 0 })}>
+                  <option value="">Do not balance from this</option>
+                  {(Object.keys(METRIC_LABELS) as BalanceMetric[]).map((metric) => <option key={metric} value={metric}>{METRIC_LABELS[metric]}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-xs font-bold text-[#5f523b]">
+                Metric weight
+                <input className="realm-field h-10 px-2 text-sm outline-none" type="number" min={0} max={100} disabled={!question.balanceMetric} value={question.balanceWeight ?? 0} onChange={(event) => update(index, { balanceWeight: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} />
+              </label>
             </div>
           </article>
         ))}

@@ -17,6 +17,11 @@ type Player = {
 
 type LiveState = {
   started: boolean;
+  order: 'snake' | 'linear' | 'random' | 'third_round_reversal';
+  pickSeconds: number;
+  autoPick: boolean;
+  paused: boolean;
+  turnStartedAt: string | null;
   currentCaptain: { id: string; name: string; teamIndex: number; turnNumber: number } | null;
   captains: { id: string; playerId: string; name: string; teamIndex: number }[];
   picks: { captainId: string; playerId: string; playerName: string; pickNumber: number; turnNumber: number }[];
@@ -26,7 +31,10 @@ type LiveState = {
 
 type RankingData = {
   draft: { title: string; draftType: DraftType; teamCount: number; status: string };
-  captain: { id: string; playerId: string; name: string; submittedAt: string | null };
+  captain: {
+    id: string; playerId: string; name: string; submittedAt: string | null; revision: number;
+    frozenAt: string | null; rankingDeadline: string | null; canEditRankings: boolean;
+  };
   players: Player[];
   live: LiveState | null;
   result: DraftResult | null;
@@ -48,7 +56,7 @@ export function CaptainRanker({ token }: { token: string }) {
       const next = (await response.json()) as RankingData & { error?: string };
       if (!response.ok) throw new Error(next.error || 'The captain board could not be loaded.');
       setData(next);
-      if (next.draft.draftType !== 'live') {
+      if (!quiet) {
         setOrder(next.players);
         setPasteValue(formatPaste(next.players));
       }
@@ -72,6 +80,7 @@ export function CaptainRanker({ token }: { token: string }) {
   }, [data?.draft.draftType, data?.result, load]);
 
   const avoidCount = useMemo(() => order.filter((player) => player.avoid).length, [order]);
+  const refresh = useCallback(() => load(true), [load]);
 
   function applyPaste() {
     const byName = new Map(order.map((player) => [normalizeName(player.name), player] as const));
@@ -156,7 +165,7 @@ export function CaptainRanker({ token }: { token: string }) {
       const next = (await response.json()) as { submittedAt?: string; error?: string };
       if (!response.ok || !next.submittedAt) throw new Error(next.error || 'Your scores could not be saved.');
       setData((current) =>
-        current ? { ...current, captain: { ...current.captain, submittedAt: next.submittedAt! }, result: null } : current,
+        current ? { ...current, captain: { ...current.captain, submittedAt: next.submittedAt!, revision: (current.captain.revision ?? 0) + 1 }, result: null } : current,
       );
       setSuccess('Scores submitted. Your organizer can now see that you’re ready.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -193,6 +202,7 @@ export function CaptainRanker({ token }: { token: string }) {
   }
 
   const isLive = data.draft.draftType === 'live';
+  const showLiveBoard = isLive && Boolean(data.live?.started);
 
   return (
     <main className="realm-bg min-h-screen text-[#eadcb9]">
@@ -202,21 +212,23 @@ export function CaptainRanker({ token }: { token: string }) {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">{data.draft.title}</p>
             <h1 className="fantasy-title mt-3 text-4xl font-bold leading-none text-[#f5df9b] sm:text-6xl">
-              {isLive ? 'Draft your team live.' : 'Score your player pool.'}
+              {showLiveBoard ? 'Draft your team live.' : isLive ? 'Pre-rank your live board.' : 'Score your player pool.'}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#b5a888]">
-              {isLive
+              {showLiveBoard
                 ? 'This board updates automatically. When your turn arrives, inspect the player intel and lock in your pick.'
+                : isLive
+                  ? 'Score the player pool privately before the organizer starts. If timer auto-pick is enabled, your highest legal score becomes your fallback.'
                 : `Give every player a private 1–10 score. Your ordered list breaks ties for ${DRAFT_TYPE_LABELS[data.draft.draftType].toLowerCase()}.`}
             </p>
           </div>
-          {isLive ? (
+          {showLiveBoard ? (
             <span className="self-start rounded-full bg-[#f2e4ad] px-4 py-2 text-xs font-black text-[#5a4510] lg:self-auto">
               {data.live?.started ? data.live.currentCaptain ? `${data.live.currentCaptain.name} is picking` : 'Draft complete' : 'Waiting in lobby'}
             </span>
           ) : (
             <span className={`self-start rounded-full px-4 py-2 text-xs font-black lg:self-auto ${data.captain.submittedAt ? 'bg-[#cce7d7] text-[#195440]' : 'bg-[#f2e4ad] text-[#5a4510]'}`}>
-              {data.captain.submittedAt ? '✓ Submitted — edits allowed' : 'Not submitted yet'}
+              {data.captain.frozenAt ? 'Rankings frozen' : data.captain.submittedAt ? `✓ Revision ${data.captain.revision} submitted` : 'Not submitted yet'}
             </span>
           )}
         </div>
@@ -224,13 +236,13 @@ export function CaptainRanker({ token }: { token: string }) {
         {success ? <p role="status" className="mb-5 rounded-xl border border-[#2d6f5e]/20 bg-[#e6f3eb] px-4 py-3 text-sm font-bold text-[#245b4c]">{success}</p> : null}
         {error ? <p role="alert" className="mb-5 rounded-xl border border-[#d25839]/25 bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#9b3c26]">{error}</p> : null}
 
-        {isLive && data.live ? (
+        {showLiveBoard && data.live ? (
           <LiveDraftBoard
             token={token}
             captainId={data.captain.id}
             players={data.players}
             live={data.live}
-            onRefresh={() => load(true)}
+            onRefresh={refresh}
           />
         ) : (
           <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
@@ -306,7 +318,7 @@ export function CaptainRanker({ token }: { token: string }) {
                 <p className="max-w-md text-xs leading-relaxed text-[#6a7872]">
                   Submitting replaces your previous sheet. Return through this private link to edit until the organizer runs the draft.
                 </p>
-                <button type="button" disabled={saving || order.length === 0} onClick={() => void submitRanking()} className="gold-button shrink-0 px-5 py-3 text-sm">
+                <button type="button" disabled={saving || order.length === 0 || !data.captain.canEditRankings} onClick={() => void submitRanking()} className="gold-button shrink-0 px-5 py-3 text-sm">
                   {saving ? 'Submitting…' : data.captain.submittedAt ? 'Update scores' : 'Submit scores →'}
                 </button>
               </div>

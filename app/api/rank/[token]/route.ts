@@ -1,6 +1,10 @@
 import { type CaptainRow, type ConstraintRow } from '../../../../lib/draft';
-import { getLiveTurn, type LivePickRow } from '../../../../lib/live';
+import { getLiveTurn, type LivePickRow, type LiveTurnActionRow } from '../../../../lib/live';
 import { ensureSchema, getDatabase, json } from '../../../../lib/db';
+import { resolveCaptainId } from '../../../../lib/access-tokens';
+import { recordAudit } from '../../../../lib/audit';
+import { isExpired } from '../../../../lib/validation';
+import { scheduleDiscordEvent } from '../../../../lib/discord-webhooks';
 import type { DraftResult, DraftType } from '../../../../lib/types';
 
 type CaptainDraftRow = {
@@ -14,7 +18,15 @@ type CaptainDraftRow = {
   status: string;
   result_json: string | null;
   submitted_at: string | null;
+  ranking_revision: number;
+  rankings_frozen_at: string | null;
+  ranking_deadline: string | null;
   live_started_at: string | null;
+  live_order: 'snake' | 'linear' | 'random' | 'third_round_reversal';
+  live_pick_seconds: number;
+  live_auto_pick: number;
+  live_paused_at: string | null;
+  live_turn_started_at: string | null;
 };
 type PlayerRow = { id: string; name: string; sort_order: number };
 type RankingQueryRow = { player_id: string; rank: number; score: number | null; avoid: number };
@@ -22,17 +34,22 @@ type AnswerRow = { player_id: string; question_id: string; label: string; value:
 type PickQueryRow = LivePickRow & { player_name: string };
 
 async function findCaptain(token: string) {
+  const captainId = await resolveCaptainId(token);
+  if (!captainId) return null;
   return getDatabase()
     .prepare(
       `SELECT c.id AS captain_id, c.player_id AS captain_player_id,
-              p.name AS captain_name, c.draft_id, c.submitted_at,
-              d.title, d.draft_type, d.team_count, d.status, d.result_json, d.live_started_at
+              p.name AS captain_name, c.draft_id, c.submitted_at, c.ranking_revision,
+              c.rankings_frozen_at, d.ranking_deadline,
+              d.title, d.draft_type, d.team_count, d.status, d.result_json,
+              d.live_started_at, d.live_order, d.live_pick_seconds, d.live_auto_pick,
+              d.live_paused_at, d.live_turn_started_at
        FROM captains c
        JOIN players p ON p.id = c.player_id
        JOIN drafts d ON d.id = c.draft_id
-       WHERE c.token = ?`,
+       WHERE c.id = ?`,
     )
-    .bind(token)
+    .bind(captainId)
     .first<CaptainDraftRow>();
 }
 
@@ -47,17 +64,18 @@ export async function GET(
     if (!captain) return json({ error: 'This captain link is not valid.' }, { status: 404 });
 
     const db = getDatabase();
-    const [playerResult, captainResult, rankingResult, answerResult, constraintResult, pickResult] =
+    const [playerResult, captainResult, rankingResult, answerResult, constraintResult, pickResult, actionResult] =
       await Promise.all([
         db
-          .prepare('SELECT id, name, sort_order FROM players WHERE draft_id = ? ORDER BY sort_order')
+          .prepare("SELECT id, name, sort_order FROM players WHERE draft_id = ? AND signup_status = 'approved' AND withdrawn_at IS NULL ORDER BY sort_order")
           .bind(captain.draft_id)
           .all<PlayerRow>(),
         db
           .prepare(
             `SELECT c.id, c.player_id, c.team_index, p.name
              FROM captains c JOIN players p ON p.id = c.player_id
-             WHERE c.draft_id = ? ORDER BY c.team_index`,
+             WHERE c.draft_id = ? AND p.signup_status = 'approved' AND p.withdrawn_at IS NULL
+             ORDER BY c.team_index`,
           )
           .bind(captain.draft_id)
           .all<CaptainRow>(),
@@ -70,7 +88,8 @@ export async function GET(
             `SELECT sa.player_id, sa.question_id, sq.label, sa.value
              FROM survey_answers sa
              JOIN survey_questions sq ON sq.id = sa.question_id
-             WHERE sq.draft_id = ? ORDER BY sq.sort_order`,
+             WHERE sq.draft_id = ? AND sq.visibility IN ('captains', 'public')
+             ORDER BY sq.sort_order`,
           )
           .bind(captain.draft_id)
           .all<AnswerRow>(),
@@ -90,6 +109,11 @@ export async function GET(
           )
           .bind(captain.draft_id)
           .all<PickQueryRow>(),
+        db
+          .prepare(`SELECT captain_id, turn_number, action, player_ids_json, created_at
+                    FROM live_turn_actions WHERE draft_id = ? ORDER BY turn_number`)
+          .bind(captain.draft_id)
+          .all<LiveTurnActionRow>(),
       ]);
     const captainPlayerIds = new Set(captainResult.results.map((row) => row.player_id));
     const players = playerResult.results.filter((player) => !captainPlayerIds.has(player.id));
@@ -122,7 +146,14 @@ export async function GET(
 
     const picks = pickResult.results;
     const currentTurn = captain.live_started_at
-      ? getLiveTurn({ totalPlayers: playerResult.results.length, captains: captainResult.results, picks })
+      ? getLiveTurn({
+          totalPlayers: playerResult.results.length,
+          captains: captainResult.results,
+          picks,
+          actions: actionResult.results,
+          order: captain.live_order,
+          randomSeed: captain.draft_id,
+        })
       : null;
     const pickedIds = new Set(picks.map((pick) => pick.player_id));
 
@@ -138,6 +169,10 @@ export async function GET(
         playerId: captain.captain_player_id,
         name: captain.captain_name,
         submittedAt: captain.submitted_at,
+        revision: captain.ranking_revision,
+        frozenAt: captain.rankings_frozen_at,
+        rankingDeadline: captain.ranking_deadline,
+        canEditRankings: !captain.rankings_frozen_at && !captain.live_started_at && !isExpired(captain.ranking_deadline),
       },
       players: orderedPlayers.map((player, index) => ({
         id: player.id,
@@ -152,6 +187,11 @@ export async function GET(
       })),
       live: captain.draft_type === 'live' ? {
         started: Boolean(captain.live_started_at),
+        order: captain.live_order,
+        pickSeconds: captain.live_pick_seconds,
+        autoPick: Boolean(captain.live_auto_pick),
+        paused: Boolean(captain.live_paused_at),
+        turnStartedAt: captain.live_turn_started_at,
         currentCaptain: currentTurn ? {
           id: currentTurn.captain.id,
           name: currentTurn.captain.name,
@@ -195,8 +235,8 @@ export async function PUT(
     const { token } = await context.params;
     const captain = await findCaptain(token);
     if (!captain) return json({ error: 'This captain link is not valid.' }, { status: 404 });
-    if (captain.draft_type === 'live') {
-      return json({ error: 'Live drafts use turn-by-turn picks instead of score sheets.' }, { status: 409 });
+    if (captain.rankings_frozen_at || captain.live_started_at || isExpired(captain.ranking_deadline)) {
+      return json({ error: 'Rankings are frozen for this event.' }, { status: 409 });
     }
     const body = (await request.json()) as { rankings?: unknown };
     const rawRankings = Array.isArray(body.rankings) ? body.rankings : [];
@@ -239,6 +279,7 @@ export async function PUT(
     }
 
     const now = new Date().toISOString();
+    const revision = captain.ranking_revision + 1;
     await db.batch([
       db.prepare('DELETE FROM rankings WHERE captain_id = ?').bind(captain.captain_id),
       ...rankings.map((ranking) =>
@@ -254,14 +295,31 @@ export async function PUT(
             ranking.avoid ? 1 : 0,
           ),
       ),
-      db.prepare('UPDATE captains SET submitted_at = ? WHERE id = ?').bind(now, captain.captain_id),
+      db.prepare(
+        `INSERT INTO ranking_revisions (id, captain_id, revision, rankings_json, submitted_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), captain.captain_id, revision, JSON.stringify(rankings), now),
+      db.prepare('UPDATE captains SET submitted_at = ?, ranking_revision = ? WHERE id = ?')
+        .bind(now, revision, captain.captain_id),
       db
         .prepare(
-          `UPDATE drafts SET status = 'collecting', result_json = NULL, updated_at = ? WHERE id = ?`,
+          `UPDATE drafts SET status = 'rankings', result_json = NULL, updated_at = ? WHERE id = ?`,
         )
         .bind(now, captain.draft_id),
     ]);
-    return json({ submittedAt: now });
+    await recordAudit(db, {
+      draftId: captain.draft_id,
+      actorType: 'captain',
+      actorReference: captain.captain_id,
+      eventType: 'captain.rankings_submitted',
+      metadata: { revision, playerCount: rankings.length },
+      createdAt: now,
+    });
+    scheduleDiscordEvent(captain.draft_id, 'captain.rankings_submitted', {
+      username: "Terry's Drafting",
+      embeds: [{ title: `${captain.captain_name} submitted rankings`, description: `Revision ${revision}`, color: 0x3f6a45 }],
+    });
+    return json({ submittedAt: now, revision });
   } catch (error) {
     console.error('save ranking failed', error);
     return json({ error: 'Your scores could not be saved. Please try again.' }, { status: 500 });

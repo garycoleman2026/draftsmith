@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DRAFT_TYPE_LABELS, type DraftType, type SurveyQuestion } from '../lib/types';
 import { SiteHeader } from './SiteHeader';
+import { SurveyQuestionField } from './SurveyQuestionField';
 
 type SignupData = {
   draft: {
@@ -10,6 +11,9 @@ type SignupData = {
     draftType: DraftType;
     teamCount: number;
     registrationOpen: boolean;
+    registrationCapacity: number;
+    registrationDeadline: string | null;
+    approvalRequired: boolean;
   };
   signupCount: number;
   questions: Array<Required<Pick<SurveyQuestion, 'id' | 'label' | 'fieldType' | 'required' | 'options'>>>;
@@ -23,6 +27,8 @@ export function SignupForm({ token }: { token: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [joined, setJoined] = useState('');
+  const [signupStatus, setSignupStatus] = useState('');
+  const [managePath, setManagePath] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -51,11 +57,13 @@ export function SignupForm({ token }: { token: string }) {
       const response = await fetch(`/api/join/${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, answers }),
+        body: JSON.stringify({ name, answers, website: '' }),
       });
-      const next = (await response.json()) as { joined?: boolean; name?: string; signupCount?: number; error?: string };
+      const next = (await response.json()) as { joined?: boolean; name?: string; signupCount?: number; signupStatus?: string; managePath?: string; error?: string };
       if (!response.ok || !next.joined) throw new Error(next.error || 'Your signup could not be saved.');
       setJoined(next.name || name);
+      setSignupStatus(next.signupStatus || 'approved');
+      setManagePath(next.managePath || '');
       setData((current) => current ? { ...current, signupCount: next.signupCount ?? current.signupCount + 1 } : current);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Your signup could not be saved.');
@@ -105,8 +113,16 @@ export function SignupForm({ token }: { token: string }) {
             <span className="brand-rune mx-auto grid h-14 w-14 place-items-center rounded-full text-xl font-black text-[#f4d77c]">✓</span>
             <h2 className="fantasy-title mt-5 text-3xl font-bold">You’re in, {joined}.</h2>
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#665b45]">
-              Your answers are on the organizer’s roster. Keep this event link handy for future updates.
+              {signupStatus === 'approved'
+                ? 'Your profile is on the active roster.'
+                : signupStatus === 'pending'
+                  ? 'Your profile is waiting for organizer approval.'
+                  : 'The active roster is full, so you have been added to the waitlist.'}
             </p>
+            {managePath ? (
+              <a className="gold-button mt-6 inline-flex px-5 py-3 text-sm" href={managePath}>Save your private profile link →</a>
+            ) : null}
+            <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-[#756748]">Use the private profile link to edit your answers or withdraw before registration closes.</p>
           </section>
         ) : data.draft.registrationOpen ? (
           <form className="parchment-panel p-5 sm:p-8" onSubmit={submit}>
@@ -131,7 +147,7 @@ export function SignupForm({ token }: { token: string }) {
 
             <div className="mt-6 grid gap-5">
               {data.questions.map((question) => (
-                <QuestionField
+                <SurveyQuestionField
                   key={question.id}
                   question={question}
                   value={answers[question.id] || ''}
@@ -139,6 +155,11 @@ export function SignupForm({ token }: { token: string }) {
                 />
               ))}
             </div>
+
+            <label className="sr-only" aria-hidden="true">
+              Website
+              <input tabIndex={-1} autoComplete="off" name="website" />
+            </label>
 
             {error ? <p role="alert" className="mt-5 rounded border border-[#a7442d]/35 bg-[#f3c5a9] px-4 py-3 text-sm font-bold text-[#7d2b1c]">{error}</p> : null}
             <button className="gold-button mt-7 w-full px-5 py-3.5 text-sm" type="submit" disabled={saving}>
@@ -153,37 +174,5 @@ export function SignupForm({ token }: { token: string }) {
         )}
       </section>
     </main>
-  );
-}
-
-function QuestionField({
-  question,
-  value,
-  onChange,
-}: {
-  question: SignupData['questions'][number];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const common = {
-    id: `question-${question.id}`,
-    value,
-    required: question.required,
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onChange(event.target.value),
-  };
-  return (
-    <label className="grid gap-2 text-sm font-bold" htmlFor={common.id}>
-      <span>{question.label}{question.required ? <span className="text-[#8b3d25]"> *</span> : null}</span>
-      {question.fieldType === 'long' ? (
-        <textarea {...common} className="realm-field min-h-28 resize-y p-4 outline-none" maxLength={500} />
-      ) : question.fieldType === 'choice' ? (
-        <select {...common} className="realm-field h-12 px-3 outline-none">
-          <option value="">Choose one</option>
-          {question.options.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-      ) : (
-        <input {...common} className="realm-field h-12 px-4 outline-none" type={question.fieldType === 'number' ? 'number' : 'text'} maxLength={120} />
-      )}
-    </label>
   );
 }

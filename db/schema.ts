@@ -1,25 +1,144 @@
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+export const users = sqliteTable(
+  'users',
+  {
+    id: text('id').primaryKey().notNull(),
+    discordId: text('discord_id'),
+    email: text('email'),
+    username: text('username').notNull(),
+    displayName: text('display_name'),
+    avatarHash: text('avatar_hash'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('users_discord_id_unique').on(table.discordId)],
+);
+
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    id: text('id').primaryKey().notNull(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    createdAt: text('created_at').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+    revokedAt: text('revoked_at'),
+  },
+  (table) => [
+    uniqueIndex('sessions_token_hash_unique').on(table.tokenHash),
+    index('idx_sessions_user_id').on(table.userId),
+    index('idx_sessions_expires_at').on(table.expiresAt),
+  ],
+);
+
+export const oauthStates = sqliteTable(
+  'oauth_states',
+  {
+    id: text('id').primaryKey().notNull(),
+    stateHash: text('state_hash').notNull(),
+    verifier: text('verifier').notNull(),
+    returnTo: text('return_to').notNull().default('/dashboard'),
+    expiresAt: text('expires_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('oauth_states_state_hash_unique').on(table.stateHash),
+    index('idx_oauth_states_expires_at').on(table.expiresAt),
+  ],
+);
+
+export const clans = sqliteTable(
+  'clans',
+  {
+    id: text('id').primaryKey().notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    createdByUserId: text('created_by_user_id').notNull().references(() => users.id),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('clans_slug_unique').on(table.slug)],
+);
+
+export const clanMemberships = sqliteTable(
+  'clan_memberships',
+  {
+    clanId: text('clan_id').notNull().references(() => clans.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('member'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.clanId, table.userId] }),
+    index('idx_clan_memberships_user_id').on(table.userId),
+  ],
+);
+
 export const drafts = sqliteTable(
   'drafts',
   {
     id: text('id').primaryKey().notNull(),
     adminToken: text('admin_token').notNull(),
+    adminTokenHash: text('admin_token_hash'),
     title: text('title').notNull(),
+    publicSlug: text('public_slug'),
+    clanId: text('clan_id').references(() => clans.id, { onDelete: 'set null' }),
+    ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
     draftType: text('draft_type').notNull(),
     teamCount: integer('team_count').notNull(),
     rosterMode: text('roster_mode').notNull().default('import'),
     signupToken: text('signup_token'),
+    signupTokenHash: text('signup_token_hash'),
     registrationOpen: integer('registration_open', { mode: 'boolean' }).notNull().default(false),
+    registrationCapacity: integer('registration_capacity').notNull().default(120),
+    signupApprovalMode: integer('signup_approval_mode', { mode: 'boolean' }).notNull().default(false),
+    registrationDeadline: text('registration_deadline'),
+    rankingDeadline: text('ranking_deadline'),
+    answersVisibility: text('answers_visibility').notNull().default('captains'),
+    balancePreset: text('balance_preset').notNull().default('consensus'),
+    balanceWeightsJson: text('balance_weights_json'),
     liveStartedAt: text('live_started_at'),
-    status: text('status').notNull().default('collecting'),
+    liveOrder: text('live_order').notNull().default('snake'),
+    livePickSeconds: integer('live_pick_seconds').notNull().default(0),
+    liveAutoPick: integer('live_auto_pick', { mode: 'boolean' }).notNull().default(false),
+    livePausedAt: text('live_paused_at'),
+    liveTurnStartedAt: text('live_turn_started_at'),
+    liveRevision: integer('live_revision').notNull().default(0),
+    status: text('status').notNull().default('registration'),
     resultJson: text('result_json'),
+    archivedAt: text('archived_at'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [
     uniqueIndex('drafts_admin_token_unique').on(table.adminToken),
+    uniqueIndex('drafts_admin_token_hash_unique').on(table.adminTokenHash),
     uniqueIndex('drafts_signup_token_unique').on(table.signupToken),
+    uniqueIndex('drafts_signup_token_hash_unique').on(table.signupTokenHash),
+    uniqueIndex('drafts_public_slug_unique').on(table.publicSlug),
+    index('idx_drafts_clan_id').on(table.clanId),
+    index('idx_drafts_owner_user_id').on(table.ownerUserId),
+    index('idx_drafts_status').on(table.status),
+  ],
+);
+
+export const draftAccessTokens = sqliteTable(
+  'draft_access_tokens',
+  {
+    id: text('id').primaryKey().notNull(),
+    draftId: text('draft_id').notNull().references(() => drafts.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    purpose: text('purpose').notNull().default('manage'),
+    createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: text('expires_at'),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('draft_access_tokens_hash_unique').on(table.tokenHash),
+    index('idx_draft_access_tokens_draft_id').on(table.draftId),
   ],
 );
 
@@ -29,11 +148,20 @@ export const players = sqliteTable(
     id: text('id').primaryKey().notNull(),
     draftId: text('draft_id').notNull().references(() => drafts.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    normalizedName: text('normalized_name'),
     sortOrder: integer('sort_order').notNull(),
     source: text('source').notNull().default('import'),
+    signupStatus: text('signup_status').notNull().default('approved'),
+    participantTokenHash: text('participant_token_hash'),
     createdAt: text('created_at'),
+    updatedAt: text('updated_at'),
+    withdrawnAt: text('withdrawn_at'),
   },
-  (table) => [index('idx_players_draft_id').on(table.draftId)],
+  (table) => [
+    index('idx_players_draft_id').on(table.draftId),
+    uniqueIndex('players_participant_token_hash_unique').on(table.participantTokenHash),
+    uniqueIndex('players_draft_normalized_unique').on(table.draftId, table.normalizedName),
+  ],
 );
 
 export const captains = sqliteTable(
@@ -44,10 +172,14 @@ export const captains = sqliteTable(
     playerId: text('player_id').notNull().references(() => players.id, { onDelete: 'cascade' }),
     teamIndex: integer('team_index').notNull(),
     token: text('token').notNull(),
+    tokenHash: text('token_hash'),
     submittedAt: text('submitted_at'),
+    rankingRevision: integer('ranking_revision').notNull().default(0),
+    rankingsFrozenAt: text('rankings_frozen_at'),
   },
   (table) => [
     uniqueIndex('captains_token_unique').on(table.token),
+    uniqueIndex('captains_token_hash_unique').on(table.tokenHash),
     uniqueIndex('captains_draft_team_unique').on(table.draftId, table.teamIndex),
     uniqueIndex('captains_draft_player_unique').on(table.draftId, table.playerId),
     index('idx_captains_draft_id').on(table.draftId),
@@ -66,6 +198,21 @@ export const rankings = sqliteTable(
   (table) => [primaryKey({ columns: [table.captainId, table.playerId] })],
 );
 
+export const rankingRevisions = sqliteTable(
+  'ranking_revisions',
+  {
+    id: text('id').primaryKey().notNull(),
+    captainId: text('captain_id').notNull().references(() => captains.id, { onDelete: 'cascade' }),
+    revision: integer('revision').notNull(),
+    rankingsJson: text('rankings_json').notNull(),
+    submittedAt: text('submitted_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('ranking_revisions_captain_revision_unique').on(table.captainId, table.revision),
+    index('idx_ranking_revisions_captain_id').on(table.captainId),
+  ],
+);
+
 export const surveyQuestions = sqliteTable(
   'survey_questions',
   {
@@ -74,6 +221,9 @@ export const surveyQuestions = sqliteTable(
     label: text('label').notNull(),
     fieldType: text('field_type').notNull(),
     required: integer('required', { mode: 'boolean' }).notNull().default(false),
+    visibility: text('visibility').notNull().default('captains'),
+    balanceMetric: text('balance_metric'),
+    balanceWeight: integer('balance_weight').notNull().default(0),
     optionsJson: text('options_json'),
     sortOrder: integer('sort_order').notNull(),
   },
@@ -99,6 +249,8 @@ export const draftConstraints = sqliteTable(
     id: text('id').primaryKey().notNull(),
     draftId: text('draft_id').notNull().references(() => drafts.id, { onDelete: 'cascade' }),
     constraintType: text('constraint_type').notNull(),
+    enforcement: text('enforcement').notNull().default('hard'),
+    penalty: integer('penalty').notNull().default(100),
     playerAId: text('player_a_id').notNull().references(() => players.id, { onDelete: 'cascade' }),
     playerBId: text('player_b_id').notNull().references(() => players.id, { onDelete: 'cascade' }),
     createdAt: text('created_at').notNull(),
@@ -129,5 +281,141 @@ export const livePicks = sqliteTable(
     index('idx_live_picks_draft_id').on(table.draftId),
     uniqueIndex('live_picks_player_unique').on(table.draftId, table.playerId),
     uniqueIndex('live_picks_number_unique').on(table.draftId, table.pickNumber),
+  ],
+);
+
+export const liveTurnActions = sqliteTable(
+  'live_turn_actions',
+  {
+    id: text('id').primaryKey().notNull(),
+    draftId: text('draft_id').notNull().references(() => drafts.id, { onDelete: 'cascade' }),
+    captainId: text('captain_id').notNull().references(() => captains.id, { onDelete: 'cascade' }),
+    turnNumber: integer('turn_number').notNull(),
+    action: text('action').notNull(),
+    playerIdsJson: text('player_ids_json'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('live_turn_actions_draft_turn_unique').on(table.draftId, table.turnNumber),
+    index('idx_live_turn_actions_draft_id').on(table.draftId),
+  ],
+);
+
+export const draftRuns = sqliteTable(
+  'draft_runs',
+  {
+    id: text('id').primaryKey().notNull(),
+    draftId: text('draft_id').notNull().references(() => drafts.id, { onDelete: 'cascade' }),
+    runNumber: integer('run_number').notNull(),
+    source: text('source').notNull().default('generated'),
+    seed: text('seed').notNull(),
+    configurationJson: text('configuration_json').notNull(),
+    resultJson: text('result_json').notNull(),
+    fairnessJson: text('fairness_json').notNull(),
+    createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('draft_runs_draft_number_unique').on(table.draftId, table.runNumber),
+    index('idx_draft_runs_draft_id').on(table.draftId),
+  ],
+);
+
+export const eventTemplates = sqliteTable(
+  'event_templates',
+  {
+    id: text('id').primaryKey().notNull(),
+    clanId: text('clan_id').notNull().references(() => clans.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    configurationJson: text('configuration_json').notNull(),
+    createdByUserId: text('created_by_user_id').notNull().references(() => users.id),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('idx_event_templates_clan_id').on(table.clanId)],
+);
+
+export const playerInsightCache = sqliteTable(
+  'player_insight_cache',
+  {
+    normalizedName: text('normalized_name').primaryKey().notNull(),
+    displayName: text('display_name').notNull(),
+    payloadJson: text('payload_json').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    staleAt: text('stale_at').notNull(),
+    failureCount: integer('failure_count').notNull().default(0),
+    lastError: text('last_error'),
+  },
+  (table) => [index('idx_player_insight_cache_expires_at').on(table.expiresAt)],
+);
+
+export const rateLimits = sqliteTable(
+  'rate_limits',
+  {
+    key: text('key').primaryKey().notNull(),
+    count: integer('count').notNull().default(0),
+    windowStartedAt: text('window_started_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+  },
+  (table) => [index('idx_rate_limits_expires_at').on(table.expiresAt)],
+);
+
+export const auditEvents = sqliteTable(
+  'audit_events',
+  {
+    id: text('id').primaryKey().notNull(),
+    draftId: text('draft_id').references(() => drafts.id, { onDelete: 'cascade' }),
+    clanId: text('clan_id').references(() => clans.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    actorType: text('actor_type').notNull(),
+    actorReference: text('actor_reference'),
+    eventType: text('event_type').notNull(),
+    metadataJson: text('metadata_json'),
+    requestId: text('request_id'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_audit_events_draft_id').on(table.draftId),
+    index('idx_audit_events_clan_id').on(table.clanId),
+    index('idx_audit_events_created_at').on(table.createdAt),
+  ],
+);
+
+export const webhookIntegrations = sqliteTable(
+  'webhook_integrations',
+  {
+    id: text('id').primaryKey().notNull(),
+    draftId: text('draft_id').references(() => drafts.id, { onDelete: 'cascade' }),
+    clanId: text('clan_id').references(() => clans.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull().default('discord'),
+    encryptedUrl: text('encrypted_url').notNull(),
+    enabledEventsJson: text('enabled_events_json').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('idx_webhook_integrations_draft_id').on(table.draftId),
+    index('idx_webhook_integrations_clan_id').on(table.clanId),
+  ],
+);
+
+export const webhookDeliveries = sqliteTable(
+  'webhook_deliveries',
+  {
+    id: text('id').primaryKey().notNull(),
+    integrationId: text('integration_id').notNull().references(() => webhookIntegrations.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    payloadJson: text('payload_json').notNull(),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    responseCode: integer('response_code'),
+    lastError: text('last_error'),
+    createdAt: text('created_at').notNull(),
+    deliveredAt: text('delivered_at'),
+  },
+  (table) => [
+    index('idx_webhook_deliveries_integration_id').on(table.integrationId),
+    index('idx_webhook_deliveries_status').on(table.status),
   ],
 );
