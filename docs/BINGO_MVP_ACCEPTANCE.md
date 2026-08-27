@@ -20,18 +20,24 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - [x] Show a polling team board and a public spectator board with optional delay.
 - [x] Save the current board as a reusable draft/clan template.
 - [x] Send optional Discord lifecycle and claim notifications through the existing encrypted webhook integration.
+- [x] Normalize organizer, RuneLite, and Wise Old Man evidence into source-labelled, idempotent verification signals.
+- [x] Match signals against versioned task targets, metrics, scopes, participant counts, comparators, and allowed proof sources.
+- [x] Accumulate per-team progress without double-counting the same source across RuneLite and Wise Old Man.
+- [x] Show confidence-labelled progress candidates to teams and an accept, dismiss, reopen, replay, and dry-run queue to organizers.
+- [x] Preserve evidence source and confidence on every accepted claim, completion, public tile, and audit record.
 
 ## Safety and operating limits
 
 - Evidence is private to the organizer, limited to 5 MB, signature checked, stored in R2, and served with `nosniff`.
 - Team and organizer credentials are stored only as hashes; newly issued raw links are shown once.
 - Team claims and evidence uploads are rate limited.
-- Custom boards support 9–49 tiles in a square grid. Automatic RuneLite proof, automatic task completion from data providers, scheduled auto-start, and the full event tracker plugin remain later stages.
+- Custom boards support 9–49 tiles in a square grid. The verification engine now accepts normalized evidence, but provider polling, player pairing, scheduled auto-start, and the full RuneLite tracker plugin remain later stages.
 
 ## Verification gate
 
 - [x] Migration validation passes against fresh and legacy databases.
 - [x] Bingo scoring, structured-rule, preset-library, variable-layout, prerequisite, and import/export tests pass.
+- [x] Signal validation, source authorization, identity, participant-scope, target-ID, duration, aggregation, and corroboration tests pass.
 - [x] TypeScript, ESLint, the full unit suite, production build, and production dependency audit pass.
 - [x] Local API smoke covers create → start → claim → approve → public score.
 - [ ] Hosted API and database are healthy after deployment.

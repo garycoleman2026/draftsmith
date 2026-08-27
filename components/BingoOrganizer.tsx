@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { absoluteUrl, copyText } from '../lib/client';
 import type { BingoTaskDefinition } from '../lib/bingo-types';
 import type { BingoEventRules } from '../lib/bingo-rules';
-import type { BingoViewData, BingoViewTask } from '../lib/bingo-view-types';
+import type { BingoViewData, BingoViewTask, BingoViewVerificationCandidate } from '../lib/bingo-view-types';
+import type { BingoVerificationSignal } from '../lib/bingo-verification';
 import type { BingoMode } from '../lib/types';
 import { BingoBoard, BingoStandings } from './BingoBoard';
 import { BingoMaker } from './BingoMaker';
+import { BingoVerificationPanel } from './BingoVerificationPanel';
 import { SiteHeader } from './SiteHeader';
 
 type IssuedLink = { teamId: string; teamName: string; path: string };
@@ -27,6 +29,11 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   const [working, setWorking] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [verificationPreview, setVerificationPreview] = useState<{
+    matches?: Array<{ taskId: string; title: string; sortOrder: number }>;
+    duplicate?: boolean;
+    candidates?: BingoViewVerificationCandidate[];
+  } | null>(null);
   const initialized = useRef(false);
   const base = `/api/manage/${encodeURIComponent(token)}/bingo/events/${encodeURIComponent(eventId)}`;
 
@@ -109,6 +116,27 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
     }, 'This board is now available as a reusable template.');
   }
 
+  async function resolveCandidate(candidateId: string, action: 'accept' | 'dismiss' | 'reopen') {
+    await run(`verification-${action}-${candidateId}`, `${base}/verification/candidates/${encodeURIComponent(candidateId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+    }, action === 'accept' ? 'Verified evidence accepted and added to the score.' : action === 'dismiss' ? 'Verification candidate dismissed.' : 'Verification candidate reopened from its evidence.');
+  }
+
+  async function replayVerification() {
+    await run('verification-replay', `${base}/verification`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'replay' }),
+    }, 'Stored verification signals were replayed without duplicating progress.');
+  }
+
+  async function submitVerificationSignal(input: { teamId: string; memberId: string | null; signal: BingoVerificationSignal }, dryRun: boolean) {
+    const result = await run(dryRun ? 'verification-preview' : 'verification-ingest', `${base}/verification`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        action: dryRun ? 'dry_run' : 'ingest', ...input,
+      }),
+    }, dryRun ? 'Signal preview complete.' : 'Verification signal recorded and matched idempotently.');
+    if (result) setVerificationPreview(result as typeof verificationPreview);
+  }
+
   async function copy(label: string, value: string) { await copyText(value); setCopied(label); window.setTimeout(() => setCopied(''), 1_500); }
 
   if (!data) return <LoadingScreen error={error} />;
@@ -163,7 +191,8 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
           <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} /></section>
           <aside className="space-y-5">
-            <section className="wood-panel p-5"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Claim review</p><span className="rounded bg-[#d7ae50] px-2 py-1 text-[10px] font-black text-[#24180b]">{pendingClaims.length} pending</span></div><div className="mt-4 max-h-[540px] space-y-3 overflow-auto">{pendingClaims.map((claim) => { const task = data.tasks.find((item) => item.id === claim.taskId); const team = data.teams.find((item) => item.id === claim.teamId); return <article className="rounded border border-[#9d7932]/60 bg-black/20 p-3" key={claim.id}><p className="text-sm font-black text-[#f2d98f]">{task?.title ?? 'Task'}</p><p className="mt-1 text-xs text-[#c8b990]">{team?.name} · {claim.claimedByName} · {new Date(claim.submittedAt).toLocaleString()}</p>{claim.note ? <p className="mt-2 text-xs leading-relaxed text-[#e0d1aa]">{claim.note}</p> : null}<div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">{claim.evidenceUploadId ? <a className="text-[#d9e7aa] underline" href={`${base}/evidence/${encodeURIComponent(claim.evidenceUploadId)}`} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim.evidenceUrl ? <a className="text-[#d9e7aa] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open evidence link ↗</a> : null}</div><div className="mt-3 grid grid-cols-2 gap-2"><button className="gold-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'approve')}>Approve</button><button className="scroll-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'reject')}>Reject</button></div></article>; })}{!pendingClaims.length ? <p className="text-sm text-[#ad9f7f]">No claims await review.</p> : null}</div></section>
+            <BingoVerificationPanel data={data} working={working} preview={verificationPreview} onResolve={resolveCandidate} onReplay={replayVerification} onSignal={submitVerificationSignal} />
+            <section className="wood-panel p-5"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Claim review</p><span className="rounded bg-[#d7ae50] px-2 py-1 text-[10px] font-black text-[#24180b]">{pendingClaims.length} pending</span></div><div className="mt-4 max-h-[540px] space-y-3 overflow-auto">{pendingClaims.map((claim) => { const task = data.tasks.find((item) => item.id === claim.taskId); const team = data.teams.find((item) => item.id === claim.teamId); return <article className="rounded border border-[#9d7932]/60 bg-black/20 p-3" key={claim.id}><p className="text-sm font-black text-[#f2d98f]">{task?.title ?? 'Task'}</p><p className="mt-1 text-xs text-[#c8b990]">{team?.name} · {claim.claimedByName} · {new Date(claim.submittedAt).toLocaleString()}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#d7ae50]">{claim.verificationSource.replaceAll('_', ' ')} · {claim.verificationConfidence}</p>{claim.note ? <p className="mt-2 text-xs leading-relaxed text-[#e0d1aa]">{claim.note}</p> : null}<div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">{claim.evidenceUploadId ? <a className="text-[#d9e7aa] underline" href={`${base}/evidence/${encodeURIComponent(claim.evidenceUploadId)}`} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim.evidenceUrl ? <a className="text-[#d9e7aa] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open evidence link ↗</a> : null}</div><div className="mt-3 grid grid-cols-2 gap-2"><button className="gold-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'approve')}>Approve</button><button className="scroll-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'reject')}>Reject</button></div></article>; })}{!pendingClaims.length ? <p className="text-sm text-[#ad9f7f]">No claims await review.</p> : null}</div></section>
             <section className="parchment-panel p-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Recent hall activity</p><div className="mt-3 space-y-3">{data.activity.slice(0, 10).map((item) => <article className="border-l-2 border-[#88682e] pl-3 text-xs" key={item.id}><p className="font-bold">{item.message}</p><p className="mt-1 text-[10px] text-[#75664b]">{new Date(item.createdAt).toLocaleString()}</p></article>)}</div></section>
           </aside>
         </div>

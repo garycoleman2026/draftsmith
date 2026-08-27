@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable(
   'users',
@@ -537,6 +537,72 @@ export const bingoEvidenceUploads = sqliteTable(
   ],
 );
 
+export const bingoVerificationEvents = sqliteTable(
+  'bingo_verification_events',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').references(() => bingoTeamMembers.id, { onDelete: 'set null' }),
+    idempotencyKey: text('idempotency_key').notNull(),
+    source: text('source').notNull(),
+    signalType: text('signal_type').notNull(),
+    payloadJson: text('payload_json').notNull(),
+    observedAt: text('observed_at').notNull(),
+    receivedAt: text('received_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_verification_events_idempotency_unique').on(table.eventId, table.teamId, table.source, table.idempotencyKey),
+    index('idx_bingo_verification_events_event_observed').on(table.eventId, table.observedAt),
+    index('idx_bingo_verification_events_team_received').on(table.teamId, table.receivedAt),
+  ],
+);
+
+export const bingoVerificationCandidates = sqliteTable(
+  'bingo_verification_candidates',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').notNull().references(() => bingoTasks.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').references(() => bingoTeamMembers.id, { onDelete: 'set null' }),
+    sourceSummary: text('source_summary').notNull(),
+    confidence: text('confidence').notNull().default('reported'),
+    status: text('status').notNull().default('progress'),
+    progressValue: real('progress_value').notNull().default(0),
+    targetValue: real('target_value').notNull().default(1),
+    summary: text('summary').notNull(),
+    detailsJson: text('details_json').notNull().default('{}'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    resolvedAt: text('resolved_at'),
+  },
+  (table) => [
+    uniqueIndex('bingo_verification_candidates_task_team_unique').on(table.eventId, table.taskId, table.teamId),
+    index('idx_bingo_verification_candidates_event_status').on(table.eventId, table.status),
+    index('idx_bingo_verification_candidates_team_status').on(table.teamId, table.status),
+  ],
+);
+
+export const bingoVerificationMatches = sqliteTable(
+  'bingo_verification_matches',
+  {
+    id: text('id').primaryKey().notNull(),
+    candidateId: text('candidate_id').notNull().references(() => bingoVerificationCandidates.id, { onDelete: 'cascade' }),
+    verificationEventId: text('verification_event_id').notNull().references(() => bingoVerificationEvents.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').notNull().references(() => bingoTasks.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').references(() => bingoTeamMembers.id, { onDelete: 'set null' }),
+    value: real('value').notNull(),
+    progressKind: text('progress_kind').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_verification_matches_event_task_unique').on(table.verificationEventId, table.taskId),
+    index('idx_bingo_verification_matches_candidate').on(table.candidateId),
+  ],
+);
+
 export const bingoClaims = sqliteTable(
   'bingo_claims',
   {
@@ -549,6 +615,9 @@ export const bingoClaims = sqliteTable(
     note: text('note').notNull().default(''),
     evidenceUrl: text('evidence_url'),
     evidenceUploadId: text('evidence_upload_id').references(() => bingoEvidenceUploads.id, { onDelete: 'set null' }),
+    verificationSource: text('verification_source').notNull().default('manual'),
+    verificationConfidence: text('verification_confidence').notNull().default('unverified'),
+    verificationCandidateId: text('verification_candidate_id').references(() => bingoVerificationCandidates.id, { onDelete: 'set null' }),
     status: text('status').notNull().default('pending'),
     reviewNote: text('review_note'),
     scoreAwarded: integer('score_awarded').notNull().default(0),
@@ -557,6 +626,7 @@ export const bingoClaims = sqliteTable(
     approvedAt: text('approved_at'),
   },
   (table) => [
+    uniqueIndex('bingo_claims_verification_candidate_unique').on(table.verificationCandidateId),
     index('idx_bingo_claims_event_status').on(table.eventId, table.status),
     index('idx_bingo_claims_task_team').on(table.taskId, table.teamId),
     index('idx_bingo_claims_submitted_at').on(table.submittedAt),
@@ -574,6 +644,8 @@ export const bingoCompletions = sqliteTable(
     completionNumber: integer('completion_number').notNull().default(1),
     globalLockKey: text('global_lock_key'),
     points: integer('points').notNull(),
+    verificationSource: text('verification_source').notNull().default('manual'),
+    verificationConfidence: text('verification_confidence').notNull().default('unverified'),
     completedAt: text('completed_at').notNull(),
   },
   (table) => [

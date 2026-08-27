@@ -35,7 +35,7 @@ export function BingoPublicBoard({ slug }: { slug: string }) {
         <div className="wood-panel mt-7 p-4 sm:p-6"><BingoStandings data={data} /></div>
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_330px]">
           <section className="parchment-panel p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">The board</p><h2 className="fantasy-title text-3xl font-bold">{data.event.mode === 'lockout' ? 'First claim owns the square.' : 'Every verified task counts.'}</h2></div><span className="seal-badge px-3 py-1.5 text-[10px] font-black uppercase">Revision {data.event.revision}</span></div><BingoBoard data={data} /></section>
-          <aside className="wood-panel p-5"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Hall activity</p><div className="mt-5 space-y-4">{data.activity.map((item) => <article className="border-l-2 border-[#b7903c] pl-3" key={item.id}><p className="text-sm font-black">{item.message}</p><p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-[#9f9272]">{relativeTime(item.createdAt)}</p></article>)}{!data.activity.length ? <p className="text-sm text-[#a99c7c]">The hall is quiet—for now.</p> : null}</div></aside>
+          <aside className="space-y-5"><section className="wood-panel p-5"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Evidence confidence</p><p className="mt-2 text-xs leading-relaxed text-[#b9ab89]">Every scored square names how it was proven. RuneLite observations, Wise Old Man snapshots, screenshots, and organizer review remain visibly distinct.</p><div className="mt-3 flex flex-wrap gap-2">{confidenceCounts(data).map(([confidence, count]) => <span className="rounded bg-[#d7ae50]/15 px-2 py-1 text-[10px] font-black uppercase text-[#ead18d]" key={confidence}>{confidence}: {count}</span>)}{!data.completions.length ? <span className="text-xs text-[#9f9272]">No accepted proof yet.</span> : null}</div></section><section className="wood-panel p-5"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Hall activity</p><div className="mt-5 space-y-4">{data.activity.map((item) => <article className="border-l-2 border-[#b7903c] pl-3" key={item.id}><p className="text-sm font-black">{item.message}</p><p className="mt-1 text-[10px] uppercase tracking-[0.08em] text-[#9f9272]">{relativeTime(item.createdAt)}</p></article>)}{!data.activity.length ? <p className="text-sm text-[#a99c7c]">The hall is quiet—for now.</p> : null}</div></section></aside>
         </div>
       </section>
     </main>
@@ -43,6 +43,16 @@ export function BingoPublicBoard({ slug }: { slug: string }) {
 }
 
 function LoadingScreen({ error }: { error: string }) { return <main className="realm-bg grid min-h-screen place-items-center px-5 text-[#eadcb9]"><section className="wood-panel max-w-lg p-8 text-center"><p className="fantasy-title text-3xl font-bold">Opening the bingo hall…</p>{error ? <p className="mt-4 text-sm text-[#e8b69c]">{error}</p> : null}</section></main>; }
-function formatMode(value: string) { return value === 'lockout' ? 'Shared lockout' : value === 'classic' ? 'Classic lines' : 'Points hunt'; }
+function formatMode(value: string) {
+  return ({
+    lockout: 'Shared lockout', classic: 'Classic lines', points: 'Points hunt', blackout: 'Blackout race',
+    progression: 'Progression path', categories: 'Category challenge',
+  } as Record<string, string>)[value] ?? 'Custom bingo';
+}
+function confidenceCounts(data: BingoViewData) {
+  const counts = new Map<string, number>();
+  data.completions.forEach((completion) => counts.set(completion.verificationConfidence, (counts.get(completion.verificationConfidence) ?? 0) + 1));
+  return [...counts.entries()].sort((left, right) => right[1] - left[1]);
+}
 function statusLabel(value: string) { return value === 'live' ? 'Live now' : value === 'complete' ? 'Complete' : value === 'scheduled' ? 'Scheduled' : 'Board preview'; }
 function relativeTime(value: string) { const seconds = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 1000)); if (seconds < 60) return `${seconds}s ago`; if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`; return new Date(value).toLocaleString(); }

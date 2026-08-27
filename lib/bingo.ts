@@ -24,9 +24,15 @@ type ClaimRow = {
   id: string; event_id: string; task_id: string; team_id: string; member_id: string | null; claimed_by_name: string;
   note: string; evidence_url: string | null; evidence_upload_id: string | null; status: BingoClaimStatus;
   review_note: string | null; score_awarded: number; submitted_at: string; reviewed_at: string | null; approved_at: string | null;
+  verification_source: string; verification_confidence: string; verification_candidate_id: string | null;
 };
-type CompletionRow = { id: string; task_id: string; team_id: string; claim_id: string; completion_number: number; points: number; completed_at: string };
+type CompletionRow = { id: string; task_id: string; team_id: string; claim_id: string; completion_number: number; points: number; verification_source: string; verification_confidence: string; completed_at: string };
 type ActivityRow = { id: string; team_id: string | null; task_id: string | null; activity_type: string; message: string; metadata_json: string | null; visible_at: string; created_at: string };
+type CandidateRow = {
+  id: string; task_id: string; team_id: string; member_id: string | null; source_summary: string; confidence: string;
+  status: string; progress_value: number; target_value: number; summary: string; details_json: string;
+  created_at: string; updated_at: string; resolved_at: string | null;
+};
 
 export class BingoError extends Error {
   readonly status: number;
@@ -79,8 +85,10 @@ export async function loadBingoView(input: {
   ).bind(input.eventId).first<BingoEventRow>();
   if (!event) throw new BingoError('This bingo event does not exist.', 404);
   if (input.viewer === 'public' && !event.public_spectator) throw new BingoError('Public spectating is disabled for this event.', 404);
+  const candidateScope = input.viewer === 'organizer' ? '' : input.viewer === 'team' ? ' AND team_id = ?' : ' AND 1 = 0';
+  const candidateBindings = input.viewer === 'team' ? [event.id, input.teamId ?? ''] : [event.id];
 
-  const [teamResult, memberResult, taskResult, claimResult, completionResult, activityResult, snapshotResult] = await Promise.all([
+  const [teamResult, memberResult, taskResult, claimResult, completionResult, activityResult, snapshotResult, candidateResult, verificationCount] = await Promise.all([
     db.prepare('SELECT id, event_id, source_team_index, name, color, emblem FROM bingo_teams WHERE event_id = ? ORDER BY source_team_index')
       .bind(event.id).all<TeamRow>(),
     db.prepare(`SELECT btm.id, btm.team_id, btm.player_id, btm.display_name, btm.normalized_name, btm.role
@@ -91,15 +99,23 @@ export async function loadBingoView(input: {
                        repeatable, max_completions, hidden, free_space, icon_key, rule_json, sort_order
                 FROM bingo_tasks WHERE event_id = ? ORDER BY sort_order`).bind(event.id).all<TaskRow>(),
     db.prepare(`SELECT id, event_id, task_id, team_id, member_id, claimed_by_name, note, evidence_url,
-                       evidence_upload_id, status, review_note, score_awarded, submitted_at, reviewed_at, approved_at
+                       evidence_upload_id, verification_source, verification_confidence, verification_candidate_id,
+                       status, review_note, score_awarded, submitted_at, reviewed_at, approved_at
                 FROM bingo_claims WHERE event_id = ? ORDER BY submitted_at DESC LIMIT 250`).bind(event.id).all<ClaimRow>(),
-    db.prepare(`SELECT id, task_id, team_id, claim_id, completion_number, points, completed_at
+    db.prepare(`SELECT id, task_id, team_id, claim_id, completion_number, points, verification_source,
+                       verification_confidence, completed_at
                 FROM bingo_completions WHERE event_id = ? ORDER BY completed_at`).bind(event.id).all<CompletionRow>(),
     db.prepare(`SELECT id, team_id, task_id, activity_type, message, metadata_json, visible_at, created_at
                 FROM bingo_activity WHERE event_id = ? ORDER BY created_at DESC LIMIT 80`).bind(event.id).all<ActivityRow>(),
     db.prepare(`SELECT phase, COUNT(*) AS count, MAX(captured_at) AS captured_at
                 FROM bingo_player_snapshots WHERE event_id = ? GROUP BY phase`).bind(event.id)
       .all<{ phase: string; count: number; captured_at: string | null }>(),
+    db.prepare(`SELECT id, task_id, team_id, member_id, source_summary, confidence, status, progress_value,
+                       target_value, summary, details_json, created_at, updated_at, resolved_at
+                FROM bingo_verification_candidates WHERE event_id = ?${candidateScope} ORDER BY updated_at DESC LIMIT 1000`)
+      .bind(...candidateBindings).all<CandidateRow>(),
+    db.prepare(`SELECT COUNT(*) AS count FROM bingo_verification_events WHERE event_id = ?${candidateScope}`)
+      .bind(...candidateBindings).first<{ count: number }>(),
   ]);
 
   const now = Date.now();
@@ -233,6 +249,9 @@ export async function loadBingoView(input: {
       evidenceUploadId: input.viewer === 'organizer' ? claim.evidence_upload_id : null,
       status: claim.status,
       reviewNote: input.viewer === 'public' ? null : claim.review_note,
+      verificationSource: claim.verification_source,
+      verificationConfidence: claim.verification_confidence,
+      verificationCandidateId: input.viewer === 'organizer' ? claim.verification_candidate_id : null,
       scoreAwarded: claim.score_awarded,
       submittedAt: claim.submitted_at,
       reviewedAt: claim.reviewed_at,
@@ -245,6 +264,8 @@ export async function loadBingoView(input: {
       claimId: completion.claim_id,
       completionNumber: completion.completion_number,
       points: completion.points,
+      verificationSource: completion.verification_source,
+      verificationConfidence: completion.verification_confidence,
       completedAt: completion.completed_at,
     })),
     activity: activityResult.results.filter((activity) => {
@@ -264,6 +285,20 @@ export async function loadBingoView(input: {
       createdAt: activity.created_at,
     })),
     snapshots: snapshotResult.results.map((snapshot) => ({ phase: snapshot.phase, count: snapshot.count, capturedAt: snapshot.captured_at })),
+    verification: {
+      eventCount: verificationCount?.count ?? 0,
+      candidates: candidateResult.results.filter((candidate) => {
+        if (input.viewer === 'organizer') return true;
+        if (input.viewer === 'team') return candidate.team_id === input.teamId && candidate.status !== 'dismissed';
+        return false;
+      }).map((candidate) => ({
+        id: candidate.id, taskId: candidate.task_id, teamId: candidate.team_id, memberId: candidate.member_id,
+        sourceSummary: candidate.source_summary, confidence: candidate.confidence, status: candidate.status,
+        progressValue: candidate.progress_value, targetValue: candidate.target_value, summary: candidate.summary,
+        details: input.viewer === 'public' ? {} : parseJson<Record<string, unknown>>(candidate.details_json, {}),
+        createdAt: candidate.created_at, updatedAt: candidate.updated_at, resolvedAt: candidate.resolved_at,
+      })),
+    },
     viewer: { type: input.viewer, teamId: input.teamId ?? null },
   };
 }

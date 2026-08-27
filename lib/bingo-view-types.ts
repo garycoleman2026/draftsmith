@@ -1,5 +1,6 @@
 import type { BingoBoardScope, BingoClaimStatus, BingoMode, BingoStatus, BingoVerificationMode } from './types';
 import type { BingoEventRules, BingoTaskRule } from './bingo-rules';
+import type { VerificationConfidence } from './bingo-verification-core';
 
 export type BingoViewTeam = {
   id: string; name: string; color: string; emblem: string; sourceTeamIndex: number;
@@ -19,6 +20,14 @@ export type BingoViewClaim = {
   id: string; taskId: string; teamId: string; memberId: string | null; claimedByName: string;
   note: string; evidenceUrl: string | null; evidenceUploadId: string | null; status: BingoClaimStatus;
   reviewNote: string | null; scoreAwarded: number; submittedAt: string; reviewedAt: string | null; approvedAt: string | null;
+  verificationSource: string; verificationConfidence: VerificationConfidence; verificationCandidateId: string | null;
+};
+
+export type BingoViewVerificationCandidate = {
+  id: string; taskId: string; teamId: string; memberId: string | null; sourceSummary: string;
+  confidence: VerificationConfidence; status: 'progress' | 'ready' | 'accepted' | 'dismissed';
+  progressValue: number; targetValue: number; summary: string; details: Record<string, unknown>;
+  createdAt: string; updatedAt: string; resolvedAt: string | null;
 };
 
 export type BingoViewData = {
@@ -32,8 +41,9 @@ export type BingoViewData = {
   teams: BingoViewTeam[];
   tasks: BingoViewTask[];
   claims: BingoViewClaim[];
-  completions: { id: string; taskId: string; teamId: string; claimId: string; completionNumber: number; points: number; completedAt: string }[];
+  completions: { id: string; taskId: string; teamId: string; claimId: string; completionNumber: number; points: number; verificationSource: string; verificationConfidence: VerificationConfidence; completedAt: string }[];
   activity: { id: string; teamId: string | null; taskId: string | null; type: string; message: string; metadata: Record<string, unknown>; createdAt: string }[];
   snapshots: { phase: string; count: number; capturedAt: string | null }[];
+  verification: { eventCount: number; candidates: BingoViewVerificationCandidate[] };
   viewer: { type: 'public' | 'team' | 'organizer'; teamId: string | null };
 };

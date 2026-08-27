@@ -27,6 +27,9 @@ type ReviewableClaim = {
   team_name: string;
   claimed_by_name: string;
   evidence_upload_id: string | null;
+  verification_source: string;
+  verification_confidence: string;
+  verification_candidate_id: string | null;
   status: string;
 };
 
@@ -39,7 +42,8 @@ export async function reviewBingoClaim(input: {
 }) {
   const db = getDatabase();
   const claim = await db.prepare(
-    `SELECT bc.id, bc.event_id, bc.task_id, bc.team_id, bc.claimed_by_name, bc.evidence_upload_id, bc.status,
+    `SELECT bc.id, bc.event_id, bc.task_id, bc.team_id, bc.claimed_by_name, bc.evidence_upload_id,
+            bc.verification_source, bc.verification_confidence, bc.verification_candidate_id, bc.status,
             be.draft_id, be.title AS event_title, be.status AS event_status, be.mode, be.spectator_delay_seconds,
             bt.title AS task_title, bt.points AS task_points, bt.repeatable, bt.max_completions, bt.free_space,
             bt.verification_mode, bt.sort_order, bt.rule_json,
@@ -103,24 +107,39 @@ export async function reviewBingoClaim(input: {
   if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile is no longer available.', 409);
   const completionNumber = completions.filter((completion) => completion.teamId === claim.team_id && completion.taskId === claim.task_id).length + 1;
   const delay = Math.max(0, claim.spectator_delay_seconds);
+  const approvedConfidence = claim.verification_confidence === 'unverified' ? 'reviewed' : claim.verification_confidence;
   try {
     await db.batch([
       db.prepare(
         `INSERT INTO bingo_completions
-          (id, event_id, task_id, team_id, claim_id, completion_number, global_lock_key, points, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, event_id, task_id, team_id, claim_id, completion_number, global_lock_key, points,
+           verification_source, verification_confidence, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), claim.event_id, claim.task_id, claim.team_id, claim.id, completionNumber,
-        claim.mode === 'lockout' ? claim.task_id : null, claim.task_points, now),
+        claim.mode === 'lockout' ? claim.task_id : null, claim.task_points,
+        claim.verification_source, approvedConfidence, now),
       db.prepare(
-        `UPDATE bingo_claims SET status = 'approved', review_note = ?, score_awarded = ?, reviewed_at = ?, approved_at = ?
+        `UPDATE bingo_claims SET status = 'approved', review_note = ?, score_awarded = ?, verification_confidence = ?,
+         reviewed_at = ?, approved_at = ?
          WHERE id = ? AND event_id = ? AND status = 'pending'`,
-      ).bind(reviewNote, claim.task_points, now, now, claim.id, claim.event_id),
+      ).bind(reviewNote, claim.task_points, approvedConfidence, now, now, claim.id, claim.event_id),
+      ...(claim.verification_candidate_id ? [db.prepare(
+        `UPDATE bingo_verification_candidates
+         SET status = 'accepted', confidence = ?, resolved_at = ?, updated_at = ?
+         WHERE id = ? AND event_id = ?`,
+      ).bind(approvedConfidence, now, now, claim.verification_candidate_id, claim.event_id)] : []),
       ...(claim.evidence_upload_id ? [db.prepare('UPDATE bingo_evidence_uploads SET consumed_at = ? WHERE id = ?').bind(now, claim.evidence_upload_id)] : []),
       bingoActivityInsert({
         eventId: claim.event_id, teamId: claim.team_id, taskId: claim.task_id, type: 'claim.approved',
         message: `${claim.team_name} claimed ${claim.task_title} for ${claim.task_points} point${claim.task_points === 1 ? '' : 's'}!`,
-        metadata: { points: claim.task_points, claimedBy: claim.claimed_by_name }, delaySeconds: delay, now,
+        metadata: { points: claim.task_points, claimedBy: claim.claimed_by_name, source: claim.verification_source, confidence: approvedConfidence }, delaySeconds: delay, now,
       }),
+      ...(claim.verification_candidate_id ? [bingoActivityInsert({
+        eventId: claim.event_id, teamId: claim.team_id, taskId: claim.task_id, type: 'verification.accepted',
+        message: 'Automated evidence was reviewed and added to the scoreboard.',
+        metadata: { candidateId: claim.verification_candidate_id, source: claim.verification_source, confidence: approvedConfidence },
+        delaySeconds: delay, now,
+      })] : []),
       db.prepare('UPDATE bingo_events SET revision = revision + 1, updated_at = ? WHERE id = ?').bind(now, claim.event_id),
     ]);
   } catch (error) {
@@ -140,5 +159,5 @@ export async function reviewBingoClaim(input: {
       color: 0xd0a23d,
     }],
   });
-  return { status: 'approved' as const, scoreAwarded: claim.task_points };
+  return { status: 'approved' as const, scoreAwarded: claim.task_points, verificationSource: claim.verification_source, verificationConfidence: approvedConfidence };
 }

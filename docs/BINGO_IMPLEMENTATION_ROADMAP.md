@@ -6,8 +6,10 @@ Ordinary boards are self-service. Organizers compose layouts, game rules, and ta
 
 ## Delivery stages
 
-1. **Custom maker** — variable grids, six game styles, OSRS presets, drag-and-drop editing, spreadsheet round-tripping, template cloning, validation, and prerequisite enforcement.
-2. **Verification engine** — normalized evidence events, confidence/source labels, idempotent matching, progress candidates, replay, and organizer audit controls.
+Status: stages 1 and 2 are implemented. Stage 3 is the next active delivery stage.
+
+1. **Custom maker — shipped** — variable grids, six game styles, OSRS presets, drag-and-drop editing, spreadsheet round-tripping, template cloning, validation, and prerequisite enforcement.
+2. **Verification engine — shipped** — normalized evidence events, confidence/source labels, idempotent matching, progress candidates, replay, and organizer audit controls.
 3. **Wise Old Man** — event baselines, periodic checkpoints, final reconciliation, and automatic XP/level/KC candidates without aggressive upstream polling.
 4. **RuneLite service contract** — one-time device pairing, revocable credentials, minimal event batches, rate limits, deduplication, privacy controls, and an event overlay API.
 5. **RuneLite plugin** — public standalone repository, team/board overlay, manual submission, XP and supported chat/loot events, disclosure of transmitted data, tests, and Plugin Hub submission.

@@ -62,12 +62,13 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile cannot be claimed.', 409);
     const claimId = crypto.randomUUID();
     const now = new Date().toISOString();
+    const verificationSource = evidenceUploadId || evidenceUrl ? 'screenshot' : 'manual';
     await db.batch([
       db.prepare(`INSERT INTO bingo_claims
         (id, event_id, task_id, team_id, member_id, claimed_by_name, note, evidence_url, evidence_upload_id,
-         status, score_awarded, submitted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)`).bind(claimId, event.id, task.id, team.id, member.id,
-        member.display_name, note, evidenceUrl, evidenceUploadId, now),
+         verification_source, verification_confidence, status, score_awarded, submitted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unverified', 'pending', 0, ?)`).bind(claimId, event.id, task.id, team.id, member.id,
+        member.display_name, note, evidenceUrl, evidenceUploadId, verificationSource, now),
       bingoActivityInsert({ eventId: event.id, teamId: team.id, taskId: task.id, type: 'claim.submitted',
         message: `${team.name} submitted ${task.title} for review.`, now }),
       db.prepare('UPDATE bingo_events SET revision = revision + 1, updated_at = ? WHERE id = ?').bind(now, event.id),

@@ -21,6 +21,9 @@ export function BingoBoard({
             ? task.ownerTeamIds.filter((owner) => owner === teamId)
             : task.ownerTeamIds;
           const ownerTeams = owners.flatMap((owner) => data.teams.filter((team) => team.id === owner));
+          const proofLabels = [...new Set(data.completions
+            .filter((completion) => completion.taskId === task.id && owners.includes(completion.teamId))
+            .map((completion) => `${formatProofSource(completion.verificationSource)} · ${completion.verificationConfidence}`))];
           const ownPending = Boolean(teamId && task.pendingTeamIds.includes(teamId));
           const selected = selectedTaskId === task.id;
           const style = data.event.mode === 'lockout' && ownerTeams[0]
@@ -44,6 +47,7 @@ export function BingoBoard({
                   {ownerTeams.map((team) => <span key={team.id} className="rounded px-1.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: team.color }}>{team.name}</span>)}
                 </div>
               ) : ownPending ? <p className="mt-3 text-[10px] font-black text-[#946716]">Awaiting organizer review</p> : null}
+              {proofLabels.length ? <p className="mt-2 line-clamp-1 text-[9px] font-black uppercase tracking-[0.04em] text-[#4f7049]" title={proofLabels.join(' · ')}>Proof: {proofLabels.join(' · ')}</p> : null}
             </>
           );
           const className = `parchment-card min-h-36 w-full p-3 text-left transition ${selected ? 'ring-4 ring-[#517347]/35' : ''} ${onSelect ? 'hover:-translate-y-0.5 hover:brightness-105' : ''}`;
@@ -54,6 +58,10 @@ export function BingoBoard({
       </div>
     </div>
   );
+}
+
+function formatProofSource(value: string) {
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function BingoStandings({ data }: { data: BingoViewData }) {
