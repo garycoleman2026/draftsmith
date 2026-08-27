@@ -1,5 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SiteFooter } from '../../components/SiteFooter';
 import { SiteHeader } from '../../components/SiteHeader';
+
+export const metadata: Metadata = {
+  title: 'Custom OSRS bingo maker and live tracker — Terry’s Drafting',
+  description: 'Build 3×3 to 7×7 clan bingo boards with OSRS presets, custom rules, lockout or points scoring, team claims, evidence review, and live spectators.',
+  alternates: { canonical: '/bingo' },
+};
 
 const previewTiles = [
   ['First blood', 25, 'verified'], ['Treasure trail', 40, 'open'], ['Boss unique', 80, 'pending'], ['Gain a level', 30, 'open'], ['Mystery task', 60, 'hidden'],
@@ -83,6 +91,7 @@ export default function BingoHallPage() {
           </div>
         </section>
       </section>
+      <SiteFooter />
     </main>
   );
 }

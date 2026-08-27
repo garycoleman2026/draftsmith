@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SiteFooter } from '../../components/SiteFooter';
 import { SiteHeader } from '../../components/SiteHeader';
 
 export const metadata: Metadata = {
   title: 'RuneLite integration and privacy — Terry’s Drafting',
   description: 'How Terry’s Drafting pairs RuneLite, which bingo observations are transmitted, and how to disconnect a device.',
+  alternates: { canonical: '/runelite' },
 };
 
 const sent = [
@@ -62,6 +64,7 @@ export default function RuneliteGuidePage() {
         <div className="mt-8 flex flex-wrap gap-3"><Link className="gold-button px-5 py-3 text-sm" href="/bingo">Explore the bingo hall →</Link><Link className="scroll-button px-5 py-3 text-sm" href="/">Back to Terry’s Drafting</Link></div>
         <p className="mt-8 text-[10px] leading-relaxed text-[#8f8267]">Terry’s Drafting is an independent community tool and is not affiliated with or endorsed by RuneLite, Jagex, or Wise Old Man.</p>
       </section>
+      <SiteFooter />
     </main>
   );
 }

@@ -15,7 +15,23 @@ export function SiteHeader({ badge }: { badge?: string }) {
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          <Link className="hidden text-xs font-black text-[#cbb77f] underline decoration-[#8b6d2c] underline-offset-4 md:inline" href="/bingo">Bingo hall</Link>
+          <nav aria-label="Main navigation" className="hidden items-center gap-4 lg:flex">
+            <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/">Draft teams</Link>
+            <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/bingo">Bingo hall</Link>
+            <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/presets">Task library</Link>
+            <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/guides">Guides</Link>
+            <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/about">About</Link>
+          </nav>
+          <details className="relative lg:hidden">
+            <summary className="scroll-button list-none px-3 py-2 text-xs">Menu</summary>
+            <nav aria-label="Mobile navigation" className="absolute right-0 z-50 mt-2 grid w-44 gap-1 rounded border border-[#9b792f] bg-[#1c1710] p-2 shadow-2xl">
+              <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/">Draft teams</Link>
+              <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/bingo">Bingo hall</Link>
+              <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/presets">Task library</Link>
+              <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/guides">Guides</Link>
+              <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/about">About</Link>
+            </nav>
+          </details>
           {badge ? (
             <span className="hidden rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-xs font-bold text-[#ddc27b] shadow-inner sm:inline-flex">
               {badge}

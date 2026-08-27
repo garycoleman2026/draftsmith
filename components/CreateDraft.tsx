@@ -5,6 +5,7 @@ import { absoluteUrl, copyText, initials } from '../lib/client';
 import type { BalancePreset, DraftType, LiveOrder, QuestionVisibility, RosterMode, SurveyQuestion } from '../lib/types';
 import { validateRsn } from '../lib/validation';
 import { SiteHeader } from './SiteHeader';
+import { SiteFooter } from './SiteFooter';
 import { SurveyBuilder } from './SurveyBuilder';
 
 type CreatedDraft = {
@@ -641,6 +642,7 @@ export function CreateDraft() {
           </div>
         ) : null}
       </section>
+      <SiteFooter />
     </main>
   );
 }
