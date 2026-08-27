@@ -2,11 +2,12 @@
 
 ## Release goal
 
-A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without re-entering teams. Organizers manage the event, each team receives a private claim link, and spectators receive a read-only live board.
+A completed Terry's Drafting event can become a hosted clan bingo without re-entering teams, while organizers with pre-made teams can paste those rosters and begin directly. Organizers manage the event, each team receives a private claim link, and spectators receive a read-only live board.
 
 ## Required journeys
 
 - [x] Create a classic, points, lockout, blackout, progression, category, or saved-template bingo from completed draft results.
+- [x] Create the same secure bingo event directly from 2–8 named, copy/pasted team rosters without running a draft first.
 - [x] Snapshot team membership so later draft edits cannot silently change an active bingo.
 - [x] Build 3 × 3 through 7 × 7 boards with drag-and-drop tiles, direct editing, or pasted pipe, tab, and CSV rows.
 - [x] Start from a searchable library of at least 60 editable OSRS task presets.
@@ -36,7 +37,7 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - Evidence is private to the organizer, limited to 5 MB, signature checked, stored in R2, and served with `nosniff`.
 - Team and organizer credentials are stored only as hashes; newly issued raw links are shown once.
 - Team claims and evidence uploads are rate limited.
-- Custom boards support 9–49 tiles in a square grid. Wise Old Man syncing is organizer-driven (or automatic while an organizer room is open). RuneLite pairing and the source beta tracker are implemented; Plugin Hub release still requires owner-confirmed in-game testing.
+- Custom boards support 9–49 tiles in a square grid. Direct events accept 2–8 teams and up to 120 unique valid OSRS names, rejecting a player assigned to several teams. Wise Old Man syncing is organizer-driven (or automatic while an organizer room is open). RuneLite pairing and the source beta tracker are implemented; Plugin Hub release still requires owner-confirmed in-game testing.
 
 ## Verification gate
 
@@ -45,5 +46,6 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - [x] Signal validation, source authorization, identity, participant-scope, target-ID, duration, aggregation, and corroboration tests pass.
 - [x] TypeScript, ESLint, the full unit suite, production build, and production dependency audit pass.
 - [x] Local API smoke covers create → start → claim → approve → public score.
+- [x] Local standalone smoke covers pasted teams → organizer room → private team view → public spectator view, plus duplicate-RSN rejection.
 - [x] Local RuneLite API smoke covers enable → pair → overlay → ingest → replay deduplication → revoke.
 - [x] Hosted API and database are healthy after deployment.

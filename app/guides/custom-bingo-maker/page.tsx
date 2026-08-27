@@ -10,6 +10,9 @@ export const metadata: Metadata = {
 
 export default function CustomMakerGuidePage() {
   return <ContentPage eyebrow="Custom bingo maker" title="Make unusual rules without commissioning a new feature." intro="Most custom ideas can be expressed as data: a title, target, amount, contributor scope, evidence source, points value, and relationship to other tiles. Code is reserved for genuinely new kinds of game evidence.">
+    <h2>Start with drafted teams or paste the teams you already have.</h2>
+    <p>The <Link href="/bingo#create">bingo hall</Link> accepts pre-made rosters directly. Separate teams with a blank line, put the team name first, and add one OSRS name per line. Terry creates the organizer room, one private link per team, and the spectator board in a single step. The first listed player is only the displayed team lead; it does not grant extra scoring power.</p>
+
     <h2>What organizers can build today.</h2>
     <p>The maker supports 3 × 3 through 7 × 7 boards, six built-in game styles, more than sixty editable OSRS presets, hidden tiles, free spaces, repeat limits, task prerequisites, shared or per-team ownership, and saved clan templates. You can paste tasks as rows for fast bulk editing or tune each rule in the visual editor.</p>
 

@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { StandaloneBingoCreator, type StandaloneBingoTemplateOption } from '../../components/StandaloneBingoCreator';
 import { SiteFooter } from '../../components/SiteFooter';
 import { SiteHeader } from '../../components/SiteHeader';
+import { listGalleryTemplates } from '../../lib/bingo-gallery';
 
 export const metadata: Metadata = {
   title: 'Custom OSRS bingo maker and live tracker — Terry’s Drafting',
-  description: 'Build 3×3 to 7×7 clan bingo boards with OSRS presets, custom rules, lockout or points scoring, team claims, evidence review, and live spectators.',
+  description: 'Paste pre-made teams or use a Terry draft, then build 3×3 to 7×7 OSRS bingo boards with custom rules, team claims, evidence review, and live spectators.',
   alternates: { canonical: '/bingo' },
 };
 
@@ -26,7 +28,20 @@ const stateClasses: Record<string, string> = {
   open: 'border-[#9c7933] bg-[#efe0b6]',
 };
 
-export default function BingoHallPage() {
+export default async function BingoHallPage() {
+  const gallery = await listGalleryTemplates({ sort: 'popular' });
+  const templates: StandaloneBingoTemplateOption[] = [...gallery]
+    .sort((left, right) => {
+      const leftPriority = left.official && left.configuration.key === 'points' ? 0 : left.official ? 1 : 2;
+      const rightPriority = right.official && right.configuration.key === 'points' ? 0 : right.official ? 1 : 2;
+      return leftPriority - rightPriority || left.name.localeCompare(right.name);
+    })
+    .map((template) => ({
+      value: template.official ? `builtin:${template.configuration.key}` : `community:${template.id}`,
+      name: template.name,
+      summary: template.summary,
+      meta: `${template.gridSize}×${template.gridSize} · ${template.mode.replaceAll('_', ' ')}`,
+    }));
   return (
     <main className="realm-bg min-h-screen text-[#eadcb9]">
       <SiteHeader badge="Live bingo tracker" />
@@ -35,10 +50,12 @@ export default function BingoHallPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">The next stage after drafting</p>
             <h1 className="fantasy-title mt-3 max-w-4xl text-4xl font-bold leading-none text-[#f5df9b] sm:text-6xl">Run the whole clan bingo from one great hall.</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#b5a888]">Design a custom OSRS bingo, run live scoring and private team claims, review evidence, and publish a spectator board—all connected to the teams Terry already forged.</p>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#b5a888]">Design a custom OSRS bingo, run live scoring and private team claims, review evidence, and publish a spectator board—using teams Terry drafted or rosters your clan already formed.</p>
           </div>
-          <Link className="gold-button inline-flex justify-center px-5 py-3 text-sm" href="/">Draft the teams first →</Link>
+          <Link className="gold-button inline-flex justify-center px-5 py-3 text-sm" href="#create">Create from existing teams ↓</Link>
         </div>
+
+        <StandaloneBingoCreator templates={templates} />
 
         <div className="mt-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
           <section className="parchment-card p-4 sm:p-6">
