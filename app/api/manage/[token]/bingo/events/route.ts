@@ -115,6 +115,10 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       eventType: 'bingo.created', metadata: { eventId, mode, boardScope, taskCount: tasks.length },
       requestId: requestId(request), createdAt: now,
     });
+    if (customTemplate?.visibility === 'public') {
+      await db.prepare('UPDATE bingo_templates SET clone_count = clone_count + 1 WHERE id = ? AND visibility = ?')
+        .bind(customTemplate.id, 'public').run();
+    }
     return json({
       id: eventId,
       managePath: `/bingo/manage/${token}/${eventId}`,
@@ -130,9 +134,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
 
 async function loadCustomTemplate(templateId: string, draftId: string, clanId: string | null) {
   return getDatabase().prepare(
-    `SELECT id, configuration_json FROM bingo_templates
-     WHERE id = ? AND (owner_draft_id = ? OR (clan_id IS NOT NULL AND clan_id = ?))`,
-  ).bind(templateId, draftId, clanId).first<{ id: string; configuration_json: string }>();
+    `SELECT id, configuration_json, visibility FROM bingo_templates
+     WHERE id = ? AND (owner_draft_id = ? OR (clan_id IS NOT NULL AND clan_id = ?) OR visibility = 'public')`,
+  ).bind(templateId, draftId, clanId).first<{ id: string; configuration_json: string; visibility: string }>();
 }
 
 function validMode(value: unknown): BingoMode {

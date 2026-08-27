@@ -7,7 +7,7 @@ type BingoEventSummary = {
   id: string; title: string; mode: string; status: string; task_count: number; pending_count: number;
   created_at: string; managePath: string; publicPath: string;
 };
-type TemplateChoice = { key?: string; id?: string; name: string; description: string; mode: string; boardScope: string; gridSize?: number };
+type TemplateChoice = { key?: string; id?: string; name: string; description: string; mode: string; boardScope: string; gridSize?: number; source?: string; category?: string; visibility?: string; publicPath?: string | null; ratingAverage?: number | null };
 type IssuedLink = { teamId: string; teamName: string; path: string };
 
 export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string; hasResult: boolean; draftTitle: string }) {
@@ -29,7 +29,12 @@ export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string
     const eventData = await eventResponse.json() as { events?: BingoEventSummary[]; error?: string };
     const templateData = await templateResponse.json() as { builtin?: TemplateChoice[]; custom?: TemplateChoice[]; error?: string };
     if (!eventResponse.ok) throw new Error(eventData.error || 'Bingo events could not be loaded.');
-    setEvents(eventData.events ?? []); setTemplates([...(templateData.builtin ?? []), ...(templateData.custom ?? [])]);
+    const nextTemplates = [...(templateData.builtin ?? []), ...(templateData.custom ?? [])];
+    setEvents(eventData.events ?? []); setTemplates(nextTemplates);
+    const preferred = window.localStorage.getItem('terrys_preferred_bingo_template');
+    if (preferred && nextTemplates.some((template) => preferred === (template.id ? `custom:${template.id}` : `builtin:${template.key}`))) {
+      setTemplateChoice(preferred);
+    }
   }, [base]);
   useEffect(() => {
     const initial = window.setTimeout(() => void load().catch((cause) => setError(cause instanceof Error ? cause.message : 'Bingo events could not be loaded.')), 0);
@@ -61,6 +66,21 @@ export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string
     setCopied(true); window.setTimeout(() => setCopied(false), 1_500);
   }
 
+  async function deleteTemplate(template: TemplateChoice) {
+    if (!template.id || !window.confirm(`Remove “${template.name}”? Published gallery links will stop working.`)) return;
+    setWorking(true); setError('');
+    try {
+      const response = await fetch(`${base}/templates`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ templateId: template.id }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'The template could not be removed.');
+      if (templateChoice === `custom:${template.id}`) setTemplateChoice('builtin:points');
+      setSuccess('The saved template was removed.'); await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'The template could not be removed.'); }
+    finally { setWorking(false); }
+  }
+
   return (
     <section className="wood-panel mt-5 p-5 sm:p-8">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -74,10 +94,11 @@ export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string
           <h3 className="font-black text-[#f2d98f]">Open a new bingo event</h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_260px]">
             <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Event title<input className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-            <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Starting board<select className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={templateChoice} onChange={(event) => setTemplateChoice(event.target.value)}>{templates.filter((item) => item.key).map((item) => <option value={`builtin:${item.key}`} key={item.key}>{item.name}</option>)}{templates.filter((item) => item.id).map((item) => <option value={`custom:${item.id}`} key={item.id}>Saved · {item.name}</option>)}</select></label>
+            <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Starting board<select className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={templateChoice} onChange={(event) => setTemplateChoice(event.target.value)}>{templates.filter((item) => item.key).map((item) => <option value={`builtin:${item.key}`} key={item.key}>{item.name}</option>)}{templates.filter((item) => item.id).map((item) => <option value={`custom:${item.id}`} key={item.id}>{item.source === 'community' ? 'Community' : item.source === 'clan' ? 'Clan' : 'Saved'} · {item.name}{item.ratingAverage ? ` · ${item.ratingAverage.toFixed(1)}★` : ''}</option>)}</select></label>
           </div>
-          <p className="mt-3 text-xs text-[#a99c7d]">{templates.find((item) => templateChoice.endsWith(item.key ?? item.id ?? ''))?.description ?? 'Pick a built-in or saved custom board.'}</p>
+          <p className="mt-3 text-xs text-[#a99c7d]">{templates.find((item) => templateChoice.endsWith(item.key ?? item.id ?? ''))?.description ?? 'Pick a built-in, private, clan, or community board.'} <a className="font-black text-[#d9e7aa] underline" href="/templates" target="_blank" rel="noreferrer">Browse gallery ↗</a></p>
           <button className="gold-button mt-4 px-5 py-3 text-sm" disabled={!hasResult || !title.trim() || working} onClick={() => void createEvent()}>{working ? 'Forging the hall…' : hasResult ? 'Create bingo event →' : 'Finish the draft first'}</button>
+          {templates.some((template) => template.id && template.source === 'saved') ? <details className="mt-4 rounded border border-white/10 bg-black/15 p-3"><summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.1em] text-[#d7ae50]">Manage saved templates</summary><div className="mt-3 space-y-2">{templates.filter((template) => template.id && template.source === 'saved').map((template) => <div className="flex items-center gap-2 rounded border border-white/10 p-2 text-xs" key={template.id}><span className="min-w-0 flex-1 truncate text-[#e3d4ad]">{template.name} · {template.visibility}</span>{template.publicPath ? <a className="text-[#d9e7aa] underline" href={template.publicPath} target="_blank" rel="noreferrer">View</a> : null}<button className="text-[#e5b39a] underline" disabled={working} onClick={() => void deleteTemplate(template)}>Remove</button></div>)}</div></details> : null}
           {issuedLinks.length ? <div className="mt-5 rounded border border-[#d4ad4d]/45 bg-[#11170f] p-4"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.1em] text-[#d7ae50]">New private links</p><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copyAll()}>{copied ? 'Copied all' : 'Copy all links'}</button></div><div className="mt-3 space-y-2">{issuedLinks.map((link) => <div className="flex items-center gap-2 text-xs" key={link.teamId}><span className="min-w-0 flex-1 truncate text-[#e3d4ad]">{link.teamName}</span><button className="text-[#cdda9e] underline" onClick={() => void copyText(absoluteUrl(link.path))}>Copy</button><a className="text-[#cdda9e] underline" href={link.path} target="_blank" rel="noreferrer">Open ↗</a></div>)}</div></div> : null}
         </div>
         <div className="rounded border border-[#9d7932]/55 bg-black/20 p-4 sm:p-5">

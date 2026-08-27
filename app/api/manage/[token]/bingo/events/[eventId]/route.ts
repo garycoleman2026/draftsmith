@@ -37,6 +37,7 @@ export async function PUT(request: Request, context: Context) {
     if (startAt && endAt && Date.parse(endAt) <= Date.parse(startAt)) throw new BingoError('The end time must be after the start time.');
     const requiresReview = body.requiresReview === undefined ? event.requires_review : Boolean(body.requiresReview);
     const publicSpectator = body.publicSpectator === undefined ? event.public_spectator : Boolean(body.publicSpectator);
+    const publicListed = publicSpectator && (body.publicListed === undefined ? Boolean(event.public_listed) : Boolean(body.publicListed));
     const spectatorDelaySeconds = clampInteger(body.spectatorDelaySeconds, 0, 3600, event.spectator_delay_seconds);
     const winCondition = mode === 'classic' ? 'lines' : mode === 'blackout' ? 'blackout' : mode === 'categories' ? 'categories' : 'points';
     const targetValue = clampInteger(body.targetValue, 0, 100_000, event.target_value);
@@ -47,13 +48,13 @@ export async function PUT(request: Request, context: Context) {
     const now = new Date().toISOString();
     await getDatabase().prepare(
       `UPDATE bingo_events SET title = ?, mode = ?, board_scope = ?, win_condition = ?, target_value = ?,
-          requires_review = ?, public_spectator = ?, spectator_delay_seconds = ?, start_at = ?, end_at = ?,
+          requires_review = ?, public_spectator = ?, public_listed = ?, spectator_delay_seconds = ?, start_at = ?, end_at = ?,
           status = ?, rules_json = ?, revision = revision + 1, updated_at = ? WHERE id = ?`,
-    ).bind(title, mode, boardScope, winCondition, targetValue, requiresReview ? 1 : 0, publicSpectator ? 1 : 0,
+    ).bind(title, mode, boardScope, winCondition, targetValue, requiresReview ? 1 : 0, publicSpectator ? 1 : 0, publicListed ? 1 : 0,
       spectatorDelaySeconds, startAt, endAt, status, JSON.stringify(rules), now, eventId).run();
     await recordAudit(getDatabase(), {
       draftId: event.draft_id, actorType: 'organizer', eventType: 'bingo.settings_updated',
-      metadata: { eventId, mode, boardScope, requiresReview, publicSpectator, spectatorDelaySeconds },
+      metadata: { eventId, mode, boardScope, requiresReview, publicSpectator, publicListed, spectatorDelaySeconds },
       requestId: requestId(request), createdAt: now,
     }).catch(() => undefined);
     return json(await loadBingoView({ eventId, viewer: 'organizer' }));

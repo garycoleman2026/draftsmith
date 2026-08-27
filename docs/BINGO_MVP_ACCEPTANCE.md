@@ -36,7 +36,7 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - Evidence is private to the organizer, limited to 5 MB, signature checked, stored in R2, and served with `nosniff`.
 - Team and organizer credentials are stored only as hashes; newly issued raw links are shown once.
 - Team claims and evidence uploads are rate limited.
-- Custom boards support 9–49 tiles in a square grid. Wise Old Man syncing is organizer-driven (or automatic while an organizer room is open); durable scheduled polling, RuneLite player pairing, and the full RuneLite tracker plugin remain later stages.
+- Custom boards support 9–49 tiles in a square grid. Wise Old Man syncing is organizer-driven (or automatic while an organizer room is open). RuneLite pairing and the source beta tracker are implemented; Plugin Hub release still requires owner-confirmed in-game testing.
 
 ## Verification gate
 

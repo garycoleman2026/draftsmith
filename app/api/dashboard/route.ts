@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const [clans, drafts, templates] = await Promise.all([
       db
         .prepare(
-          `SELECT c.id, c.name, c.slug, cm.role
+          `SELECT c.id, c.name, c.slug, c.description, c.public_listing, cm.role
            FROM clan_memberships cm JOIN clans c ON c.id = cm.clan_id
            WHERE cm.user_id = ? ORDER BY c.name`,
         )

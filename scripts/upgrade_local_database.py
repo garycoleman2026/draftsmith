@@ -20,6 +20,7 @@ def main() -> None:
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     columns = {row[1] for row in connection.execute("PRAGMA table_info(drafts)")}
     task_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_tasks)")} if "bingo_tasks" in tables else set()
+    template_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_templates)")} if "bingo_templates" in tables else set()
     verification_index_columns = (
         [row[2] for row in connection.execute("PRAGMA index_info(bingo_verification_events_idempotency_unique)")]
         if "bingo_verification_events" in tables else []
@@ -44,6 +45,8 @@ def main() -> None:
             migrations.append(ROOT / "drizzle" / "0007_nosy_obadiah_stane.sql")
         if "bingo_runelite_integrations" not in tables:
             migrations.append(ROOT / "drizzle" / "0008_cooing_mandarin.sql")
+    if "bingo_template_ratings" not in tables or "public_slug" not in template_columns:
+        migrations.append(ROOT / "drizzle" / "0009_short_king_cobra.sql")
     if not migrations:
         connection.close()
         print(f"Local database is already current: {database}")

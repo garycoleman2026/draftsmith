@@ -16,6 +16,8 @@ export default function PrivacyPage() {
       <li><strong>Sign-up data:</strong> answers to organizer-created survey fields, which may include Discord name, availability, experience, or gear band. Organizers should not request sensitive personal information.</li>
       <li><strong>Account data:</strong> when Discord sign-in is used, the service processes the profile identifiers needed to create a session and administer a clan workspace.</li>
       <li><strong>Bingo data:</strong> boards, claims, notes, evidence links or uploaded screenshots, decisions, scores, and activity history.</li>
+      <li><strong>Community discovery:</strong> clan owners may opt a clan profile into the public directory, organizers may separately list individual spectator boards, and signed-in clan administrators may publish reusable templates. Private workspaces, private templates, and unlisted events are excluded.</li>
+      <li><strong>Template ratings:</strong> a random browser token is stored as an essential cookie and saved only as a hash so one browser can update its own rating without creating a public identity.</li>
       <li><strong>Public OSRS data:</strong> official Hiscores and Wise Old Man information requested for roster insights or event snapshots.</li>
       <li><strong>RuneLite data:</strong> the paired character, task-relevant normalized observations, timestamps, anonymous party size when needed, plugin version, and revocable device information. Raw chat and other players’ names are rejected.</li>
       <li><strong>Operational data:</strong> request metadata such as IP address may be processed by hosting, rate-limiting, and security infrastructure.</li>
@@ -28,7 +30,7 @@ export default function PrivacyPage() {
     <p>Private link holders can access the role attached to that link. Captains receive their own input areas. Team links show that team’s board and evidence status. Organizers can review event configuration, survey information authorized for their role, claims, and evidence. Spectator pages receive publishable scores and activity, not private notes or uploaded evidence.</p>
 
     <h2>Cookies and third parties.</h2>
-    <p>The service uses an essential session cookie when a user signs in. Integrations may send task-specific requests to Discord, Wise Old Man, official Hiscores, and the hosting providers required to run the site. The site does not currently load Google advertising or behavioral analytics cookies. This policy and a consent mechanism will be updated before personalized advertising is enabled.</p>
+    <p>The service uses an essential session cookie when a user signs in and an essential browser-scoped token after someone rates a community template. Integrations may send task-specific requests to Discord, Wise Old Man, official Hiscores, and the hosting providers required to run the site. The site does not currently load Google advertising or behavioral analytics cookies. This policy and a consent mechanism will be updated before personalized advertising is enabled.</p>
 
     <h2>Retention and security.</h2>
     <p>Event records may be retained to keep organizer history and audit decisions available. One-time codes and device credentials are hashed; raw secrets are not stored. RuneLite credentials expire and can be revoked. No internet service can promise perfect security, so organizers should limit survey questions, protect role links, and remove sensitive material from claim notes.</p>

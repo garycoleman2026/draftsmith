@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
 const groups = [
-  { title: 'Build', links: [['Draft teams', '/'], ['Bingo hall', '/bingo'], ['Task library', '/presets'], ['RuneLite beta', '/runelite']] },
+  { title: 'Build', links: [['Draft teams', '/'], ['Bingo hall', '/bingo'], ['Community templates', '/templates'], ['Task library', '/presets'], ['RuneLite beta', '/runelite']] },
   { title: 'Learn', links: [['Guides', '/guides'], ['Clan bingo guide', '/guides/osrs-clan-bingo'], ['Custom board maker', '/guides/custom-bingo-maker'], ['Tracking guide', '/guides/runelite-tracking']] },
-  { title: 'Trust', links: [['About', '/about'], ['FAQ', '/faq'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Contact', '/contact']] },
+  { title: 'Trust', links: [['Public clans', '/clans'], ['About', '/about'], ['FAQ', '/faq'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['Contact', '/contact']] },
 ] as const;
 
 export function SiteFooter() {

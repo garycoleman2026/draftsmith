@@ -55,6 +55,8 @@ export const clans = sqliteTable(
     id: text('id').primaryKey().notNull(),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
+    description: text('description').notNull().default(''),
+    publicListing: integer('public_listing', { mode: 'boolean' }).notNull().default(false),
     createdByUserId: text('created_by_user_id').notNull().references(() => users.id),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
@@ -435,6 +437,7 @@ export const bingoEvents = sqliteTable(
     targetValue: integer('target_value').notNull().default(0),
     requiresReview: integer('requires_review', { mode: 'boolean' }).notNull().default(true),
     publicSpectator: integer('public_spectator', { mode: 'boolean' }).notNull().default(true),
+    publicListed: integer('public_listed', { mode: 'boolean' }).notNull().default(false),
     spectatorDelaySeconds: integer('spectator_delay_seconds').notNull().default(0),
     startAt: text('start_at'),
     endAt: text('end_at'),
@@ -684,12 +687,39 @@ export const bingoTemplates = sqliteTable(
     mode: text('mode').notNull(),
     boardScope: text('board_scope').notNull(),
     configurationJson: text('configuration_json').notNull(),
+    publicSlug: text('public_slug'),
+    visibility: text('visibility').notNull().default('private'),
+    summary: text('summary').notNull().default(''),
+    category: text('category').notNull().default('General'),
+    tagsJson: text('tags_json').notNull().default('[]'),
+    cloneCount: integer('clone_count').notNull().default(0),
+    ratingCount: integer('rating_count').notNull().default(0),
+    ratingTotal: integer('rating_total').notNull().default(0),
+    publishedAt: text('published_at'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [
     index('idx_bingo_templates_owner_draft').on(table.ownerDraftId),
     index('idx_bingo_templates_clan_id').on(table.clanId),
+    uniqueIndex('bingo_templates_public_slug_unique').on(table.publicSlug),
+    index('idx_bingo_templates_visibility_updated').on(table.visibility, table.updatedAt),
+    index('idx_bingo_templates_category_visibility').on(table.category, table.visibility),
+  ],
+);
+
+export const bingoTemplateRatings = sqliteTable(
+  'bingo_template_ratings',
+  {
+    templateId: text('template_id').notNull().references(() => bingoTemplates.id, { onDelete: 'cascade' }),
+    raterHash: text('rater_hash').notNull(),
+    rating: integer('rating').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.templateId, table.raterHash] }),
+    index('idx_bingo_template_ratings_template').on(table.templateId),
   ],
 );
 

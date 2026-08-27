@@ -23,7 +23,7 @@ export default function TermsPage() {
     </ul>
 
     <h2>Submitted content.</h2>
-    <p>You retain responsibility for event names, surveys, task text, claim notes, links, and evidence you submit. You grant the service permission to store, process, and display that material only as needed to operate the event and its selected public views. Do not submit content you lack permission to use.</p>
+    <p>You retain responsibility for event names, surveys, task text, claim notes, links, evidence, public clan descriptions, and community templates you submit. You grant the service permission to store, process, and display that material only as needed to operate the event and its selected public views. Do not submit content you lack permission to use. Public listings or ratings may be limited or removed when they are deceptive, abusive, infringing, unsafe, or manipulated.</p>
 
     <h2>Beta availability.</h2>
     <p>The service is provided as available. Features, limits, integrations, and free access may change. External services can be delayed or unavailable, and game or client updates can break a detector. You remain responsible for event rules, backups of important information, awards, and final decisions.</p>

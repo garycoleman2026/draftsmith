@@ -8,9 +8,10 @@ import type { BingoBoardScope, BingoClaimStatus, BingoMode, BingoStatus, BingoVe
 export type BingoEventRow = {
   id: string; draft_id: string; title: string; public_slug: string; mode: BingoMode; board_scope: BingoBoardScope;
   grid_size: number; status: BingoStatus; win_condition: string; target_value: number; requires_review: number;
-  public_spectator: number; spectator_delay_seconds: number; start_at: string | null; end_at: string | null;
+  public_spectator: number; public_listed: number; spectator_delay_seconds: number; start_at: string | null; end_at: string | null;
   started_at: string | null; ended_at: string | null; baseline_status: string; revision: number;
   rules_json: string | null; created_at: string; updated_at: string;
+  clan_name?: string | null; clan_slug?: string | null;
 };
 
 type TeamRow = { id: string; event_id: string; source_team_index: number; name: string; color: string; emblem: string };
@@ -53,7 +54,7 @@ export async function requireManagedBingoEvent(token: string, eventId: string) {
   if (!draftId) throw new BingoError('This organizer link is not valid.', 404);
   const event = await getDatabase().prepare(
     `SELECT id, draft_id, title, public_slug, mode, board_scope, grid_size, status, win_condition, target_value,
-            requires_review, public_spectator, spectator_delay_seconds, start_at, end_at, started_at, ended_at,
+            requires_review, public_spectator, public_listed, spectator_delay_seconds, start_at, end_at, started_at, ended_at,
             baseline_status, revision, rules_json, created_at, updated_at
      FROM bingo_events WHERE id = ? AND draft_id = ?`,
   ).bind(eventId, draftId).first<BingoEventRow>();
@@ -88,10 +89,16 @@ export async function loadBingoView(input: {
 }) {
   const db = getDatabase();
   const event = await db.prepare(
-    `SELECT id, draft_id, title, public_slug, mode, board_scope, grid_size, status, win_condition, target_value,
-            requires_review, public_spectator, spectator_delay_seconds, start_at, end_at, started_at, ended_at,
-            baseline_status, revision, rules_json, created_at, updated_at
-     FROM bingo_events WHERE id = ?`,
+    `SELECT be.id, be.draft_id, be.title, be.public_slug, be.mode, be.board_scope, be.grid_size, be.status,
+            be.win_condition, be.target_value, be.requires_review, be.public_spectator, be.public_listed,
+            be.spectator_delay_seconds, be.start_at, be.end_at, be.started_at, be.ended_at,
+            be.baseline_status, be.revision, be.rules_json, be.created_at, be.updated_at,
+            CASE WHEN c.public_listing = 1 THEN c.name END AS clan_name,
+            CASE WHEN c.public_listing = 1 THEN c.slug END AS clan_slug
+     FROM bingo_events be
+     JOIN drafts d ON d.id = be.draft_id
+     LEFT JOIN clans c ON c.id = d.clan_id
+     WHERE be.id = ?`,
   ).bind(input.eventId).first<BingoEventRow>();
   if (!event) throw new BingoError('This bingo event does not exist.', 404);
   if (input.viewer === 'public' && !event.public_spectator) throw new BingoError('Public spectating is disabled for this event.', 404);
@@ -183,6 +190,9 @@ export async function loadBingoView(input: {
       targetValue: event.target_value,
       requiresReview: Boolean(event.requires_review),
       publicSpectator: Boolean(event.public_spectator),
+      publicListed: Boolean(event.public_listed),
+      clanName: event.clan_name ?? null,
+      clanPath: event.clan_slug ? `/clans/${event.clan_slug}` : null,
       spectatorDelaySeconds: event.spectator_delay_seconds,
       startAt: event.start_at,
       endAt: event.end_at,

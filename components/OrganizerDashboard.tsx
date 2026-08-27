@@ -6,7 +6,7 @@ import { SiteHeader } from './SiteHeader';
 
 type DashboardData = {
   user: { id: string; displayName: string | null; username: string };
-  clans: { id: string; name: string; slug: string; role: string }[];
+  clans: { id: string; name: string; slug: string; description: string; public_listing: number; role: string }[];
   events: {
     id: string;
     title: string;
@@ -37,6 +37,8 @@ export function OrganizerDashboard() {
   const [members, setMembers] = useState<{ id: string; username: string; display_name: string | null; role: string }[]>([]);
   const [discordId, setDiscordId] = useState('');
   const [memberRole, setMemberRole] = useState('member');
+  const [clanDescription, setClanDescription] = useState('');
+  const [clanPublicListing, setClanPublicListing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,7 +77,12 @@ export function OrganizerDashboard() {
 
   useEffect(() => {
     if (selectedClanId || !data?.clans[0]) return;
-    const timer = window.setTimeout(() => setSelectedClanId(data.clans[0].id), 0);
+    const firstClan = data.clans[0];
+    const timer = window.setTimeout(() => {
+      setSelectedClanId(firstClan.id);
+      setClanDescription(firstClan.description ?? '');
+      setClanPublicListing(Boolean(firstClan.public_listing));
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [data?.clans, selectedClanId]);
 
@@ -88,6 +95,7 @@ export function OrganizerDashboard() {
       archived: events.filter((event) => Boolean(event.archived_at)),
     };
   }, [data?.events]);
+  const selectedClan = useMemo(() => data?.clans.find((clan) => clan.id === selectedClanId) ?? null, [data?.clans, selectedClanId]);
 
   async function createClan() {
     if (!clanName.trim()) return;
@@ -142,6 +150,21 @@ export function OrganizerDashboard() {
       const refreshed = await fetch(`/api/clans/${encodeURIComponent(selectedClanId)}/members`).then((result) => result.json()) as { members: typeof members };
       setMembers(refreshed.members ?? []);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Member could not be added.'); }
+    finally { setWorking(''); }
+  }
+
+  async function saveClanProfile() {
+    if (!selectedClanId) return;
+    setWorking('clan-profile'); setError('');
+    try {
+      const response = await fetch(`/api/clans/${encodeURIComponent(selectedClanId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: clanDescription, publicListing: clanPublicListing }),
+      });
+      const next = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(next.error || 'The clan profile could not be saved.');
+      await load();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'The clan profile could not be saved.'); }
     finally { setWorking(''); }
   }
 
@@ -234,7 +257,7 @@ export function OrganizerDashboard() {
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Clan workspaces</p>
             <div className="mt-4 space-y-2">
               {data.clans.map((clan) => (
-                <button type="button" onClick={() => setSelectedClanId(clan.id)} className={`block w-full rounded border px-3 py-3 text-left ${selectedClanId === clan.id ? 'border-[#d7ae50] bg-[#4b3a1d]' : 'border-white/10 bg-black/20'}`} key={clan.id}>
+                <button type="button" onClick={() => { setSelectedClanId(clan.id); setClanDescription(clan.description ?? ''); setClanPublicListing(Boolean(clan.public_listing)); }} className={`block w-full rounded border px-3 py-3 text-left ${selectedClanId === clan.id ? 'border-[#d7ae50] bg-[#4b3a1d]' : 'border-white/10 bg-black/20'}`} key={clan.id}>
                   <p className="font-black">{clan.name}</p>
                   <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#b8aa87]">{clan.role}</p>
                 </button>
@@ -247,6 +270,7 @@ export function OrganizerDashboard() {
             <button className="gold-button mt-3 w-full px-4 py-3 text-sm" type="button" disabled={working === 'clan' || clanName.trim().length < 2} onClick={() => void createClan()}>
               {working === 'clan' ? 'Creating…' : 'Create workspace'}
             </button>
+            {selectedClan ? <section className="mt-6 border-t border-white/10 pt-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Public clan page</p><textarea className="dark-field mt-3 min-h-24 w-full p-3 text-xs normal-case" disabled={!['owner', 'admin'].includes(selectedClan.role)} maxLength={500} value={clanDescription} onChange={(event) => setClanDescription(event.target.value)} placeholder="What does your clan enjoy and how do you run events?" /><label className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-[#d4c59f]"><input className="mt-0.5" type="checkbox" disabled={!['owner', 'admin'].includes(selectedClan.role)} checked={clanPublicListing} onChange={(event) => setClanPublicListing(event.target.checked)} /><span>List this clan in the public hall. Only bingo events separately marked “list publicly” appear in its history.</span></label>{['owner', 'admin'].includes(selectedClan.role) ? <button className="iron-button mt-3 w-full px-3 py-2.5 text-xs" disabled={working === 'clan-profile'} onClick={() => void saveClanProfile()}>{working === 'clan-profile' ? 'Saving…' : 'Save public profile'}</button> : null}{selectedClan.public_listing ? <Link className="mt-3 block text-center text-xs font-black text-[#d9e7aa] underline" href={`/clans/${selectedClan.slug}`} target="_blank">View public clan page ↗</Link> : null}</section> : null}
             {selectedClanId ? <details className="mt-6 border-t border-white/10 pt-5"><summary className="cursor-pointer text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Members & roles</summary><div className="mt-3 space-y-2">{members.map((member) => <div className="flex items-center justify-between rounded bg-black/20 px-3 py-2 text-xs" key={member.id}><span className="truncate font-bold">{member.display_name || member.username}</span><span className="uppercase text-[#b8aa87]">{member.role}</span></div>)}</div><input className="dark-field mt-3 h-10 w-full px-3 text-xs" value={discordId} onChange={(event) => setDiscordId(event.target.value)} placeholder="Discord numeric user ID" /><select className="dark-field mt-2 h-10 w-full px-3 text-xs" value={memberRole} onChange={(event) => setMemberRole(event.target.value)}><option value="member">Member</option><option value="captain">Captain</option><option value="admin">Admin</option></select><button className="iron-button mt-2 w-full px-3 py-2 text-xs" disabled={!discordId || working === 'member'} onClick={() => void addMember()}>Add or update member</button><p className="mt-2 text-[10px] leading-relaxed text-[#a99a78]">Members must sign in once before being added. Owners/admins can manage clan events; captains and members have read access to the workspace roster.</p></details> : null}
           </aside>
         </div>

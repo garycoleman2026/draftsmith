@@ -28,7 +28,7 @@ export function BingoPublicBoard({ slug }: { slug: string }) {
       <SiteHeader badge="Spectator board" />
       <section className="mx-auto max-w-[1500px] px-4 pb-20 pt-8 sm:px-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">Live clan bingo</p><h1 className="fantasy-title mt-2 text-4xl font-bold text-[#f5df9b] sm:text-6xl">{data.event.title}</h1><p className="mt-3 text-sm text-[#b7aa8a]">{formatMode(data.event.mode)} · {statusLabel(data.event.status)}{data.event.spectatorDelaySeconds ? ` · ${data.event.spectatorDelaySeconds}s spectator delay` : ''}</p></div>
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">Live clan bingo</p><h1 className="fantasy-title mt-2 text-4xl font-bold text-[#f5df9b] sm:text-6xl">{data.event.title}</h1><p className="mt-3 text-sm text-[#b7aa8a]">{formatMode(data.event.mode)} · {statusLabel(data.event.status)} · {data.teams.length} teams · {data.tasks.length} tasks{data.event.spectatorDelaySeconds ? ` · ${data.event.spectatorDelaySeconds}s spectator delay` : ''}</p>{data.event.clanName && data.event.clanPath ? <a className="mt-2 inline-flex text-xs font-black text-[#d9e7aa] underline" href={data.event.clanPath}>Hosted by {data.event.clanName} →</a> : null}</div>
           <p className="rounded border border-[#8b6d2c] bg-[#2c2417] px-4 py-2 text-xs font-bold text-[#ddc27b]">Board refreshes every 5 seconds</p>
         </div>
         {error ? <p className="mt-5 rounded border border-[#b75b42] bg-[#4a2118] px-4 py-3 text-sm">{error}</p> : null}

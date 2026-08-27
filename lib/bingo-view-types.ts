@@ -41,9 +41,9 @@ export type BingoViewData = {
   event: {
     id: string; draftId: string | null; title: string; publicSlug: string; publicPath: string; mode: BingoMode;
     boardScope: BingoBoardScope; gridSize: number; status: BingoStatus; winCondition: string; targetValue: number;
-    requiresReview: boolean; publicSpectator: boolean; spectatorDelaySeconds: number; startAt: string | null;
+    requiresReview: boolean; publicSpectator: boolean; publicListed: boolean; spectatorDelaySeconds: number; startAt: string | null;
     endAt: string | null; startedAt: string | null; endedAt: string | null; baselineStatus: string;
-    revision: number; rules: BingoEventRules; createdAt: string; updatedAt: string;
+    clanName: string | null; clanPath: string | null; revision: number; rules: BingoEventRules; createdAt: string; updatedAt: string;
   };
   teams: BingoViewTeam[];
   tasks: BingoViewTask[];

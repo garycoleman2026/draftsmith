@@ -22,10 +22,16 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   const [mode, setMode] = useState<BingoMode>('points');
   const [requiresReview, setRequiresReview] = useState(true);
   const [publicSpectator, setPublicSpectator] = useState(true);
+  const [publicListed, setPublicListed] = useState(false);
   const [spectatorDelaySeconds, setSpectatorDelaySeconds] = useState(0);
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
   const [templateName, setTemplateName] = useState('My clan board');
+  const [templateSummary, setTemplateSummary] = useState('A reusable OSRS clan bingo board.');
+  const [templateCategory, setTemplateCategory] = useState('Mixed');
+  const [templateTags, setTemplateTags] = useState('clan bingo, custom board');
+  const [templatePublic, setTemplatePublic] = useState(false);
+  const [publishedTemplatePath, setPublishedTemplatePath] = useState('');
   const [issuedLinks, setIssuedLinks] = useState<IssuedLink[]>([]);
   const [copied, setCopied] = useState('');
   const [working, setWorking] = useState('');
@@ -48,7 +54,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
       if (!initialized.current) {
         initialized.current = true;
         setTitle(next.event.title); setMode(next.event.mode); setRequiresReview(next.event.requiresReview);
-        setPublicSpectator(next.event.publicSpectator); setSpectatorDelaySeconds(next.event.spectatorDelaySeconds);
+        setPublicSpectator(next.event.publicSpectator); setPublicListed(next.event.publicListed); setSpectatorDelaySeconds(next.event.spectatorDelaySeconds);
         setStartAt(toLocalInput(next.event.startAt)); setEndAt(toLocalInput(next.event.endAt));
         setTemplateName(`${next.event.title} board`);
       }
@@ -77,6 +83,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
     await run('settings', base, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         title, mode, boardScope: mode === 'lockout' ? 'shared' : 'per_team', requiresReview, publicSpectator,
+        publicListed: publicSpectator && publicListed,
         spectatorDelaySeconds, startAt: toIso(startAt), endAt: toIso(endAt),
       }),
     }, 'Event settings saved.');
@@ -119,9 +126,13 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   }
 
   async function saveTemplate() {
-    await run('template', `/api/manage/${encodeURIComponent(token)}/bingo/templates`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId, name: templateName }),
-    }, 'This board is now available as a reusable template.');
+    const result = await run('template', `/api/manage/${encodeURIComponent(token)}/bingo/templates`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        eventId, name: templateName, summary: templateSummary, category: templateCategory,
+        tags: templateTags, visibility: templatePublic ? 'public' : 'private',
+      }),
+    }, templatePublic ? 'This board is published in the community template gallery.' : 'This board is now available as a private reusable template.');
+    setPublishedTemplatePath(typeof result?.publicPath === 'string' ? result.publicPath : '');
   }
 
   async function resolveCandidate(candidateId: string, action: 'accept' | 'dismiss' | 'reopen') {
@@ -175,6 +186,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
               <label className="text-[10px] font-black uppercase text-[#65583f]">Planned end<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} /></label>
               <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b]"><input type="checkbox" checked={requiresReview} onChange={(event) => setRequiresReview(event.target.checked)} /> Organizer reviews claims</label>
               <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b]"><input type="checkbox" checked={publicSpectator} onChange={(event) => setPublicSpectator(event.target.checked)} /> Public spectator board</label>
+              <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b] sm:col-span-2"><input type="checkbox" disabled={!publicSpectator} checked={publicSpectator && publicListed} onChange={(event) => setPublicListed(event.target.checked)} /> List this event in public discovery and clan history</label>
             </div>
             <button className="gold-button mt-5 px-5 py-3 text-sm" disabled={working === 'settings'} onClick={() => void saveSettings()}>{working === 'settings' ? 'Saving…' : 'Save event settings'}</button>
           </section>
@@ -190,7 +202,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
         <section className="parchment-panel mt-5 p-5 sm:p-7">
           <div className="flex flex-col gap-4 border-b border-[#8b6a32]/25 pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">No-code custom bingo maker</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Build the clan’s game, not just a spreadsheet.</h2><p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#6e5e43]">Choose a layout, arrange OSRS presets, define who contributes, set proof sources, and add unlock rules. Advanced boards still copy cleanly to and from spreadsheets.</p></div>
-            <div className="grid min-w-72 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><button className="iron-button px-4 py-2.5 text-xs" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : 'Save as template'}</button></div>
+            <div className="grid min-w-72 gap-2 sm:min-w-[520px] sm:grid-cols-[minmax(0,1fr)_170px]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><select aria-label="Template category" className="realm-field h-11 w-full px-3 text-xs" value={templateCategory} onChange={(event) => setTemplateCategory(event.target.value)}>{['Mixed', 'Bossing', 'Raids', 'Skilling', 'Speed', 'Progression', 'Casual', 'Competitive'].map((item) => <option key={item}>{item}</option>)}</select><input aria-label="Template summary" className="realm-field h-11 w-full px-3 text-xs normal-case sm:col-span-2" maxLength={240} value={templateSummary} onChange={(event) => setTemplateSummary(event.target.value)} placeholder="What makes this board useful?" /><input aria-label="Template tags" className="realm-field h-11 w-full px-3 text-xs normal-case" value={templateTags} onChange={(event) => setTemplateTags(event.target.value)} placeholder="raids, weekend, mixed levels" /><label className="flex items-center gap-2 rounded border border-[#8b6a32]/30 bg-white/20 px-3 text-[10px] font-black uppercase text-[#5d4b30]"><input type="checkbox" checked={templatePublic} onChange={(event) => setTemplatePublic(event.target.checked)} /> Publish publicly</label><button className="iron-button px-4 py-2.5 text-xs sm:col-span-2" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : templatePublic ? 'Publish community template' : 'Save private template'}</button>{publishedTemplatePath ? <a className="text-center text-xs font-black text-[#315b39] underline sm:col-span-2" href={publishedTemplatePath} target="_blank" rel="noreferrer">Open published template ↗</a> : null}</div>
           </div>
           <div className="mt-5"><BingoMaker initialTasks={tasksToDefinitions(data.tasks)} initialRules={data.event.rules} mode={data.event.mode} disabled={structuralLocked} saving={working === 'tasks'} onSave={saveBoard} /></div>
           <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>WOM baseline:</b> {data.wiseOldMan.baselineCoverage} players · <b>Last sync:</b> {data.wiseOldMan.lastSyncAt ? new Date(data.wiseOldMan.lastSyncAt).toLocaleString() : 'Not run'} · <b>Worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
