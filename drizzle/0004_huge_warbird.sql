@@ -1,0 +1,1 @@
+ALTER TABLE `bingo_tasks` ADD `rule_json` text DEFAULT '{}' NOT NULL;

@@ -507,6 +507,7 @@ export const bingoTasks = sqliteTable(
     hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
     freeSpace: integer('free_space', { mode: 'boolean' }).notNull().default(false),
     iconKey: text('icon_key').notNull().default('scroll'),
+    ruleJson: text('rule_json').notNull().default('{}'),
     sortOrder: integer('sort_order').notNull(),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

@@ -2,6 +2,7 @@ import { resolveManagerDraftId } from '@/lib/access-tokens';
 import { recordAudit, requestId } from '@/lib/audit';
 import { BingoError, bingoErrorResponse, parseJson } from '@/lib/bingo';
 import { BUILTIN_BINGO_TEMPLATES, type BingoTaskDefinition } from '@/lib/bingo-types';
+import { sanitizeBingoEventRules, sanitizeBingoTaskRule } from '@/lib/bingo-rules';
 import { getSessionUser } from '@/lib/auth';
 import { ensureSchema, getDatabase, json } from '@/lib/db';
 
@@ -22,11 +23,12 @@ export async function GET(_request: Request, context: Context) {
     return json({
       builtin: BUILTIN_BINGO_TEMPLATES.map((template) => ({
         key: template.key, name: template.name, description: template.description,
-        mode: template.mode, boardScope: template.boardScope,
+        mode: template.mode, boardScope: template.boardScope, gridSize: template.gridSize,
       })),
       custom: custom.results.map((template) => ({
         id: template.id, name: template.name, mode: template.mode, boardScope: template.board_scope,
         description: parseJson<{ description?: string }>(template.configuration_json, {}).description ?? 'Saved custom board',
+        gridSize: parseJson<{ gridSize?: number }>(template.configuration_json, {}).gridSize ?? 5,
         updatedAt: template.updated_at,
       })),
     });
@@ -54,7 +56,7 @@ export async function POST(request: Request, context: Context) {
         .first<{ id: string; mode: string; board_scope: string; grid_size: number; win_condition: string; target_value: number; rules_json: string | null }>(),
       db.prepare('SELECT clan_id FROM drafts WHERE id = ?').bind(draftId).first<{ clan_id: string | null }>(),
       db.prepare(`SELECT title, description, points, category, difficulty, verification_mode, repeatable,
-                         max_completions, hidden, free_space, icon_key
+                         max_completions, hidden, free_space, icon_key, rule_json
                   FROM bingo_tasks WHERE event_id = ? ORDER BY sort_order`).bind(eventId).all<Record<string, string | number>>(),
       getSessionUser(request),
     ]);
@@ -66,12 +68,17 @@ export async function POST(request: Request, context: Context) {
       verificationMode: String(task.verification_mode) as BingoTaskDefinition['verificationMode'],
       repeatable: Boolean(task.repeatable), maxCompletions: Number(task.max_completions), hidden: Boolean(task.hidden),
       freeSpace: Boolean(task.free_space), iconKey: String(task.icon_key),
+      rule: sanitizeBingoTaskRule(parseJson(String(task.rule_json ?? '{}'), {}), String(task.verification_mode) as BingoTaskDefinition['verificationMode']),
     }));
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
+    const rules = sanitizeBingoEventRules(parseJson(event.rules_json, {}), event.grid_size,
+      ['lines', 'points', 'blackout', 'categories'].includes(event.win_condition)
+        ? event.win_condition as 'lines' | 'points' | 'blackout' | 'categories' : 'points');
     const configuration = {
+      schemaVersion: 1,
       key: id, name, description: `Saved from ${name}`, mode: event.mode, boardScope: event.board_scope,
-      gridSize: event.grid_size, winCondition: event.win_condition, targetValue: event.target_value, tasks,
+      gridSize: event.grid_size, winCondition: event.win_condition, targetValue: event.target_value, rules, tasks,
     };
     await db.prepare(
       `INSERT INTO bingo_templates

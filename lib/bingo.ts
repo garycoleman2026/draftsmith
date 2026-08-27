@@ -1,6 +1,7 @@
 import { resolveManagerDraftId } from './access-tokens';
 import { calculateBingoStandings, claimAvailability, type BingoScoreCompletion } from './bingo-scoring';
 import { getDatabase } from './db';
+import { sanitizeBingoEventRules, sanitizeBingoTaskRule, type BingoEventRules } from './bingo-rules';
 import { hashToken } from './security';
 import type { BingoBoardScope, BingoClaimStatus, BingoMode, BingoStatus, BingoVerificationMode } from './types';
 
@@ -17,7 +18,7 @@ type MemberRow = { id: string; team_id: string; player_id: string | null; displa
 type TaskRow = {
   id: string; event_id: string; title: string; description: string; points: number; category: string; difficulty: string;
   verification_mode: BingoVerificationMode; repeatable: number; max_completions: number; hidden: number; free_space: number;
-  icon_key: string; sort_order: number;
+  icon_key: string; rule_json: string; sort_order: number;
 };
 type ClaimRow = {
   id: string; event_id: string; task_id: string; team_id: string; member_id: string | null; claimed_by_name: string;
@@ -87,7 +88,7 @@ export async function loadBingoView(input: {
                 WHERE bt.event_id = ? ORDER BY bt.source_team_index, CASE btm.role WHEN 'captain' THEN 0 ELSE 1 END, btm.display_name`)
       .bind(event.id).all<MemberRow>(),
     db.prepare(`SELECT id, event_id, title, description, points, category, difficulty, verification_mode,
-                       repeatable, max_completions, hidden, free_space, icon_key, sort_order
+                       repeatable, max_completions, hidden, free_space, icon_key, rule_json, sort_order
                 FROM bingo_tasks WHERE event_id = ? ORDER BY sort_order`).bind(event.id).all<TaskRow>(),
     db.prepare(`SELECT id, event_id, task_id, team_id, member_id, claimed_by_name, note, evidence_url,
                        evidence_upload_id, status, review_note, score_awarded, submitted_at, reviewed_at, approved_at
@@ -107,12 +108,19 @@ export async function loadBingoView(input: {
   const scoreCompletions: BingoScoreCompletion[] = completions.map((completion) => ({
     taskId: completion.task_id, teamId: completion.team_id, points: completion.points,
   }));
+  const eventRules = sanitizeBingoEventRules(
+    parseJson(event.rules_json, {}), event.grid_size,
+    ['lines', 'points', 'blackout', 'categories'].includes(event.win_condition)
+      ? event.win_condition as BingoEventRules['scoring']['winCondition'] : 'points',
+  );
   const standings = calculateBingoStandings(
     teamResult.results.map((team) => ({ id: team.id, name: team.name, sourceTeamIndex: team.source_team_index })),
-    taskResult.results.map((task) => ({ id: task.id, sortOrder: task.sort_order, points: task.points, freeSpace: Boolean(task.free_space) })),
+    taskResult.results.map((task) => ({ id: task.id, sortOrder: task.sort_order, points: task.points, freeSpace: Boolean(task.free_space), category: task.category })),
     scoreCompletions,
     event.grid_size,
-    event.win_condition === 'lines' ? 'lines' : 'points',
+    ['lines', 'blackout', 'categories'].includes(event.win_condition)
+      ? event.win_condition as 'lines' | 'blackout' | 'categories' : 'points',
+    eventRules.scoring.categoryTarget,
   );
   const standingById = new Map(standings.map((standing) => [standing.id, standing]));
   const visibleClaims = claimResult.results.filter((claim) => {
@@ -144,6 +152,7 @@ export async function loadBingoView(input: {
       endedAt: event.ended_at,
       baselineStatus: event.baseline_status,
       revision: event.revision,
+      rules: eventRules,
       createdAt: event.created_at,
       updatedAt: event.updated_at,
     },
@@ -159,12 +168,24 @@ export async function loadBingoView(input: {
       score: standingById.get(team.id)?.score ?? 0,
       completedCount: standingById.get(team.id)?.completedCount ?? 0,
       lineCount: standingById.get(team.id)?.lineCount ?? 0,
+      categoryCount: standingById.get(team.id)?.categoryCount ?? 0,
       rank: standings.findIndex((standing) => standing.id === team.id) + 1,
     })),
     tasks: taskResult.results.map((task) => {
       const owners = completions.filter((completion) => completion.task_id === task.id).map((completion) => completion.team_id);
       const pendingTeamIds = pendingClaims.filter((claim) => claim.task_id === task.id).map((claim) => claim.team_id);
-      const concealed = Boolean(task.hidden) && input.viewer !== 'organizer' && !owners.length;
+      const rule = sanitizeBingoTaskRule(parseJson(task.rule_json, {}), task.verification_mode);
+      const prerequisiteTaskIds = rule.prerequisitePositions.flatMap((position) => {
+        const prerequisite = taskResult.results.find((candidate) => candidate.sort_order === position);
+        return prerequisite ? [prerequisite.id] : [];
+      });
+      const prerequisiteCompleteFor = (teamId: string) => prerequisiteTaskIds.every((taskId) =>
+        completions.some((completion) => completion.task_id === taskId && completion.team_id === teamId));
+      const unlocked = !prerequisiteTaskIds.length
+        || input.viewer === 'team' && Boolean(input.teamId && prerequisiteCompleteFor(input.teamId))
+        || input.viewer === 'public' && teamResult.results.some((team) => prerequisiteCompleteFor(team.id));
+      const viewerHasCompletion = input.viewer === 'team' && input.teamId ? owners.includes(input.teamId) : owners.length > 0;
+      const concealed = Boolean(task.hidden) && input.viewer !== 'organizer' && !viewerHasCompletion && !unlocked;
       const availability = input.viewer === 'team' && input.teamId ? claimAvailability({
         mode: event.mode,
         repeatable: Boolean(task.repeatable),
@@ -173,6 +194,7 @@ export async function loadBingoView(input: {
         teamId: input.teamId,
         completions: scoreCompletions,
         hasPendingClaim: pendingTeamIds.includes(input.teamId),
+        prerequisiteTaskIds,
       }) : null;
       return {
         id: task.id,
@@ -188,6 +210,7 @@ export async function loadBingoView(input: {
         concealed,
         freeSpace: Boolean(task.free_space),
         iconKey: task.icon_key,
+        rule: concealed ? sanitizeBingoTaskRule({}, 'manual') : rule,
         sortOrder: task.sort_order,
         ownerTeamIds: [...new Set(owners)],
         pendingTeamIds: input.viewer === 'organizer'

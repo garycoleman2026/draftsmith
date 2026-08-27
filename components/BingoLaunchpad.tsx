@@ -7,7 +7,7 @@ type BingoEventSummary = {
   id: string; title: string; mode: string; status: string; task_count: number; pending_count: number;
   created_at: string; managePath: string; publicPath: string;
 };
-type TemplateChoice = { key?: string; id?: string; name: string; description: string; mode: string; boardScope: string };
+type TemplateChoice = { key?: string; id?: string; name: string; description: string; mode: string; boardScope: string; gridSize?: number };
 type IssuedLink = { teamId: string; teamName: string; path: string };
 
 export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string; hasResult: boolean; draftTitle: string }) {
@@ -76,7 +76,7 @@ export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string
             <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Event title<input className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
             <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Starting board<select className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={templateChoice} onChange={(event) => setTemplateChoice(event.target.value)}>{templates.filter((item) => item.key).map((item) => <option value={`builtin:${item.key}`} key={item.key}>{item.name}</option>)}{templates.filter((item) => item.id).map((item) => <option value={`custom:${item.id}`} key={item.id}>Saved · {item.name}</option>)}</select></label>
           </div>
-          <p className="mt-3 text-xs text-[#a99c7d]">{templates.find((item) => templateChoice.endsWith(item.key ?? item.id ?? ''))?.description ?? 'Pick a built-in or saved 5 × 5 board.'}</p>
+          <p className="mt-3 text-xs text-[#a99c7d]">{templates.find((item) => templateChoice.endsWith(item.key ?? item.id ?? ''))?.description ?? 'Pick a built-in or saved custom board.'}</p>
           <button className="gold-button mt-4 px-5 py-3 text-sm" disabled={!hasResult || !title.trim() || working} onClick={() => void createEvent()}>{working ? 'Forging the hall…' : hasResult ? 'Create bingo event →' : 'Finish the draft first'}</button>
           {issuedLinks.length ? <div className="mt-5 rounded border border-[#d4ad4d]/45 bg-[#11170f] p-4"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.1em] text-[#d7ae50]">New private links</p><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copyAll()}>{copied ? 'Copied all' : 'Copy all links'}</button></div><div className="mt-3 space-y-2">{issuedLinks.map((link) => <div className="flex items-center gap-2 text-xs" key={link.teamId}><span className="min-w-0 flex-1 truncate text-[#e3d4ad]">{link.teamName}</span><button className="text-[#cdda9e] underline" onClick={() => void copyText(absoluteUrl(link.path))}>Copy</button><a className="text-[#cdda9e] underline" href={link.path} target="_blank" rel="noreferrer">Open ↗</a></div>)}</div></div> : null}
         </div>

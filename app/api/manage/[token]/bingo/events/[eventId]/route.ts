@@ -1,7 +1,8 @@
 import { recordAudit, requestId } from '@/lib/audit';
 import { scheduleBingoSnapshot } from '@/lib/bingo-baselines';
-import { BingoError, bingoActivityInsert, bingoErrorResponse, loadBingoView, requireManagedBingoEvent } from '@/lib/bingo';
+import { BingoError, bingoActivityInsert, bingoErrorResponse, loadBingoView, parseJson, requireManagedBingoEvent } from '@/lib/bingo';
 import { ensureSchema, getDatabase, json } from '@/lib/db';
+import { sanitizeBingoEventRules } from '@/lib/bingo-rules';
 import { scheduleDiscordEvent } from '@/lib/discord-webhooks';
 import type { BingoBoardScope, BingoMode } from '@/lib/types';
 
@@ -37,16 +38,19 @@ export async function PUT(request: Request, context: Context) {
     const requiresReview = body.requiresReview === undefined ? event.requires_review : Boolean(body.requiresReview);
     const publicSpectator = body.publicSpectator === undefined ? event.public_spectator : Boolean(body.publicSpectator);
     const spectatorDelaySeconds = clampInteger(body.spectatorDelaySeconds, 0, 3600, event.spectator_delay_seconds);
-    const winCondition = mode === 'classic' ? 'lines' : body.winCondition === 'blackout' ? 'blackout' : 'points';
+    const winCondition = mode === 'classic' ? 'lines' : mode === 'blackout' ? 'blackout' : mode === 'categories' ? 'categories' : 'points';
     const targetValue = clampInteger(body.targetValue, 0, 100_000, event.target_value);
+    const rules = sanitizeBingoEventRules(parseJson(event.rules_json, {}), event.grid_size, winCondition);
+    rules.scoring.winCondition = winCondition;
+    rules.scoring.targetValue = targetValue;
     const status = structuralLocked ? event.status : startAt && Date.parse(startAt) > Date.now() ? 'scheduled' : 'draft';
     const now = new Date().toISOString();
     await getDatabase().prepare(
       `UPDATE bingo_events SET title = ?, mode = ?, board_scope = ?, win_condition = ?, target_value = ?,
           requires_review = ?, public_spectator = ?, spectator_delay_seconds = ?, start_at = ?, end_at = ?,
-          status = ?, revision = revision + 1, updated_at = ? WHERE id = ?`,
+          status = ?, rules_json = ?, revision = revision + 1, updated_at = ? WHERE id = ?`,
     ).bind(title, mode, boardScope, winCondition, targetValue, requiresReview ? 1 : 0, publicSpectator ? 1 : 0,
-      spectatorDelaySeconds, startAt, endAt, status, now, eventId).run();
+      spectatorDelaySeconds, startAt, endAt, status, JSON.stringify(rules), now, eventId).run();
     await recordAudit(getDatabase(), {
       draftId: event.draft_id, actorType: 'organizer', eventType: 'bingo.settings_updated',
       metadata: { eventId, mode, boardScope, requiresReview, publicSpectator, spectatorDelaySeconds },
@@ -114,7 +118,7 @@ export async function PATCH(request: Request, context: Context) {
 }
 
 function validMode(value: unknown): BingoMode {
-  return ['classic', 'points', 'lockout'].includes(String(value)) ? String(value) as BingoMode : 'points';
+  return ['classic', 'points', 'lockout', 'blackout', 'progression', 'categories'].includes(String(value)) ? String(value) as BingoMode : 'points';
 }
 function validScope(value: unknown): BingoBoardScope { return value === 'shared' ? 'shared' : 'per_team'; }
 function validDate(value: unknown) {

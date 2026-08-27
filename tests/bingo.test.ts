@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculateBingoStandings, claimAvailability, countCompletedLines } from '../lib/bingo-scoring';
-import { parseBingoTaskImport, sanitizeBingoTasks } from '../lib/bingo-types';
+import { OSRS_BINGO_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, serializeBingoTaskImport } from '../lib/bingo-types';
+import { defaultBingoEventRules, validateBingoBoard } from '../lib/bingo-rules';
 
 const tasks = Array.from({ length: 25 }, (_, index) => ({
   id: `task-${index}`, sortOrder: index, points: index === 12 ? 0 : 10, freeSpace: index === 12,
@@ -54,6 +55,19 @@ describe('bingo claim constraints', () => {
       completions: [{ taskId: 'task', teamId: 'a', points: 5 }, { taskId: 'task', teamId: 'a', points: 5 }],
     }).allowed).toBe(false);
   });
+
+  it('blocks a progression tile until its prerequisites are complete for that team', () => {
+    expect(claimAvailability({
+      mode: 'progression', repeatable: false, maxCompletions: 1, taskId: 'next', teamId: 'a',
+      completions: [{ taskId: 'first', teamId: 'b', points: 10 }], hasPendingClaim: false,
+      prerequisiteTaskIds: ['first'],
+    })).toMatchObject({ allowed: false });
+    expect(claimAvailability({
+      mode: 'progression', repeatable: false, maxCompletions: 1, taskId: 'next', teamId: 'a',
+      completions: [{ taskId: 'first', teamId: 'a', points: 10 }], hasPendingClaim: false,
+      prerequisiteTaskIds: ['first'],
+    })).toMatchObject({ allowed: true });
+  });
 });
 
 describe('bingo task imports', () => {
@@ -73,5 +87,33 @@ describe('bingo task imports', () => {
     expect(sanitizeBingoTasks([{ title: 'Free Space', points: 99 }, { title: '' }], 25)).toEqual([
       expect.objectContaining({ title: "Terry's free space", freeSpace: true, points: 0 }),
     ]);
+  });
+
+  it('round-trips advanced verifier, scope, proof, and prerequisite rules', () => {
+    const source = structuredClone(OSRS_BINGO_PRESETS.find((task) => task.title.includes('Agility XP'))!);
+    source.rule.prerequisitePositions = [0, 4];
+    const [parsed] = parseBingoTaskImport(serializeBingoTaskImport([source]));
+    expect(parsed.rule).toMatchObject({
+      verifier: { type: 'xp_gain', metric: 'agility', amount: 10_000_000, unit: 'XP' },
+      scope: { type: 'team_total' },
+      prerequisitePositions: [0, 4],
+    });
+    expect(parsed.rule.proof.sources).toEqual(['wise_old_man', 'runelite', 'screenshot']);
+  });
+
+  it('ships a broad OSRS library with the requested headline presets', () => {
+    expect(OSRS_BINGO_PRESETS.length).toBeGreaterThanOrEqual(60);
+    expect(OSRS_BINGO_PRESETS.map((task) => task.title)).toEqual(expect.arrayContaining([
+      'Get an Oathplate helm', 'Obtain the Baby mole pet', 'Receive a Twisted ancestral colour kit',
+      'Beat the GM Theatre of Blood trio time', 'Beat the Chambers CM five-player time',
+      'Gain 10,000,000 team Agility XP',
+    ]));
+  });
+
+  it('validates variable grid boards and structured task requirements', () => {
+    const rules = defaultBingoEventRules(3, 'points');
+    const board = OSRS_BINGO_PRESETS.slice(0, 9);
+    expect(validateBingoBoard(board, rules)).toMatchObject({ valid: true, errors: [] });
+    expect(validateBingoBoard(board.slice(0, 8), rules)).toMatchObject({ valid: false });
   });
 });

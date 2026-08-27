@@ -1,5 +1,6 @@
 import { recordAudit } from './audit';
-import { BingoError, bingoActivityInsert } from './bingo';
+import { BingoError, bingoActivityInsert, parseJson } from './bingo';
+import { sanitizeBingoTaskRule } from './bingo-rules';
 import { claimAvailability, type BingoScoreCompletion } from './bingo-scoring';
 import { getDatabase } from './db';
 import { scheduleDiscordEvent } from './discord-webhooks';
@@ -19,6 +20,9 @@ type ReviewableClaim = {
   repeatable: number;
   max_completions: number;
   free_space: number;
+  verification_mode: string;
+  sort_order: number;
+  rule_json: string;
   team_id: string;
   team_name: string;
   claimed_by_name: string;
@@ -38,6 +42,7 @@ export async function reviewBingoClaim(input: {
     `SELECT bc.id, bc.event_id, bc.task_id, bc.team_id, bc.claimed_by_name, bc.evidence_upload_id, bc.status,
             be.draft_id, be.title AS event_title, be.status AS event_status, be.mode, be.spectator_delay_seconds,
             bt.title AS task_title, bt.points AS task_points, bt.repeatable, bt.max_completions, bt.free_space,
+            bt.verification_mode, bt.sort_order, bt.rule_json,
             bteam.name AS team_name
      FROM bingo_claims bc
      JOIN bingo_events be ON be.id = bc.event_id
@@ -72,9 +77,12 @@ export async function reviewBingoClaim(input: {
   }
 
   if (claim.free_space) throw new BingoError('The free space is already counted and cannot be claimed.', 409);
-  const completionRows = await db.prepare(
-    'SELECT task_id, team_id, points FROM bingo_completions WHERE event_id = ? AND task_id = ?',
-  ).bind(claim.event_id, claim.task_id).all<{ task_id: string; team_id: string; points: number }>();
+  const [completionRows, taskRows] = await Promise.all([
+    db.prepare('SELECT task_id, team_id, points FROM bingo_completions WHERE event_id = ?')
+      .bind(claim.event_id).all<{ task_id: string; team_id: string; points: number }>(),
+    db.prepare('SELECT id, sort_order FROM bingo_tasks WHERE event_id = ?')
+      .bind(claim.event_id).all<{ id: string; sort_order: number }>(),
+  ]);
   const completions: BingoScoreCompletion[] = completionRows.results.map((row) => ({
     taskId: row.task_id, teamId: row.team_id, points: row.points,
   }));
@@ -86,9 +94,14 @@ export async function reviewBingoClaim(input: {
     teamId: claim.team_id,
     completions,
     hasPendingClaim: false,
+    prerequisiteTaskIds: sanitizeBingoTaskRule(parseJson(claim.rule_json, {}), claim.verification_mode as 'manual' | 'screenshot' | 'stat_delta' | 'hybrid')
+      .prerequisitePositions.flatMap((position) => {
+        const prerequisite = taskRows.results.find((task) => task.sort_order === position);
+        return prerequisite ? [prerequisite.id] : [];
+      }),
   });
   if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile is no longer available.', 409);
-  const completionNumber = completions.filter((completion) => completion.teamId === claim.team_id).length + 1;
+  const completionNumber = completions.filter((completion) => completion.teamId === claim.team_id && completion.taskId === claim.task_id).length + 1;
   const delay = Math.max(0, claim.spectator_delay_seconds);
   try {
     await db.batch([

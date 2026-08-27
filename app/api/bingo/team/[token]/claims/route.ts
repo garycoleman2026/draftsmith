@@ -1,8 +1,9 @@
 import { recordAudit, requestId } from '@/lib/audit';
-import { BingoError, bingoActivityInsert, bingoErrorResponse, resolveBingoTeam } from '@/lib/bingo';
+import { BingoError, bingoActivityInsert, bingoErrorResponse, parseJson, resolveBingoTeam } from '@/lib/bingo';
 import { reviewBingoClaim } from '@/lib/bingo-claims';
 import { claimAvailability } from '@/lib/bingo-scoring';
 import { ensureSchema, getDatabase, json } from '@/lib/db';
+import { sanitizeBingoTaskRule } from '@/lib/bingo-rules';
 import { scheduleDiscordEvent } from '@/lib/discord-webhooks';
 import { enforceRateLimit, RateLimitError, rateLimitResponse } from '@/lib/rate-limit';
 import type { BingoMode, BingoVerificationMode } from '@/lib/types';
@@ -21,18 +22,20 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const evidenceUrl = validEvidenceUrl(body.evidenceUrl);
     const evidenceUploadId = typeof body.evidenceUploadId === 'string' ? body.evidenceUploadId : null;
     const db = getDatabase();
-    const [event, task, member, upload, completionRows, pending] = await Promise.all([
+    const [event, task, member, upload, taskRows, completionRows, pending] = await Promise.all([
       db.prepare('SELECT id, draft_id, title, status, mode, requires_review FROM bingo_events WHERE id = ?').bind(team.event_id)
         .first<{ id: string; draft_id: string; title: string; status: string; mode: BingoMode; requires_review: number }>(),
-      db.prepare(`SELECT id, title, verification_mode, repeatable, max_completions, free_space
+      db.prepare(`SELECT id, title, verification_mode, repeatable, max_completions, free_space, sort_order, rule_json
                   FROM bingo_tasks WHERE id = ? AND event_id = ?`).bind(taskId, team.event_id)
-        .first<{ id: string; title: string; verification_mode: BingoVerificationMode; repeatable: number; max_completions: number; free_space: number }>(),
+        .first<{ id: string; title: string; verification_mode: BingoVerificationMode; repeatable: number; max_completions: number; free_space: number; sort_order: number; rule_json: string }>(),
       db.prepare('SELECT id, display_name FROM bingo_team_members WHERE id = ? AND team_id = ?').bind(memberId, team.id)
         .first<{ id: string; display_name: string }>(),
       evidenceUploadId ? db.prepare(`SELECT id FROM bingo_evidence_uploads
         WHERE id = ? AND event_id = ? AND team_id = ? AND consumed_at IS NULL`).bind(evidenceUploadId, team.event_id, team.id).first<{ id: string }>() : null,
-      db.prepare('SELECT task_id, team_id, points FROM bingo_completions WHERE event_id = ? AND task_id = ?')
-        .bind(team.event_id, taskId).all<{ task_id: string; team_id: string; points: number }>(),
+      db.prepare('SELECT id, sort_order FROM bingo_tasks WHERE event_id = ?').bind(team.event_id)
+        .all<{ id: string; sort_order: number }>(),
+      db.prepare('SELECT task_id, team_id, points FROM bingo_completions WHERE event_id = ?')
+        .bind(team.event_id).all<{ task_id: string; team_id: string; points: number }>(),
       db.prepare("SELECT id FROM bingo_claims WHERE event_id = ? AND task_id = ? AND team_id = ? AND status = 'pending' LIMIT 1")
         .bind(team.event_id, taskId, team.id).first<{ id: string }>(),
     ]);
@@ -44,11 +47,17 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     if (['screenshot', 'hybrid'].includes(task.verification_mode) && !evidenceUrl && !evidenceUploadId) {
       throw new BingoError('Add a screenshot or HTTPS evidence link for this tile.');
     }
+    const taskRule = sanitizeBingoTaskRule(parseJson(task.rule_json, {}), task.verification_mode);
+    const prerequisiteTaskIds = taskRule.prerequisitePositions.flatMap((position) => {
+      const prerequisite = taskRows.results.find((row) => row.sort_order === position);
+      return prerequisite ? [prerequisite.id] : [];
+    });
     const availability = claimAvailability({
       mode: event.mode, repeatable: Boolean(task.repeatable), maxCompletions: task.max_completions,
       taskId, teamId: team.id,
       completions: completionRows.results.map((row) => ({ taskId: row.task_id, teamId: row.team_id, points: row.points })),
       hasPendingClaim: Boolean(pending),
+      prerequisiteTaskIds,
     });
     if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile cannot be claimed.', 409);
     const claimId = crypto.randomUUID();

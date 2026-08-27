@@ -1,6 +1,7 @@
 'use client';
 
 import type { BingoViewData, BingoViewTask } from '../lib/bingo-view-types';
+import { bingoRuleSummary } from '../lib/bingo-rules';
 
 export function BingoBoard({
   data, teamId, selectedTaskId, onSelect,
@@ -37,6 +38,7 @@ export function BingoBoard({
               </div>
               <p className="mt-2 text-sm font-black leading-tight text-[#332616]">{task.title}</p>
               <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#6f5c3c]">{task.description || (task.concealed ? 'Complete another task to reveal this square.' : task.difficulty)}</p>
+              {!task.concealed && !task.freeSpace ? <p className="mt-2 line-clamp-1 text-[9px] font-bold uppercase tracking-[0.04em] text-[#80642b]">{bingoRuleSummary(task.rule)}</p> : null}
               {ownerTeams.length ? (
                 <div className="mt-3 flex flex-wrap gap-1">
                   {ownerTeams.map((team) => <span key={team.id} className="rounded px-1.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: team.color }}>{team.name}</span>)}
@@ -61,7 +63,7 @@ export function BingoStandings({ data }: { data: BingoViewData }) {
         <article className="rounded border border-white/10 bg-black/20 p-3" key={team.id}>
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 text-xs font-black text-white" style={{ borderColor: team.color, backgroundColor: `${team.color}99` }}>{team.rank}</span>
-            <div className="min-w-0"><p className="truncate text-sm font-black text-[#f2d98f]">{team.name}</p><p className="text-[10px] uppercase tracking-[0.08em] text-[#aa9d7e]">{team.completedCount} tiles · {team.lineCount} lines</p></div>
+            <div className="min-w-0"><p className="truncate text-sm font-black text-[#f2d98f]">{team.name}</p><p className="text-[10px] uppercase tracking-[0.08em] text-[#aa9d7e]">{data.event.mode === 'categories' ? `${team.categoryCount} categories · ${team.completedCount} tiles` : data.event.mode === 'blackout' ? `${team.completedCount} tiles complete` : `${team.completedCount} tiles · ${team.lineCount} lines`}</p></div>
             <strong className="ml-auto text-xl text-[#f4d77c]">{team.score}</strong>
           </div>
         </article>

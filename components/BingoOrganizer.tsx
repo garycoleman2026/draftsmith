@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { absoluteUrl, copyText } from '../lib/client';
-import { parseBingoTaskImport, serializeBingoTaskImport, type BingoTaskDefinition } from '../lib/bingo-types';
+import type { BingoTaskDefinition } from '../lib/bingo-types';
+import type { BingoEventRules } from '../lib/bingo-rules';
 import type { BingoViewData, BingoViewTask } from '../lib/bingo-view-types';
+import type { BingoMode } from '../lib/types';
 import { BingoBoard, BingoStandings } from './BingoBoard';
+import { BingoMaker } from './BingoMaker';
 import { SiteHeader } from './SiteHeader';
 
 type IssuedLink = { teamId: string; teamName: string; path: string };
@@ -12,13 +15,12 @@ type IssuedLink = { teamId: string; teamName: string; path: string };
 export function BingoOrganizer({ token, eventId }: { token: string; eventId: string }) {
   const [data, setData] = useState<BingoViewData | null>(null);
   const [title, setTitle] = useState('');
-  const [mode, setMode] = useState('points');
+  const [mode, setMode] = useState<BingoMode>('points');
   const [requiresReview, setRequiresReview] = useState(true);
   const [publicSpectator, setPublicSpectator] = useState(true);
   const [spectatorDelaySeconds, setSpectatorDelaySeconds] = useState(0);
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
-  const [taskText, setTaskText] = useState('');
   const [templateName, setTemplateName] = useState('My clan board');
   const [issuedLinks, setIssuedLinks] = useState<IssuedLink[]>([]);
   const [copied, setCopied] = useState('');
@@ -39,7 +41,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
         setTitle(next.event.title); setMode(next.event.mode); setRequiresReview(next.event.requiresReview);
         setPublicSpectator(next.event.publicSpectator); setSpectatorDelaySeconds(next.event.spectatorDelaySeconds);
         setStartAt(toLocalInput(next.event.startAt)); setEndAt(toLocalInput(next.event.endAt));
-        setTaskText(tasksToText(next.tasks)); setTemplateName(`${next.event.title} board`);
+        setTemplateName(`${next.event.title} board`);
       }
       if (!quiet) setError('');
     } catch (cause) { if (!quiet) setError(cause instanceof Error ? cause.message : 'The organizer board could not be loaded.'); }
@@ -71,12 +73,12 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
     }, 'Event settings saved.');
   }
 
-  async function saveTasks() {
-    const tasks = parseBingoTaskImport(taskText);
-    if (tasks.length !== 25) { setError(`The board needs exactly 25 task rows; ${tasks.length} valid rows were found.`); return; }
+  async function saveBoard(tasks: BingoTaskDefinition[], rules: BingoEventRules) {
     await run('tasks', `${base}/tasks`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks }),
-    }, 'The 25-tile board was saved.');
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        tasks, rules, gridSize: rules.layout.rows,
+      }),
+    }, `The ${tasks.length}-tile custom board and its rules were saved.`);
   }
 
   async function lifecycle(action: 'start' | 'complete') {
@@ -131,7 +133,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Event settings</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Set the rules of the hall.</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <label className="text-[10px] font-black uppercase text-[#65583f] sm:col-span-2">Event title<input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-              <label className="text-[10px] font-black uppercase text-[#65583f]">Bingo type<select className="realm-field mt-1 h-11 w-full px-3 text-sm" value={mode} disabled={structuralLocked} onChange={(event) => setMode(event.target.value)}><option value="points">Points hunt</option><option value="classic">Classic lines</option><option value="lockout">Shared lockout</option></select></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Bingo type<select className="realm-field mt-1 h-11 w-full px-3 text-sm" value={mode} disabled={structuralLocked} onChange={(event) => setMode(event.target.value as BingoMode)}><option value="points">Points hunt</option><option value="classic">Classic lines</option><option value="lockout">Shared lockout</option><option value="blackout">Blackout race</option><option value="progression">Tiered expedition</option><option value="categories">Category conquest</option></select></label>
               <label className="text-[10px] font-black uppercase text-[#65583f]">Spectator delay (seconds)<input className="realm-field mt-1 h-11 w-full px-3 text-sm" type="number" min={0} max={3600} value={spectatorDelaySeconds} onChange={(event) => setSpectatorDelaySeconds(Number(event.target.value))} /></label>
               <label className="text-[10px] font-black uppercase text-[#65583f]">Planned start<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} /></label>
               <label className="text-[10px] font-black uppercase text-[#65583f]">Planned end<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} /></label>
@@ -150,10 +152,12 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
         </div>
 
         <section className="parchment-panel mt-5 p-5 sm:p-7">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Custom board builder</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Paste 25 task rows.</h2><p className="mt-2 text-xs leading-relaxed text-[#6e5e43]">One row per tile: <b>title | points | category | verification | description</b>. Tabs and CSV also work. Verification can be manual, screenshot, stat_delta, or hybrid.</p><textarea className="realm-field mt-4 min-h-80 w-full p-3 font-mono text-xs leading-relaxed normal-case" value={taskText} disabled={structuralLocked} onChange={(event) => setTaskText(event.target.value)} /><div className="mt-3 flex flex-wrap gap-2"><button className="gold-button px-4 py-2.5 text-xs" disabled={structuralLocked || working === 'tasks'} onClick={() => void saveTasks()}>{working === 'tasks' ? 'Saving board…' : `Save ${parseBingoTaskImport(taskText).length} / 25 tasks`}</button><button className="scroll-button px-4 py-2.5 text-xs" onClick={() => setTaskText(tasksToText(data.tasks))}>Restore saved text</button></div></div>
-            <aside><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Reusable clan template</p><input className="realm-field mt-3 h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><button className="iron-button mt-3 w-full px-4 py-2.5 text-xs" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : 'Save current board as template'}</button><div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>Start snapshot:</b> {snapshotLabel(data, 'start')}<br /><b>End snapshot:</b> {snapshotLabel(data, 'end')}<br /><b>Snapshot worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div></aside>
+          <div className="flex flex-col gap-4 border-b border-[#8b6a32]/25 pb-5 lg:flex-row lg:items-end lg:justify-between">
+            <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">No-code custom bingo maker</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Build the clan’s game, not just a spreadsheet.</h2><p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#6e5e43]">Choose a layout, arrange OSRS presets, define who contributes, set proof sources, and add unlock rules. Advanced boards still copy cleanly to and from spreadsheets.</p></div>
+            <div className="grid min-w-72 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><button className="iron-button px-4 py-2.5 text-xs" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : 'Save as template'}</button></div>
           </div>
+          <div className="mt-5"><BingoMaker initialTasks={tasksToDefinitions(data.tasks)} initialRules={data.event.rules} mode={data.event.mode} disabled={structuralLocked} saving={working === 'tasks'} onSave={saveBoard} /></div>
+          <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>Start snapshot:</b> {snapshotLabel(data, 'start')} · <b>End snapshot:</b> {snapshotLabel(data, 'end')} · <b>Snapshot worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
         </section>
 
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
@@ -168,14 +172,13 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   );
 }
 
-function tasksToText(tasks: BingoViewTask[]) {
-  const definitions: BingoTaskDefinition[] = tasks.map((task) => ({
+function tasksToDefinitions(tasks: BingoViewTask[]): BingoTaskDefinition[] {
+  return tasks.map((task) => ({
     title: task.title, description: task.description, points: task.points ?? 0, category: task.category,
     difficulty: (task.difficulty ?? 'medium') as BingoTaskDefinition['difficulty'],
     verificationMode: task.verificationMode ?? 'manual', repeatable: task.repeatable,
-    maxCompletions: task.maxCompletions, hidden: task.hidden, freeSpace: task.freeSpace, iconKey: task.iconKey,
+    maxCompletions: task.maxCompletions, hidden: task.hidden, freeSpace: task.freeSpace, iconKey: task.iconKey, rule: task.rule,
   }));
-  return serializeBingoTaskImport(definitions);
 }
 function snapshotLabel(data: BingoViewData, phase: string) { const snapshot = data.snapshots.find((item) => item.phase === phase); return snapshot ? `${snapshot.count} players · ${snapshot.capturedAt ? new Date(snapshot.capturedAt).toLocaleString() : 'captured'}` : 'Not captured'; }
 function toLocalInput(value: string | null) { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); }

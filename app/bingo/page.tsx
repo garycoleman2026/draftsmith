@@ -27,7 +27,7 @@ export default function BingoHallPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">The next stage after drafting</p>
             <h1 className="fantasy-title mt-3 max-w-4xl text-4xl font-bold leading-none text-[#f5df9b] sm:text-6xl">Run the whole clan bingo from one great hall.</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#b5a888]">Live scoring, private team claims, evidence review, reusable boards, and a public activity feed—all connected to the teams Terry already forged.</p>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#b5a888]">Design a custom OSRS bingo, run live scoring and private team claims, review evidence, and publish a spectator board—all connected to the teams Terry already forged.</p>
           </div>
           <Link className="gold-button inline-flex justify-center px-5 py-3 text-sm" href="/">Draft the teams first →</Link>
         </div>
@@ -58,11 +58,30 @@ export default function BingoHallPage() {
             </div>
             <div className="mt-7 border-t border-white/10 pt-5">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Built-in halls</p>
-              <p className="mt-3 text-sm leading-relaxed text-[#c7b995]">Classic · Points · Lockout</p>
-              <p className="mt-2 text-xs leading-relaxed text-[#9f9272]">Custom 5 × 5 task boards and reusable clan templates are included.</p>
+              <p className="mt-3 text-sm leading-relaxed text-[#c7b995]">Classic · Points · Lockout · Blackout · Progression · Categories</p>
+              <p className="mt-2 text-xs leading-relaxed text-[#9f9272]">Build 3 × 3 through 7 × 7 boards from 60 OSRS presets, custom proof rules, unlock paths, and reusable clan templates.</p>
             </div>
           </aside>
         </div>
+
+        <section className="mt-8 grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="parchment-panel p-6 sm:p-8">
+            <p className="text-xs font-black uppercase tracking-[0.15em] text-[#80642b]">The custom maker</p>
+            <h2 className="fantasy-title mt-2 text-3xl font-bold sm:text-4xl">Build the rules without waiting for a code change.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#66563d]">Drag presets onto the board, edit the points and target, choose who contributes, require RuneLite, Wise Old Man, screenshots, or organizer review, and make later tiles depend on earlier ones.</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {['Get an Oathplate helm', 'Obtain the Baby mole pet', 'Beat the GM ToB trio time', 'Gain 10m team Agility XP'].map((task) => <article className="parchment-card p-4" key={task}><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">Editable preset</p><p className="mt-2 text-sm font-black text-[#392d1b]">{task}</p></article>)}
+            </div>
+          </div>
+          <div className="wood-panel p-6 sm:p-8">
+            <p className="text-xs font-black uppercase tracking-[0.15em] text-[#d7ae50]">One event, three views</p>
+            <div className="mt-5 space-y-4">
+              <article className="rounded border border-white/10 bg-black/20 p-4"><p className="font-black text-[#f2d98f]">Organizer room</p><p className="mt-1 text-xs leading-relaxed text-[#b8aa87]">Design the board, issue team links, review claims, and watch verification status.</p></article>
+              <article className="rounded border border-white/10 bg-black/20 p-4"><p className="font-black text-[#f2d98f]">Private team board</p><p className="mt-1 text-xs leading-relaxed text-[#b8aa87]">See unlocks, submit proof, and follow live progress without exposing private evidence.</p></article>
+              <article className="rounded border border-white/10 bg-black/20 p-4"><p className="font-black text-[#f2d98f]">Spectator board</p><p className="mt-1 text-xs leading-relaxed text-[#b8aa87]">Share a public scoreboard with optional delay, activity, ownership, and standings.</p></article>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
   );

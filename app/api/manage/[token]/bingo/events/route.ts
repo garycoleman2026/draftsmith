@@ -1,7 +1,7 @@
 import { createHashedCredential, resolveManagerDraftId } from '@/lib/access-tokens';
 import { recordAudit, requestId } from '@/lib/audit';
 import { bingoActivityInsert, chunkedBatch, parseJson, uniqueBingoSlug } from '@/lib/bingo';
-import { getBuiltinBingoTemplate, sanitizeBingoTasks, type BingoTemplateDefinition } from '@/lib/bingo-types';
+import { getBuiltinBingoTemplate, sanitizeBingoTemplate } from '@/lib/bingo-types';
 import { getSessionUser } from '@/lib/auth';
 import { ensureSchema, getDatabase, json } from '@/lib/db';
 import type { DraftResult, BingoBoardScope, BingoMode } from '@/lib/types';
@@ -53,14 +53,14 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       ? await loadCustomTemplate(body.templateId, draftId, draft.clan_id)
       : null;
     const builtin = getBuiltinBingoTemplate(body.templateKey);
-    const configuration: Partial<BingoTemplateDefinition> = customTemplate
-      ? parseJson<Partial<BingoTemplateDefinition>>(customTemplate.configuration_json, {})
+    const configuration = customTemplate
+      ? sanitizeBingoTemplate(parseJson(customTemplate.configuration_json, {}), builtin)
       : builtin;
     const mode = validMode(body.mode ?? configuration.mode);
     const boardScope = mode === 'lockout' ? 'shared' : validScope(body.boardScope ?? configuration.boardScope);
-    const gridSize = 5;
+    const gridSize = Math.max(3, Math.min(7, configuration.rules.layout.rows));
     const expectedTasks = gridSize * gridSize;
-    const tasks = sanitizeBingoTasks(configuration.tasks, expectedTasks);
+    const tasks = configuration.tasks;
     if (tasks.length !== expectedTasks) return json({ error: `The selected template must contain exactly ${expectedTasks} tasks.` }, { status: 400 });
     const titleInput = typeof body.title === 'string' ? body.title.trim().slice(0, 90) : '';
     const title = titleInput || `${draft.title} bingo`;
@@ -84,7 +84,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         ...team.players.map((player) => ({ id: player.id, name: player.name, role: 'member' })),
       ],
     })));
-    const winCondition = configuration.winCondition === 'lines' || mode === 'classic' ? 'lines' : 'points';
+    const winCondition = configuration.rules.scoring.winCondition;
     const targetValue = winCondition === 'lines' ? Math.max(1, Number(configuration.targetValue) || 1) : Math.max(0, Number(configuration.targetValue) || 0);
     await db.batch([
       db.prepare(`INSERT INTO bingo_events
@@ -93,17 +93,17 @@ export async function POST(request: Request, context: { params: Promise<{ token:
          revision, rules_json, created_by_user_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, 1, 1, 0, ?, ?, 'idle', 0, ?, ?, ?, ?)`)
         .bind(eventId, draftId, title, publicSlug, mode, boardScope, gridSize, winCondition, targetValue,
-          startAt, endAt, JSON.stringify({ templateKey: customTemplate ? null : builtin.key }), sessionUser?.id ?? draft.owner_user_id, now, now),
+          startAt, endAt, JSON.stringify({ ...configuration.rules, templateKey: customTemplate ? null : builtin.key }), sessionUser?.id ?? draft.owner_user_id, now, now),
       ...teamData.map((team) => db.prepare(`INSERT INTO bingo_teams
         (id, event_id, source_team_index, name, color, emblem, access_token_hash, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(team.id, eventId, team.sourceTeamIndex, team.name, team.color, team.emblem, team.credential.hash, now)),
       ...tasks.map((task, sortOrder) => db.prepare(`INSERT INTO bingo_tasks
         (id, event_id, title, description, points, category, difficulty, verification_mode, repeatable,
-         max_completions, hidden, free_space, icon_key, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         max_completions, hidden, free_space, icon_key, rule_json, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(crypto.randomUUID(), eventId, task.title, task.description, task.points, task.category, task.difficulty,
           task.verificationMode, task.repeatable ? 1 : 0, task.maxCompletions, task.hidden ? 1 : 0,
-          task.freeSpace ? 1 : 0, task.iconKey, sortOrder, now, now)),
+          task.freeSpace ? 1 : 0, task.iconKey, JSON.stringify(task.rule), sortOrder, now, now)),
       bingoActivityInsert({ eventId, type: 'event.created', message: `${title} entered the bingo hall.`, now }),
     ]);
     await chunkedBatch(teamData.flatMap((team) => team.members.map((member) => db.prepare(`INSERT INTO bingo_team_members
@@ -136,7 +136,7 @@ async function loadCustomTemplate(templateId: string, draftId: string, clanId: s
 }
 
 function validMode(value: unknown): BingoMode {
-  return ['classic', 'points', 'lockout'].includes(String(value)) ? String(value) as BingoMode : 'points';
+  return ['classic', 'points', 'lockout', 'blackout', 'progression', 'categories'].includes(String(value)) ? String(value) as BingoMode : 'points';
 }
 function validScope(value: unknown): BingoBoardScope { return value === 'shared' ? 'shared' : 'per_team'; }
 function validDate(value: unknown) {

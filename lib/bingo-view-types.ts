@@ -1,15 +1,17 @@
 import type { BingoBoardScope, BingoClaimStatus, BingoMode, BingoStatus, BingoVerificationMode } from './types';
+import type { BingoEventRules, BingoTaskRule } from './bingo-rules';
 
 export type BingoViewTeam = {
   id: string; name: string; color: string; emblem: string; sourceTeamIndex: number;
   members: { id: string; playerId: string | null; name: string; role: string }[];
-  score: number; completedCount: number; lineCount: number; rank: number;
+  score: number; completedCount: number; lineCount: number; categoryCount: number; rank: number;
 };
 
 export type BingoViewTask = {
   id: string; title: string; description: string; points: number | null; category: string;
   difficulty: string | null; verificationMode: BingoVerificationMode | null; repeatable: boolean;
   maxCompletions: number; hidden: boolean; concealed: boolean; freeSpace: boolean; iconKey: string;
+  rule: BingoTaskRule;
   sortOrder: number; ownerTeamIds: string[]; pendingTeamIds: string[]; claimable: boolean; claimBlockedReason: string | null;
 };
 
@@ -25,7 +27,7 @@ export type BingoViewData = {
     boardScope: BingoBoardScope; gridSize: number; status: BingoStatus; winCondition: string; targetValue: number;
     requiresReview: boolean; publicSpectator: boolean; spectatorDelaySeconds: number; startAt: string | null;
     endAt: string | null; startedAt: string | null; endedAt: string | null; baselineStatus: string;
-    revision: number; createdAt: string; updatedAt: string;
+    revision: number; rules: BingoEventRules; createdAt: string; updatedAt: string;
   };
   teams: BingoViewTeam[];
   tasks: BingoViewTask[];
