@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const sent = [
   ['XP & levels', 'Skill name, XP gained or level reached, and observation time.'],
   ['Loot & log slots', 'Item name/ID, quantity, pet or collection-log event, and observation time.'],
-  ['Bosses & raids', 'Boss/raid name, one kill or completion, party display names when needed, and completion seconds.'],
+  ['Bosses & raids', 'Boss/raid name, one kill or completion, anonymous party size when needed, and completion seconds.'],
   ['Achievements & clues', 'The completed task or clue tier and observation time.'],
 ] as const;
 
@@ -40,6 +40,7 @@ export default function RuneliteGuidePage() {
             <ul className="mt-5 space-y-3 text-sm leading-relaxed text-[#c8b990]">
               <li>• No Jagex or RuneLite account password, session, launcher token, or bank PIN.</li>
               <li>• No raw public, private, clan, friends-chat, or game-message text.</li>
+              <li>• No teammate or party-member names; shared encounters send only an anonymous party size.</li>
               <li>• No full bank, inventory, equipment, friends list, or always-on location history.</li>
               <li>• No event data when the organizer disables its category or the bingo is not live.</li>
             </ul>
@@ -55,7 +56,7 @@ export default function RuneliteGuidePage() {
 
         <section className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
           <div className="wood-panel p-6"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Controls</p><h2 className="fantasy-title mt-2 text-3xl font-bold text-[#f2d98f]">Disconnect at any time.</h2><p className="mt-4 text-sm leading-relaxed text-[#c8b990]">A team can disconnect its paired devices from the private board. The organizer can disconnect any event device or disable the integration, which revokes every active credential. The plugin can also revoke its own credential.</p></div>
-          <div className="parchment-panel p-6 text-[#433520]"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#80642b]">Status</p><h2 className="fantasy-title mt-2 text-3xl font-bold">Plugin release path.</h2><p className="mt-4 text-sm leading-relaxed text-[#6e5e43]">The authenticated service contract and event overlay API are live. The standalone open-source plugin and Plugin Hub submission are the next release stage.</p></div>
+          <div className="parchment-panel p-6 text-[#433520]"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#80642b]">Status</p><h2 className="fantasy-title mt-2 text-3xl font-bold">Open-source beta.</h2><p className="mt-4 text-sm leading-relaxed text-[#6e5e43]">The service and standalone plugin source are public. Clone the beta and run it in RuneLite developer mode for the first in-game test; Plugin Hub submission follows a confirmed gameplay pass.</p><a className="mt-4 inline-block text-xs font-black text-[#315d45] underline" href="https://github.com/garycoleman2026/terrys-drafting-runelite" target="_blank" rel="noreferrer">Open the plugin repository ↗</a></div>
         </section>
 
         <div className="mt-8 flex flex-wrap gap-3"><Link className="gold-button px-5 py-3 text-sm" href="/bingo">Explore the bingo hall →</Link><Link className="scroll-button px-5 py-3 text-sm" href="/">Back to Terry’s Drafting</Link></div>

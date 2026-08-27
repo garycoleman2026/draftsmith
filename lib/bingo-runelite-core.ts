@@ -1,5 +1,4 @@
 import { sanitizeVerificationSignal, type BingoVerificationSignal } from './bingo-verification-core';
-import { normalizeRsn } from './validation';
 
 export const RUNELITE_DISCLOSURE_VERSION = 1 as const;
 export const RUNELITE_SCOPES = ['xp', 'loot', 'kills', 'raids', 'achievements'] as const;
@@ -64,12 +63,17 @@ export function sanitizeRuneliteObservation(input: unknown, context: {
   const targetId = nullableInteger(row.targetId, 0, 10_000_000);
   const metric = metricValue(row.metric || target);
   const numeric = positiveNumber(row.value);
-  const participants = Array.isArray(row.participants)
-    ? [...new Set(row.participants.map((name) => textValue(name, 12)).filter(Boolean))].slice(0, 100)
-    : [];
-  if (participants.length && !participants.some((name) => normalizeRsn(name) === normalizeRsn(context.memberRsn))) {
-    throw new Error('Party observations must include the paired player.');
+  if (row.participants !== undefined) {
+    throw new Error('RuneLite observations must not include other players\' names. Send only participantCount.');
   }
+  const participantCount = nullableInteger(row.participantCount, 1, 100);
+  if (participantCount !== null && !['boss_kill', 'raid_complete', 'raid_time'].includes(type)) {
+    throw new Error('Only shared boss and raid observations may include a party size.');
+  }
+  const participants = participantCount === null ? [] : [
+    context.memberRsn,
+    ...Array.from({ length: participantCount - 1 }, (_, index) => `party-${index + 2}`),
+  ];
   const observedAt = typeof row.observedAt === 'string' ? row.observedAt : '';
   if (!observedAt) throw new Error('RuneLite observations need an observation time.');
 

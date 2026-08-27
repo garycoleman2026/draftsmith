@@ -15,7 +15,7 @@ const LABELS: Record<RuneliteScope, { name: string; detail: string }> = {
   xp: { name: 'XP & levels', detail: 'Skill XP deltas and level milestones.' },
   loot: { name: 'Loot & collection log', detail: 'Item IDs/names, quantities, pets, and new log slots.' },
   kills: { name: 'Boss kills', detail: 'Supported boss kill-count observations.' },
-  raids: { name: 'Raids & times', detail: 'Raid completions, party names, and completion seconds.' },
+  raids: { name: 'Raids & times', detail: 'Raid completions, anonymous party size, and completion seconds.' },
   achievements: { name: 'Achievements & clues', detail: 'Combat achievements and clue completions.' },
 };
 

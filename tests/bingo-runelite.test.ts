@@ -62,18 +62,26 @@ describe('RuneLite observation normalization', () => {
     });
   });
 
-  it('requires the paired player in a reported raid party', () => {
-    expect(() => sanitizeRuneliteObservation({
+  it('accepts only an anonymous party size for shared encounters', () => {
+    const result = sanitizeRuneliteObservation({
       type: 'raid_time', clientEventId: 'raid:12345678', target: 'Theatre of Blood', metric: 'trio',
-      value: 900, participants: ['Somebody Else', 'Player Two', 'Player Three'],
+      value: 900, participantCount: 3,
       observedAt: '2026-08-27T12:00:00.000Z',
-    }, { ...context, allowedScopes: [...context.allowedScopes] })).toThrow('paired player');
+    }, { ...context, allowedScopes: [...context.allowedScopes] });
+    expect(result.signal.participants).toEqual(['Terry Main', 'party-2', 'party-3']);
+  });
+
+  it('rejects other players names at the service boundary', () => {
+    expect(() => sanitizeRuneliteObservation({
+      type: 'raid_complete', clientEventId: 'raid:12345678', target: 'Theatre of Blood',
+      participants: ['Terry Main', 'Player Two'], observedAt: '2026-08-27T12:00:00.000Z',
+    }, { ...context, allowedScopes: [...context.allowedScopes] })).toThrow('must not include other players');
   });
 
   it('deduplicates a shared raid fingerprint across different devices', () => {
     const observation = {
       type: 'raid_complete', clientEventId: 'raid:local:1234', correlationId: 'tob:1900000000:a-b-c',
-      target: 'Theatre of Blood', participants: ['Terry Main', 'Player Two', 'Player Three'],
+      target: 'Theatre of Blood', participantCount: 3,
       observedAt: '2026-08-27T12:00:00.000Z',
     };
     const first = sanitizeRuneliteObservation(observation, { ...context, allowedScopes: [...context.allowedScopes] });

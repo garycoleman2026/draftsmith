@@ -7,6 +7,7 @@ import {
 } from './bingo-runelite-core';
 import { ingestVerificationSignal } from './bingo-verification';
 import { getDatabase } from './db';
+import { scheduleDiscordEvent } from './discord-webhooks';
 import { hashToken, randomToken } from './security';
 import { normalizeRsn } from './validation';
 
@@ -237,7 +238,10 @@ export async function redeemRunelitePairing(input: {
     team: { id: pairing.team_id, name: pairing.team_name },
     member: { id: pairing.member_id, name: pairing.display_name },
     privacy: runelitePrivacy(true, requestedScopes),
-    endpoints: { events: '/api/runelite/events', overlay: '/api/runelite/overlay', device: '/api/runelite/device' },
+    endpoints: {
+      events: '/api/runelite/events', overlay: '/api/runelite/overlay', claims: '/api/runelite/claims',
+      device: '/api/runelite/device',
+    },
   };
 }
 
@@ -397,6 +401,8 @@ export async function buildRuneliteOverlay(device: RuneliteDeviceContext, origin
         category: task.category, concealed: task.concealed, freeSpace: task.freeSpace,
         claimed: task.ownerTeamIds.length > 0, claimedByOwnTeam: task.ownerTeamIds.includes(device.teamId),
         pendingForOwnTeam: task.pendingTeamIds.includes(device.teamId), claimable: task.claimable,
+        pluginClaimable: task.claimable && task.verificationMode !== 'screenshot',
+        claimBlockedReason: task.claimBlockedReason,
         progress: progress ? {
           status: progress.status, value: progress.progressValue, target: progress.targetValue,
           confidence: progress.confidence,
@@ -406,6 +412,59 @@ export async function buildRuneliteOverlay(device: RuneliteDeviceContext, origin
     capturePlan,
     privacy: runelitePrivacy(true, device.scopes),
   };
+}
+
+export async function submitRuneliteClaim(device: RuneliteDeviceContext, value: unknown) {
+  if (device.eventStatus !== 'live') throw new BingoError('Claims are open only while the bingo is live.', 409);
+  const body = objectValue(value);
+  const taskId = textValue(body.taskId, 64);
+  const note = textValue(body.note, 500);
+  if (!taskId) throw new BingoError('Choose a bingo task to submit.');
+  const data = await loadBingoView({ eventId: device.eventId, viewer: 'team', teamId: device.teamId });
+  const task = data.tasks.find((candidate) => candidate.id === taskId);
+  if (!task) throw new BingoError('That tile is not on this bingo board.', 404);
+  if (!task.claimable) throw new BingoError(task.claimBlockedReason ?? 'That tile cannot be claimed.', 409);
+  if (task.verificationMode === 'screenshot') {
+    throw new BingoError('This tile requires screenshot evidence. Open the private team board to submit it.', 409);
+  }
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const claimId = crypto.randomUUID();
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO bingo_claims
+          (id, event_id, task_id, team_id, member_id, claimed_by_name, note,
+           verification_source, verification_confidence, status, score_awarded, submitted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'runelite_manual', 'reported', 'pending', 0, ?)`,
+      ).bind(claimId, device.eventId, task.id, device.teamId, device.memberId, device.memberName, note, now),
+      bingoActivityInsert({
+        eventId: device.eventId, teamId: device.teamId, taskId: task.id, type: 'claim.submitted',
+        message: `${device.teamName} submitted ${task.title} from RuneLite for review.`, now,
+      }),
+      db.prepare('UPDATE bingo_events SET revision = revision + 1, updated_at = ? WHERE id = ?').bind(now, device.eventId),
+    ]);
+  } catch (error) {
+    if (/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) {
+      throw new BingoError('That tile already has a pending claim or was just completed. Refresh the board.', 409);
+    }
+    throw error;
+  }
+  await recordAudit(db, {
+    draftId: device.draftId, actorType: 'participant', actorReference: device.id,
+    eventType: 'bingo.claim_submitted',
+    metadata: { eventId: device.eventId, claimId, taskId: task.id, memberId: device.memberId, source: 'runelite_manual' },
+    createdAt: now,
+  }).catch(() => undefined);
+  scheduleDiscordEvent(device.draftId, 'bingo.claim_submitted', {
+    username: "Terry's Drafting",
+    embeds: [{
+      title: 'RuneLite claim awaiting review',
+      description: `${device.teamName} · ${task.title} · ${device.memberName}`,
+      color: 0xb58932,
+    }],
+  });
+  return { id: claimId, status: 'pending' as const, taskId: task.id, submittedAt: now };
 }
 
 export async function revokeRuneliteDevice(input: {

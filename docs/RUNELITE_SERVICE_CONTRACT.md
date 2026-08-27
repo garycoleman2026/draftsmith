@@ -17,21 +17,22 @@ RuneLite reports are authenticated client observations, not cryptographic proof.
 - `xp`: XP deltas and levels.
 - `loot`: item drops, pets, and collection-log slots.
 - `kills`: boss-kill observations.
-- `raids`: raid completions, participant names when required, and completion times.
+- `raids`: raid completions, anonymous party size when required, and completion times.
 - `achievements`: combat achievements and clues.
 
-Raw chat, credentials, bank contents, full inventory/equipment, friends lists, and continuous location history are not accepted by the contract. Unknown fields are discarded during normalization.
+Raw chat, other players' names, credentials, bank contents, full inventory/equipment, friends lists, and continuous location history are not accepted by the contract. Unknown fields are discarded during normalization.
 
 ## API
 
 - `POST /api/runelite/pair` — redeem one pairing code.
 - `POST /api/runelite/events` — submit a bounded batch of 1–25 normalized observations. Requires bearer credential and matching `X-RuneLite-RSN`.
 - `GET /api/runelite/overlay` — fetch the paired team, standings, board, progress, and task-specific capture plan. Supports `ETag`/`If-None-Match`.
+- `POST /api/runelite/claims` — submit a non-screenshot tile as a reported claim for organizer review. Requires bearer credential and matching `X-RuneLite-RSN`.
 - `DELETE /api/runelite/device` — revoke the caller’s device.
 
 Each batch has a stable 8–64 character `batchKey`; each observation has a stable 8–64 character `clientEventId`. The service namespaces observation IDs by device and the verification database enforces source-level idempotency.
 
-Shared boss and raid observations should also include an 8–64 character `correlationId` derived from the encounter, completion time, and sorted party. The service uses that team-scoped key to collapse the same completion reported by several paired clients.
+Shared boss and raid observations may also include an 8–64 character `correlationId` derived from the encounter, completion time, and anonymous party size. It must not contain character names. The service uses that team-scoped key to collapse the same completion reported by several paired clients. The plugin sends `participantCount`; the service rejects a `participants` field.
 
 ## Accepted observation types
 
