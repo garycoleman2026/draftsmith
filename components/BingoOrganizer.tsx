@@ -1,0 +1,183 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { absoluteUrl, copyText } from '../lib/client';
+import { parseBingoTaskImport, serializeBingoTaskImport, type BingoTaskDefinition } from '../lib/bingo-types';
+import type { BingoViewData, BingoViewTask } from '../lib/bingo-view-types';
+import { BingoBoard, BingoStandings } from './BingoBoard';
+import { SiteHeader } from './SiteHeader';
+
+type IssuedLink = { teamId: string; teamName: string; path: string };
+
+export function BingoOrganizer({ token, eventId }: { token: string; eventId: string }) {
+  const [data, setData] = useState<BingoViewData | null>(null);
+  const [title, setTitle] = useState('');
+  const [mode, setMode] = useState('points');
+  const [requiresReview, setRequiresReview] = useState(true);
+  const [publicSpectator, setPublicSpectator] = useState(true);
+  const [spectatorDelaySeconds, setSpectatorDelaySeconds] = useState(0);
+  const [startAt, setStartAt] = useState('');
+  const [endAt, setEndAt] = useState('');
+  const [taskText, setTaskText] = useState('');
+  const [templateName, setTemplateName] = useState('My clan board');
+  const [issuedLinks, setIssuedLinks] = useState<IssuedLink[]>([]);
+  const [copied, setCopied] = useState('');
+  const [working, setWorking] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const initialized = useRef(false);
+  const base = `/api/manage/${encodeURIComponent(token)}/bingo/events/${encodeURIComponent(eventId)}`;
+
+  const load = useCallback(async (quiet = false) => {
+    try {
+      const response = await fetch(base, { cache: 'no-store' });
+      const next = await response.json() as BingoViewData & { error?: string };
+      if (!response.ok) throw new Error(next.error || 'The organizer board could not be loaded.');
+      setData(next);
+      if (!initialized.current) {
+        initialized.current = true;
+        setTitle(next.event.title); setMode(next.event.mode); setRequiresReview(next.event.requiresReview);
+        setPublicSpectator(next.event.publicSpectator); setSpectatorDelaySeconds(next.event.spectatorDelaySeconds);
+        setStartAt(toLocalInput(next.event.startAt)); setEndAt(toLocalInput(next.event.endAt));
+        setTaskText(tasksToText(next.tasks)); setTemplateName(`${next.event.title} board`);
+      }
+      if (!quiet) setError('');
+    } catch (cause) { if (!quiet) setError(cause instanceof Error ? cause.message : 'The organizer board could not be loaded.'); }
+  }, [base]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => void load(), 0);
+    const timer = window.setInterval(() => void load(true), 4_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+  }, [load]);
+
+  async function run(action: string, path: string, init: RequestInit, message: string) {
+    setWorking(action); setError(''); setSuccess('');
+    try {
+      const response = await fetch(path, init);
+      const result = await response.json() as Record<string, unknown> & { error?: string };
+      if (!response.ok) throw new Error(result.error || 'That change could not be saved.');
+      setSuccess(message); await load(true); return result;
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'That change could not be saved.'); return null; }
+    finally { setWorking(''); }
+  }
+
+  async function saveSettings() {
+    await run('settings', base, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        title, mode, boardScope: mode === 'lockout' ? 'shared' : 'per_team', requiresReview, publicSpectator,
+        spectatorDelaySeconds, startAt: toIso(startAt), endAt: toIso(endAt),
+      }),
+    }, 'Event settings saved.');
+  }
+
+  async function saveTasks() {
+    const tasks = parseBingoTaskImport(taskText);
+    if (tasks.length !== 25) { setError(`The board needs exactly 25 task rows; ${tasks.length} valid rows were found.`); return; }
+    await run('tasks', `${base}/tasks`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks }),
+    }, 'The 25-tile board was saved.');
+  }
+
+  async function lifecycle(action: 'start' | 'complete') {
+    await run(action, base, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) },
+      action === 'start' ? 'The bingo is live and baseline snapshots are running.' : 'The event is complete and final snapshots are running.');
+  }
+
+  async function rotateLinks(teamId?: string) {
+    const result = await run(teamId ? `link-${teamId}` : 'links', `${base}/links`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId }),
+    }, teamId ? 'A fresh private team link was issued.' : 'Fresh private links were issued for every team.');
+    if (Array.isArray(result?.teamLinks)) {
+      const next = result.teamLinks as IssuedLink[];
+      setIssuedLinks((current) => teamId ? [...current.filter((item) => item.teamId !== teamId), ...next] : next);
+    }
+  }
+
+  async function review(claimId: string, action: 'approve' | 'reject') {
+    const reviewNote = action === 'reject' ? window.prompt('Optional note for the team:', '') ?? '' : '';
+    await run(`${action}-${claimId}`, `${base}/claims/${encodeURIComponent(claimId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reviewNote }),
+    }, action === 'approve' ? 'Claim approved and the scoreboard updated.' : 'Claim returned to the team.');
+  }
+
+  async function saveTemplate() {
+    await run('template', `/api/manage/${encodeURIComponent(token)}/bingo/templates`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId, name: templateName }),
+    }, 'This board is now available as a reusable template.');
+  }
+
+  async function copy(label: string, value: string) { await copyText(value); setCopied(label); window.setTimeout(() => setCopied(''), 1_500); }
+
+  if (!data) return <LoadingScreen error={error} />;
+  const structuralLocked = ['live', 'complete', 'archived'].includes(data.event.status);
+  const pendingClaims = data.claims.filter((claim) => claim.status === 'pending');
+  const allLinks = issuedLinks.map((item) => `${item.teamName}: ${absoluteUrl(item.path)}`).join('\n');
+  return (
+    <main className="realm-bg min-h-screen text-[#eadcb9]">
+      <SiteHeader badge="Bingo organizer" />
+      <section className="mx-auto max-w-[1500px] px-4 pb-20 pt-8 sm:px-8">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">Event control room · {data.event.status}</p><h1 className="fantasy-title mt-2 text-4xl font-bold text-[#f5df9b] sm:text-6xl">{data.event.title}</h1><p className="mt-3 text-sm text-[#b7aa8a]">Configure the board, share one private link per team, review proof, and publish the live scoreboard.</p></div>
+          <div className="flex flex-wrap gap-2"><button className="scroll-button px-4 py-2.5 text-xs" onClick={() => void copy('public', absoluteUrl(data.event.publicPath))}>{copied === 'public' ? 'Copied public link' : 'Copy spectator link'}</button><a className="scroll-button px-4 py-2.5 text-xs" href={data.event.publicPath} target="_blank" rel="noreferrer">Open spectator board ↗</a>{data.event.status === 'live' ? <button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'complete'} onClick={() => void lifecycle('complete')}>Complete event</button> : ['draft', 'scheduled'].includes(data.event.status) ? <button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'start'} onClick={() => void lifecycle('start')}>{working === 'start' ? 'Starting…' : 'Start bingo →'}</button> : null}</div>
+        </div>
+        {success ? <p role="status" className="mt-5 rounded border border-[#3e775d] bg-[#dcebd9] px-4 py-3 text-sm font-bold text-[#245340]">{success}</p> : null}
+        {error ? <p role="alert" className="mt-5 rounded border border-[#b75b42] bg-[#f4d5c7] px-4 py-3 text-sm font-bold text-[#7f321f]">{error}</p> : null}
+
+        <div className="wood-panel mt-7 p-4 sm:p-6"><BingoStandings data={data} /></div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <section className="parchment-panel p-5 sm:p-7">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Event settings</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Set the rules of the hall.</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <label className="text-[10px] font-black uppercase text-[#65583f] sm:col-span-2">Event title<input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Bingo type<select className="realm-field mt-1 h-11 w-full px-3 text-sm" value={mode} disabled={structuralLocked} onChange={(event) => setMode(event.target.value)}><option value="points">Points hunt</option><option value="classic">Classic lines</option><option value="lockout">Shared lockout</option></select></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Spectator delay (seconds)<input className="realm-field mt-1 h-11 w-full px-3 text-sm" type="number" min={0} max={3600} value={spectatorDelaySeconds} onChange={(event) => setSpectatorDelaySeconds(Number(event.target.value))} /></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Planned start<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} /></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Planned end<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} /></label>
+              <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b]"><input type="checkbox" checked={requiresReview} onChange={(event) => setRequiresReview(event.target.checked)} /> Organizer reviews claims</label>
+              <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b]"><input type="checkbox" checked={publicSpectator} onChange={(event) => setPublicSpectator(event.target.checked)} /> Public spectator board</label>
+            </div>
+            <button className="gold-button mt-5 px-5 py-3 text-sm" disabled={working === 'settings'} onClick={() => void saveSettings()}>{working === 'settings' ? 'Saving…' : 'Save event settings'}</button>
+          </section>
+
+          <section className="parchment-panel p-5 sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Private team doors</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Issue the captain links.</h2></div><button className="iron-button px-3 py-2 text-xs" disabled={working === 'links'} onClick={() => void rotateLinks()}>{working === 'links' ? 'Rotating…' : 'Issue / rotate all'}</button></div>
+            <p className="mt-3 text-xs leading-relaxed text-[#6e5e43]">Private links are shown once when issued. Copy them before leaving this page. Rotating a link immediately retires the older one.</p>
+            <div className="mt-4 space-y-2">{data.teams.map((team) => { const link = issuedLinks.find((item) => item.teamId === team.id); return <article className="parchment-card flex flex-wrap items-center gap-2 p-3" key={team.id}><span className="h-8 w-2 rounded" style={{ background: team.color }} /><div className="min-w-36 flex-1"><p className="font-black">{team.name}</p><p className="text-[10px] text-[#746244]">{team.members.length} members</p></div>{link ? <><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copy(team.id, absoluteUrl(link.path))}>{copied === team.id ? 'Copied' : 'Copy link'}</button><a className="scroll-button px-3 py-2 text-xs" href={link.path} target="_blank" rel="noreferrer">Open ↗</a></> : <button className="scroll-button px-3 py-2 text-xs" disabled={working === `link-${team.id}`} onClick={() => void rotateLinks(team.id)}>Issue link</button>}</article>; })}</div>
+            <button className="iron-button mt-4 w-full px-4 py-2.5 text-xs" disabled={!allLinks} onClick={() => void copy('all', allLinks)}>{copied === 'all' ? 'Copied every link' : 'Copy all newly issued links'}</button>
+          </section>
+        </div>
+
+        <section className="parchment-panel mt-5 p-5 sm:p-7">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Custom board builder</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Paste 25 task rows.</h2><p className="mt-2 text-xs leading-relaxed text-[#6e5e43]">One row per tile: <b>title | points | category | verification | description</b>. Tabs and CSV also work. Verification can be manual, screenshot, stat_delta, or hybrid.</p><textarea className="realm-field mt-4 min-h-80 w-full p-3 font-mono text-xs leading-relaxed normal-case" value={taskText} disabled={structuralLocked} onChange={(event) => setTaskText(event.target.value)} /><div className="mt-3 flex flex-wrap gap-2"><button className="gold-button px-4 py-2.5 text-xs" disabled={structuralLocked || working === 'tasks'} onClick={() => void saveTasks()}>{working === 'tasks' ? 'Saving board…' : `Save ${parseBingoTaskImport(taskText).length} / 25 tasks`}</button><button className="scroll-button px-4 py-2.5 text-xs" onClick={() => setTaskText(tasksToText(data.tasks))}>Restore saved text</button></div></div>
+            <aside><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Reusable clan template</p><input className="realm-field mt-3 h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><button className="iron-button mt-3 w-full px-4 py-2.5 text-xs" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : 'Save current board as template'}</button><div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>Start snapshot:</b> {snapshotLabel(data, 'start')}<br /><b>End snapshot:</b> {snapshotLabel(data, 'end')}<br /><b>Snapshot worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div></aside>
+          </div>
+        </section>
+
+        <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
+          <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} /></section>
+          <aside className="space-y-5">
+            <section className="wood-panel p-5"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Claim review</p><span className="rounded bg-[#d7ae50] px-2 py-1 text-[10px] font-black text-[#24180b]">{pendingClaims.length} pending</span></div><div className="mt-4 max-h-[540px] space-y-3 overflow-auto">{pendingClaims.map((claim) => { const task = data.tasks.find((item) => item.id === claim.taskId); const team = data.teams.find((item) => item.id === claim.teamId); return <article className="rounded border border-[#9d7932]/60 bg-black/20 p-3" key={claim.id}><p className="text-sm font-black text-[#f2d98f]">{task?.title ?? 'Task'}</p><p className="mt-1 text-xs text-[#c8b990]">{team?.name} · {claim.claimedByName} · {new Date(claim.submittedAt).toLocaleString()}</p>{claim.note ? <p className="mt-2 text-xs leading-relaxed text-[#e0d1aa]">{claim.note}</p> : null}<div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">{claim.evidenceUploadId ? <a className="text-[#d9e7aa] underline" href={`${base}/evidence/${encodeURIComponent(claim.evidenceUploadId)}`} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim.evidenceUrl ? <a className="text-[#d9e7aa] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open evidence link ↗</a> : null}</div><div className="mt-3 grid grid-cols-2 gap-2"><button className="gold-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'approve')}>Approve</button><button className="scroll-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'reject')}>Reject</button></div></article>; })}{!pendingClaims.length ? <p className="text-sm text-[#ad9f7f]">No claims await review.</p> : null}</div></section>
+            <section className="parchment-panel p-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Recent hall activity</p><div className="mt-3 space-y-3">{data.activity.slice(0, 10).map((item) => <article className="border-l-2 border-[#88682e] pl-3 text-xs" key={item.id}><p className="font-bold">{item.message}</p><p className="mt-1 text-[10px] text-[#75664b]">{new Date(item.createdAt).toLocaleString()}</p></article>)}</div></section>
+          </aside>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function tasksToText(tasks: BingoViewTask[]) {
+  const definitions: BingoTaskDefinition[] = tasks.map((task) => ({
+    title: task.title, description: task.description, points: task.points ?? 0, category: task.category,
+    difficulty: (task.difficulty ?? 'medium') as BingoTaskDefinition['difficulty'],
+    verificationMode: task.verificationMode ?? 'manual', repeatable: task.repeatable,
+    maxCompletions: task.maxCompletions, hidden: task.hidden, freeSpace: task.freeSpace, iconKey: task.iconKey,
+  }));
+  return serializeBingoTaskImport(definitions);
+}
+function snapshotLabel(data: BingoViewData, phase: string) { const snapshot = data.snapshots.find((item) => item.phase === phase); return snapshot ? `${snapshot.count} players · ${snapshot.capturedAt ? new Date(snapshot.capturedAt).toLocaleString() : 'captured'}` : 'Not captured'; }
+function toLocalInput(value: string | null) { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); }
+function toIso(value: string) { return value ? new Date(value).toISOString() : null; }
+function LoadingScreen({ error }: { error: string }) { return <main className="realm-bg grid min-h-screen place-items-center px-5 text-[#eadcb9]"><section className="wood-panel max-w-lg p-8 text-center"><p className="fantasy-title text-3xl font-bold">Opening the organizer hall…</p>{error ? <p className="mt-4 text-sm text-[#e8b69c]">{error}</p> : null}</section></main>; }

@@ -35,14 +35,18 @@ def validate_database(path: Path, seed_legacy: bool) -> None:
             )
             connection.commit()
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    required = {"drafts", "users", "sessions", "draft_runs", "player_insight_cache", "webhook_deliveries"}
+    required = {
+        "drafts", "users", "sessions", "draft_runs", "player_insight_cache", "webhook_deliveries",
+        "bingo_events", "bingo_teams", "bingo_team_members", "bingo_tasks", "bingo_evidence_uploads",
+        "bingo_claims", "bingo_completions", "bingo_activity", "bingo_templates", "bingo_player_snapshots",
+    }
     assert required <= tables, f"Missing tables: {required - tables}"
     columns = {row[1] for row in connection.execute("PRAGMA table_info(drafts)")}
     assert {"admin_token_hash", "clan_id", "live_revision", "balance_preset"} <= columns
     if seed_legacy:
         assert connection.execute("SELECT title FROM drafts WHERE id = 'legacy'").fetchone() == ("Legacy",)
         assert connection.execute("SELECT name FROM players WHERE id = 'player'").fetchone() == ("Example",)
-    connection.execute("PRAGMA foreign_key_check")
+    assert not list(connection.execute("PRAGMA foreign_key_check")), "Foreign-key check failed"
     connection.close()
 
 

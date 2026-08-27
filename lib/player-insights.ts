@@ -17,7 +17,7 @@ export type PlayerInsight = {
   cache: { state: 'fresh' | 'refreshed' | 'stale'; fetchedAt: string; expiresAt: string };
 };
 
-export async function getPlayerInsight(rawName: string, options: { force?: boolean } = {}) {
+export async function getPlayerInsight(rawName: string, options: { force?: boolean; maxAgeMs?: number } = {}) {
   const name = cleanRsn(rawName);
   const validationError = validateRsn(name);
   if (validationError) throw new PlayerInsightError(validationError, 400);
@@ -30,7 +30,12 @@ export async function getPlayerInsight(rawName: string, options: { force?: boole
     display_name: string; payload_json: string; fetched_at: string; expires_at: string; stale_at: string; failure_count: number;
   }>();
   const now = Date.now();
-  if (!options.force && cached && Date.parse(cached.expires_at) > now) {
+  const cacheFreshEnough = cached && (
+    options.maxAgeMs === undefined
+      ? Date.parse(cached.expires_at) > now
+      : Date.parse(cached.fetched_at) + Math.max(0, options.maxAgeMs) > now
+  );
+  if (!options.force && cacheFreshEnough && cached) {
     return withCache(parsePayload(cached.payload_json), 'fresh', cached.fetched_at, cached.expires_at);
   }
   try {

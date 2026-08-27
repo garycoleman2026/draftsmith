@@ -17,20 +17,28 @@ def main() -> None:
         raise RuntimeError(f"Expected one local D1 database, found {len(databases)}")
     database = databases[0].resolve()
     connection = sqlite3.connect(database)
+    tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     columns = {row[1] for row in connection.execute("PRAGMA table_info(drafts)")}
-    if "admin_token_hash" in columns:
+    migrations: list[Path] = []
+    if "admin_token_hash" not in columns:
+        migrations.append(ROOT / "drizzle" / "0002_parched_maximus.sql")
+    if "bingo_events" not in tables:
+        migrations.append(ROOT / "drizzle" / "0003_special_joseph.sql")
+    if not migrations:
+        connection.close()
         print(f"Local database is already current: {database}")
         return
-    backup = database.with_suffix(f".before-0002-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.bak")
+    migration_label = "-".join(path.stem.split("_")[0] for path in migrations)
+    backup = database.with_suffix(f".before-{migration_label}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.bak")
     connection.close()
     shutil.copy2(database, backup)
     connection = sqlite3.connect(database)
     connection.execute("PRAGMA foreign_keys = ON")
-    migration = ROOT / "drizzle" / "0002_parched_maximus.sql"
     try:
-        for statement in migration.read_text(encoding="utf-8").split(BREAKPOINT):
-            if statement.strip():
-                connection.execute(statement)
+        for migration in migrations:
+            for statement in migration.read_text(encoding="utf-8").split(BREAKPOINT):
+                if statement.strip():
+                    connection.execute(statement)
         connection.commit()
         failures = list(connection.execute("PRAGMA foreign_key_check"))
         if failures:
@@ -41,7 +49,7 @@ def main() -> None:
         shutil.copy2(backup, database)
         raise
     connection.close()
-    print(f"Applied 0002 to {database}")
+    print(f"Applied {', '.join(path.stem for path in migrations)} to {database}")
     print(f"Recoverable backup: {backup}")
 
 

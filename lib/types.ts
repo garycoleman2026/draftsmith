@@ -7,6 +7,11 @@ export type BalancePreset = 'consensus' | 'all_rounder' | 'pvm' | 'skilling' | '
 export type ConstraintEnforcement = 'hard' | 'soft';
 export type LiveOrder = 'snake' | 'linear' | 'random' | 'third_round_reversal';
 export type DraftLifecycle = 'registration' | 'rankings' | 'live' | 'complete' | 'archived';
+export type BingoMode = 'classic' | 'points' | 'lockout';
+export type BingoBoardScope = 'shared' | 'per_team';
+export type BingoStatus = 'draft' | 'scheduled' | 'live' | 'complete' | 'archived';
+export type BingoVerificationMode = 'manual' | 'screenshot' | 'stat_delta' | 'hybrid';
+export type BingoClaimStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 
 export type SurveyQuestion = {
   id?: string;

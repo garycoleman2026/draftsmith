@@ -15,6 +15,7 @@ export function SiteHeader({ badge }: { badge?: string }) {
           </span>
         </Link>
         <div className="flex items-center gap-2">
+          <Link className="hidden text-xs font-black text-[#cbb77f] underline decoration-[#8b6d2c] underline-offset-4 md:inline" href="/bingo">Bingo hall</Link>
           {badge ? (
             <span className="hidden rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-xs font-bold text-[#ddc27b] shadow-inner sm:inline-flex">
               {badge}

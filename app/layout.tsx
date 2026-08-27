@@ -7,11 +7,11 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://draftsmith-teams.companyscreeninginfo.chatgpt.site'),
-  title: 'Terry’s Drafting — Clan bingo team drafts',
-  description: 'Build clan bingo teams with public signups, private captain scores, roster rules, and live picks.',
+  title: 'Terry’s Drafting — Clan drafts and live bingo',
+  description: 'Draft balanced clan teams, run live bingo boards, review evidence, and publish real-time event scores.',
   openGraph: {
-    title: 'Terry’s Drafting — Clan bingo team drafts',
-    description: 'Build clan bingo teams with public signups, private captain scores, roster rules, and live picks.',
+    title: 'Terry’s Drafting — Clan drafts and live bingo',
+    description: 'Draft balanced clan teams, run live bingo boards, review evidence, and publish real-time event scores.',
     type: 'website',
     url: 'https://draftsmith-teams.companyscreeninginfo.chatgpt.site',
     images: [
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Terry’s Drafting — Clan bingo team drafts',
-    description: 'Build clan bingo teams with public signups, private captain scores, roster rules, and live picks.',
+    title: 'Terry’s Drafting — Clan drafts and live bingo',
+    description: 'Draft balanced clan teams, run live bingo boards, review evidence, and publish real-time event scores.',
     images: ['https://draftsmith-teams.companyscreeninginfo.chatgpt.site/og.png'],
   },
 };

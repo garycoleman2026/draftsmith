@@ -8,6 +8,7 @@ import { PlayerIntel } from './PlayerIntel';
 import { ResultGrid } from './ResultGrid';
 import { SiteHeader } from './SiteHeader';
 import { AdvancedOrganizerTools } from './AdvancedOrganizerTools';
+import { BingoLaunchpad } from './BingoLaunchpad';
 
 type DashboardPlayer = {
   id: string;
@@ -493,6 +494,8 @@ export function Manager({ token }: { token: string }) {
             ))}
           </div>
         </details>
+
+        <BingoLaunchpad token={token} hasResult={Boolean(data.result)} draftTitle={data.draft.title} />
 
         <AdvancedOrganizerTools token={token} data={data} onRefresh={() => load(true)} onMessage={(message, isError) => { if (isError) setError(message); else setSuccess(message); }} />
 

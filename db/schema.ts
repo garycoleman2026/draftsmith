@@ -419,3 +419,220 @@ export const webhookDeliveries = sqliteTable(
     index('idx_webhook_deliveries_status').on(table.status),
   ],
 );
+
+export const bingoEvents = sqliteTable(
+  'bingo_events',
+  {
+    id: text('id').primaryKey().notNull(),
+    draftId: text('draft_id').notNull().references(() => drafts.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    publicSlug: text('public_slug').notNull(),
+    mode: text('mode').notNull().default('points'),
+    boardScope: text('board_scope').notNull().default('shared'),
+    gridSize: integer('grid_size').notNull().default(5),
+    status: text('status').notNull().default('draft'),
+    winCondition: text('win_condition').notNull().default('points'),
+    targetValue: integer('target_value').notNull().default(0),
+    requiresReview: integer('requires_review', { mode: 'boolean' }).notNull().default(true),
+    publicSpectator: integer('public_spectator', { mode: 'boolean' }).notNull().default(true),
+    spectatorDelaySeconds: integer('spectator_delay_seconds').notNull().default(0),
+    startAt: text('start_at'),
+    endAt: text('end_at'),
+    startedAt: text('started_at'),
+    endedAt: text('ended_at'),
+    baselineStatus: text('baseline_status').notNull().default('idle'),
+    revision: integer('revision').notNull().default(0),
+    rulesJson: text('rules_json'),
+    createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_events_public_slug_unique').on(table.publicSlug),
+    index('idx_bingo_events_draft_id').on(table.draftId),
+    index('idx_bingo_events_status').on(table.status),
+  ],
+);
+
+export const bingoTeams = sqliteTable(
+  'bingo_teams',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    sourceTeamIndex: integer('source_team_index').notNull(),
+    name: text('name').notNull(),
+    color: text('color').notNull(),
+    emblem: text('emblem').notNull(),
+    accessTokenHash: text('access_token_hash').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_teams_event_index_unique').on(table.eventId, table.sourceTeamIndex),
+    uniqueIndex('bingo_teams_access_hash_unique').on(table.accessTokenHash),
+    index('idx_bingo_teams_event_id').on(table.eventId),
+  ],
+);
+
+export const bingoTeamMembers = sqliteTable(
+  'bingo_team_members',
+  {
+    id: text('id').primaryKey().notNull(),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    playerId: text('player_id').references(() => players.id, { onDelete: 'set null' }),
+    displayName: text('display_name').notNull(),
+    normalizedName: text('normalized_name').notNull(),
+    role: text('role').notNull().default('member'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_members_team_name_unique').on(table.teamId, table.normalizedName),
+    index('idx_bingo_members_team_id').on(table.teamId),
+    index('idx_bingo_members_player_id').on(table.playerId),
+  ],
+);
+
+export const bingoTasks = sqliteTable(
+  'bingo_tasks',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    points: integer('points').notNull().default(0),
+    category: text('category').notNull().default('General'),
+    difficulty: text('difficulty').notNull().default('medium'),
+    verificationMode: text('verification_mode').notNull().default('manual'),
+    repeatable: integer('repeatable', { mode: 'boolean' }).notNull().default(false),
+    maxCompletions: integer('max_completions').notNull().default(1),
+    hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+    freeSpace: integer('free_space', { mode: 'boolean' }).notNull().default(false),
+    iconKey: text('icon_key').notNull().default('scroll'),
+    sortOrder: integer('sort_order').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_tasks_event_order_unique').on(table.eventId, table.sortOrder),
+    index('idx_bingo_tasks_event_id').on(table.eventId),
+  ],
+);
+
+export const bingoEvidenceUploads = sqliteTable(
+  'bingo_evidence_uploads',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    objectKey: text('object_key').notNull(),
+    filename: text('filename').notNull(),
+    contentType: text('content_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    createdAt: text('created_at').notNull(),
+    consumedAt: text('consumed_at'),
+  },
+  (table) => [
+    uniqueIndex('bingo_evidence_object_key_unique').on(table.objectKey),
+    index('idx_bingo_evidence_event_team').on(table.eventId, table.teamId),
+  ],
+);
+
+export const bingoClaims = sqliteTable(
+  'bingo_claims',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').notNull().references(() => bingoTasks.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').references(() => bingoTeamMembers.id, { onDelete: 'set null' }),
+    claimedByName: text('claimed_by_name').notNull(),
+    note: text('note').notNull().default(''),
+    evidenceUrl: text('evidence_url'),
+    evidenceUploadId: text('evidence_upload_id').references(() => bingoEvidenceUploads.id, { onDelete: 'set null' }),
+    status: text('status').notNull().default('pending'),
+    reviewNote: text('review_note'),
+    scoreAwarded: integer('score_awarded').notNull().default(0),
+    submittedAt: text('submitted_at').notNull(),
+    reviewedAt: text('reviewed_at'),
+    approvedAt: text('approved_at'),
+  },
+  (table) => [
+    index('idx_bingo_claims_event_status').on(table.eventId, table.status),
+    index('idx_bingo_claims_task_team').on(table.taskId, table.teamId),
+    index('idx_bingo_claims_submitted_at').on(table.submittedAt),
+  ],
+);
+
+export const bingoCompletions = sqliteTable(
+  'bingo_completions',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').notNull().references(() => bingoTasks.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    claimId: text('claim_id').notNull().references(() => bingoClaims.id, { onDelete: 'cascade' }),
+    completionNumber: integer('completion_number').notNull().default(1),
+    globalLockKey: text('global_lock_key'),
+    points: integer('points').notNull(),
+    completedAt: text('completed_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_completions_claim_unique').on(table.claimId),
+    uniqueIndex('bingo_completions_team_number_unique').on(table.taskId, table.teamId, table.completionNumber),
+    uniqueIndex('bingo_completions_global_lock_unique').on(table.globalLockKey),
+    index('idx_bingo_completions_event_id').on(table.eventId),
+    index('idx_bingo_completions_team_id').on(table.teamId),
+  ],
+);
+
+export const bingoActivity = sqliteTable(
+  'bingo_activity',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').references(() => bingoTeams.id, { onDelete: 'set null' }),
+    taskId: text('task_id').references(() => bingoTasks.id, { onDelete: 'set null' }),
+    activityType: text('activity_type').notNull(),
+    message: text('message').notNull(),
+    metadataJson: text('metadata_json'),
+    visibleAt: text('visible_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('idx_bingo_activity_event_visible').on(table.eventId, table.visibleAt)],
+);
+
+export const bingoTemplates = sqliteTable(
+  'bingo_templates',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerDraftId: text('owner_draft_id').references(() => drafts.id, { onDelete: 'cascade' }),
+    clanId: text('clan_id').references(() => clans.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    mode: text('mode').notNull(),
+    boardScope: text('board_scope').notNull(),
+    configurationJson: text('configuration_json').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('idx_bingo_templates_owner_draft').on(table.ownerDraftId),
+    index('idx_bingo_templates_clan_id').on(table.clanId),
+  ],
+);
+
+export const bingoPlayerSnapshots = sqliteTable(
+  'bingo_player_snapshots',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').notNull().references(() => bingoTeamMembers.id, { onDelete: 'cascade' }),
+    phase: text('phase').notNull(),
+    sourceState: text('source_state').notNull(),
+    payloadJson: text('payload_json').notNull(),
+    capturedAt: text('captured_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_snapshots_member_phase_unique').on(table.memberId, table.phase),
+    index('idx_bingo_snapshots_event_phase').on(table.eventId, table.phase),
+  ],
+);

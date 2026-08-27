@@ -219,7 +219,7 @@ export function CreateDraft() {
             <h1 className="fantasy-title max-w-3xl text-4xl font-bold leading-[1.02] tracking-[-0.025em] text-[#f5df9b] drop-shadow-[0_3px_0_#26190c] sm:text-6xl">
               {step === 'created'
                 ? rosterMode === 'signup' ? 'Open the gates for signups.' : 'Send each captain their scroll.'
-                : 'Forge fair teams from captain wisdom.'}
+                : 'Forge fair teams. Run the whole bingo.'}
             </h1>
           </div>
           <ol className="flex flex-wrap gap-2 text-xs font-bold" aria-label="Draft progress">
@@ -492,7 +492,8 @@ export function CreateDraft() {
                         ['01', 'Pick captains', 'Choose one captain for each team from your uploaded list.'],
                         ['02', 'Share private links', 'Captains score players, mark avoids, or make live picks.'],
                         ['03', 'Run the draft', 'Generate teams automatically or watch a live snake draft unfold.'],
-                      ]),
+                  ]),
+                  ['04', 'Open the bingo hall', 'Launch a classic, points, or lockout board with private team claims and live public scoring.'],
                 ].map(([number, itemTitle, copy]) => (
                   <div className="grid grid-cols-[38px_1fr] gap-3" key={number}>
                     <span className="text-sm font-black text-[#d7ae50]">{number}</span>
