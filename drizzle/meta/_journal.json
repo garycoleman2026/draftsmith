@@ -57,6 +57,13 @@
       "when": 1787857499443,
       "tag": "0007_nosy_obadiah_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787859201860,
+      "tag": "0008_cooing_mandarin",
+      "breakpoints": true
     }
   ]
 }

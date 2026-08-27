@@ -64,9 +64,10 @@ export async function requireManagedBingoEvent(token: string, eventId: string) {
 export async function resolveBingoTeam(token: string) {
   const tokenHash = await hashToken(token);
   return getDatabase().prepare(
-    `SELECT bt.id, bt.event_id, bt.source_team_index, bt.name, bt.color, bt.emblem
-     FROM bingo_teams bt WHERE bt.access_token_hash = ?`,
-  ).bind(tokenHash).first<TeamRow>();
+    `SELECT bt.id, bt.event_id, bt.source_team_index, bt.name, bt.color, bt.emblem, be.draft_id
+     FROM bingo_teams bt JOIN bingo_events be ON be.id = bt.event_id
+     WHERE bt.access_token_hash = ?`,
+  ).bind(tokenHash).first<TeamRow & { draft_id: string }>();
 }
 
 export async function uniqueBingoSlug(title: string) {

@@ -19,11 +19,31 @@ def main() -> None:
     connection = sqlite3.connect(database)
     tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     columns = {row[1] for row in connection.execute("PRAGMA table_info(drafts)")}
+    task_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_tasks)")} if "bingo_tasks" in tables else set()
+    verification_index_columns = (
+        [row[2] for row in connection.execute("PRAGMA index_info(bingo_verification_events_idempotency_unique)")]
+        if "bingo_verification_events" in tables else []
+    )
     migrations: list[Path] = []
     if "admin_token_hash" not in columns:
         migrations.append(ROOT / "drizzle" / "0002_parched_maximus.sql")
     if "bingo_events" not in tables:
-        migrations.append(ROOT / "drizzle" / "0003_special_joseph.sql")
+        migrations.extend(ROOT / "drizzle" / name for name in (
+            "0003_special_joseph.sql", "0004_huge_warbird.sql", "0005_overconfident_exiles.sql",
+            "0006_luxuriant_gargoyle.sql", "0007_nosy_obadiah_stane.sql", "0008_cooing_mandarin.sql",
+        ))
+    else:
+        if "rule_json" not in task_columns:
+            migrations.append(ROOT / "drizzle" / "0004_huge_warbird.sql")
+        if "bingo_verification_events" not in tables:
+            migrations.append(ROOT / "drizzle" / "0005_overconfident_exiles.sql")
+            migrations.append(ROOT / "drizzle" / "0006_luxuriant_gargoyle.sql")
+        elif verification_index_columns != ["event_id", "team_id", "source", "idempotency_key"]:
+            migrations.append(ROOT / "drizzle" / "0006_luxuriant_gargoyle.sql")
+        if "bingo_wom_integrations" not in tables:
+            migrations.append(ROOT / "drizzle" / "0007_nosy_obadiah_stane.sql")
+        if "bingo_runelite_integrations" not in tables:
+            migrations.append(ROOT / "drizzle" / "0008_cooing_mandarin.sql")
     if not migrations:
         connection.close()
         print(f"Local database is already current: {database}")

@@ -27,6 +27,9 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - [x] Preserve evidence source and confidence on every accepted claim, completion, public tile, and audit record.
 - [x] Capture versioned Wise Old Man baselines, checkpoints, and final snapshots through a group-bulk or rate-safe player queue.
 - [x] Convert in-window WOM XP, level, and boss-KC deltas into task-scoped verification candidates while retaining manual proof fallback.
+- [x] Pair RuneLite through one-use, ten-minute, exact-RSN codes and revocable device credentials whose secrets are stored only as hashes.
+- [x] Let organizers scope accepted XP, loot, kill, raid, achievement, and clue observations while rejecting unknown fields and never storing raw chat text.
+- [x] Accept bounded, rate-limited, device-namespaced, idempotent RuneLite batches and publish a private ETag-aware overlay/capture-plan API.
 
 ## Safety and operating limits
 
@@ -42,4 +45,5 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - [x] Signal validation, source authorization, identity, participant-scope, target-ID, duration, aggregation, and corroboration tests pass.
 - [x] TypeScript, ESLint, the full unit suite, production build, and production dependency audit pass.
 - [x] Local API smoke covers create → start → claim → approve → public score.
+- [x] Local RuneLite API smoke covers enable → pair → overlay → ingest → replay deduplication → revoke.
 - [x] Hosted API and database are healthy after deployment.

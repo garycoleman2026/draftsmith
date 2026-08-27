@@ -735,6 +735,87 @@ export const bingoWomIntegrations = sqliteTable(
   (table) => [index('idx_bingo_wom_integrations_next_sync').on(table.nextSyncAt)],
 );
 
+export const bingoRuneliteIntegrations = sqliteTable(
+  'bingo_runelite_integrations',
+  {
+    eventId: text('event_id').primaryKey().notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+    scopesJson: text('scopes_json').notNull().default('[]'),
+    disclosureVersion: integer('disclosure_version').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+);
+
+export const bingoRunelitePairings = sqliteTable(
+  'bingo_runelite_pairings',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').notNull().references(() => bingoTeamMembers.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    issuedBy: text('issued_by').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    consumedAt: text('consumed_at'),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_runelite_pairings_code_hash_unique').on(table.codeHash),
+    index('idx_bingo_runelite_pairings_event_member').on(table.eventId, table.memberId),
+    index('idx_bingo_runelite_pairings_expires').on(table.expiresAt),
+  ],
+);
+
+export const bingoRuneliteDevices = sqliteTable(
+  'bingo_runelite_devices',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').notNull().references(() => bingoTeamMembers.id, { onDelete: 'cascade' }),
+    pairingId: text('pairing_id').notNull().references(() => bingoRunelitePairings.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    deviceName: text('device_name').notNull(),
+    pluginVersion: text('plugin_version').notNull(),
+    scopesJson: text('scopes_json').notNull(),
+    disclosureVersion: integer('disclosure_version').notNull().default(1),
+    lastRsn: text('last_rsn').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    revokedAt: text('revoked_at'),
+    revokedBy: text('revoked_by'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_runelite_devices_pairing_unique').on(table.pairingId),
+    uniqueIndex('bingo_runelite_devices_token_hash_unique').on(table.tokenHash),
+    index('idx_bingo_runelite_devices_event').on(table.eventId),
+    index('idx_bingo_runelite_devices_team').on(table.teamId),
+    index('idx_bingo_runelite_devices_member').on(table.memberId),
+    index('idx_bingo_runelite_devices_expires').on(table.expiresAt),
+  ],
+);
+
+export const bingoRuneliteBatches = sqliteTable(
+  'bingo_runelite_batches',
+  {
+    id: text('id').primaryKey().notNull(),
+    deviceId: text('device_id').notNull().references(() => bingoRuneliteDevices.id, { onDelete: 'cascade' }),
+    batchKey: text('batch_key').notNull(),
+    eventCount: integer('event_count').notNull(),
+    acceptedCount: integer('accepted_count').notNull(),
+    duplicateCount: integer('duplicate_count').notNull(),
+    rejectedCount: integer('rejected_count').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_runelite_batches_device_key_unique').on(table.deviceId, table.batchKey),
+    index('idx_bingo_runelite_batches_device_created').on(table.deviceId, table.createdAt),
+  ],
+);
+
 export const bingoPlayerSnapshots = sqliteTable(
   'bingo_player_snapshots',
   {
