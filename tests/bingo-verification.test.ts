@@ -48,6 +48,12 @@ describe('bingo verification signals', () => {
     expect(matchVerificationSignal(rule(), signal(), 5, 'member-1')).toMatchObject({ value: 1, targetValue: 1 });
   });
 
+  it('honors provider-scoped eligible task IDs without changing raw signal matching', () => {
+    const scoped = signal({ metadata: { eligibleTaskIds: ['task-a'] } });
+    expect(matchVerificationSignal(rule(), scoped, 5, 'member-1', 'task-b')).toBeNull();
+    expect(matchVerificationSignal(rule(), scoped, 5, 'member-1', 'task-a')).not.toBeNull();
+  });
+
   it('uses target ids as the authoritative item identity when configured', () => {
     const itemRule = rule({ verifier: { targetId: 30_500 } });
     expect(matchVerificationSignal(itemRule, signal({ target: 'Localized item name', targetId: 30_500 }), 5, 'member-1')).not.toBeNull();

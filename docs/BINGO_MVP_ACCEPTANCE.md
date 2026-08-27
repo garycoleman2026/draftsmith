@@ -25,13 +25,15 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - [x] Accumulate per-team progress without double-counting the same source across RuneLite and Wise Old Man.
 - [x] Show confidence-labelled progress candidates to teams and an accept, dismiss, reopen, replay, and dry-run queue to organizers.
 - [x] Preserve evidence source and confidence on every accepted claim, completion, public tile, and audit record.
+- [x] Capture versioned Wise Old Man baselines, checkpoints, and final snapshots through a group-bulk or rate-safe player queue.
+- [x] Convert in-window WOM XP, level, and boss-KC deltas into task-scoped verification candidates while retaining manual proof fallback.
 
 ## Safety and operating limits
 
 - Evidence is private to the organizer, limited to 5 MB, signature checked, stored in R2, and served with `nosniff`.
 - Team and organizer credentials are stored only as hashes; newly issued raw links are shown once.
 - Team claims and evidence uploads are rate limited.
-- Custom boards support 9–49 tiles in a square grid. The verification engine now accepts normalized evidence, but provider polling, player pairing, scheduled auto-start, and the full RuneLite tracker plugin remain later stages.
+- Custom boards support 9–49 tiles in a square grid. Wise Old Man syncing is organizer-driven (or automatic while an organizer room is open); durable scheduled polling, RuneLite player pairing, and the full RuneLite tracker plugin remain later stages.
 
 ## Verification gate
 
@@ -40,4 +42,4 @@ A completed Terry's Drafting event can become a hosted 5 × 5 clan bingo without
 - [x] Signal validation, source authorization, identity, participant-scope, target-ID, duration, aggregation, and corroboration tests pass.
 - [x] TypeScript, ESLint, the full unit suite, production build, and production dependency audit pass.
 - [x] Local API smoke covers create → start → claim → approve → public score.
-- [ ] Hosted API and database are healthy after deployment.
+- [x] Hosted API and database are healthy after deployment.

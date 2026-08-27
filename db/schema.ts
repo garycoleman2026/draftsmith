@@ -693,19 +693,66 @@ export const bingoTemplates = sqliteTable(
   ],
 );
 
+export const bingoWomSyncRuns = sqliteTable(
+  'bingo_wom_sync_runs',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    phase: text('phase').notNull(),
+    status: text('status').notNull().default('running'),
+    sourceMode: text('source_mode').notNull(),
+    totalCount: integer('total_count').notNull().default(0),
+    capturedCount: integer('captured_count').notNull().default(0),
+    failedCount: integer('failed_count').notNull().default(0),
+    reconcileOffset: integer('reconcile_offset').notNull().default(0),
+    signalsCount: integer('signals_count').notNull().default(0),
+    lastRequestAt: text('last_request_at'),
+    errorSummary: text('error_summary'),
+    startedAt: text('started_at').notNull(),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    index('idx_bingo_wom_sync_runs_event_started').on(table.eventId, table.startedAt),
+    index('idx_bingo_wom_sync_runs_event_status').on(table.eventId, table.status),
+  ],
+);
+
+export const bingoWomIntegrations = sqliteTable(
+  'bingo_wom_integrations',
+  {
+    eventId: text('event_id').primaryKey().notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    groupId: integer('group_id'),
+    syncIntervalHours: integer('sync_interval_hours').notNull().default(6),
+    autoSync: integer('auto_sync', { mode: 'boolean' }).notNull().default(false),
+    status: text('status').notNull().default('idle'),
+    baselineRunId: text('baseline_run_id').references(() => bingoWomSyncRuns.id, { onDelete: 'set null' }),
+    lastSyncAt: text('last_sync_at'),
+    nextSyncAt: text('next_sync_at'),
+    lastError: text('last_error'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('idx_bingo_wom_integrations_next_sync').on(table.nextSyncAt)],
+);
+
 export const bingoPlayerSnapshots = sqliteTable(
   'bingo_player_snapshots',
   {
     id: text('id').primaryKey().notNull(),
     eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
     memberId: text('member_id').notNull().references(() => bingoTeamMembers.id, { onDelete: 'cascade' }),
+    syncRunId: text('sync_run_id').references(() => bingoWomSyncRuns.id, { onDelete: 'cascade' }),
     phase: text('phase').notNull(),
     sourceState: text('source_state').notNull(),
+    schemaVersion: integer('schema_version').notNull().default(1),
+    providerUpdatedAt: text('provider_updated_at'),
     payloadJson: text('payload_json').notNull(),
     capturedAt: text('captured_at').notNull(),
   },
   (table) => [
     uniqueIndex('bingo_snapshots_member_phase_unique').on(table.memberId, table.phase),
+    uniqueIndex('bingo_snapshots_run_member_unique').on(table.syncRunId, table.memberId),
     index('idx_bingo_snapshots_event_phase').on(table.eventId, table.phase),
+    index('idx_bingo_snapshots_sync_run').on(table.syncRunId),
   ],
 );

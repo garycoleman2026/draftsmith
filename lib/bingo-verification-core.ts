@@ -73,7 +73,11 @@ export function matchVerificationSignal(
   signal: BingoVerificationSignal,
   rosterSize: number,
   memberId: string | null = null,
+  taskId?: string,
 ): BingoRuleMatch | null {
+  const eligibleTaskIds = Array.isArray(signal.metadata.eligibleTaskIds)
+    ? signal.metadata.eligibleTaskIds.filter((id): id is string => typeof id === 'string') : [];
+  if (eligibleTaskIds.length && (!taskId || !eligibleTaskIds.includes(taskId))) return null;
   if (rule.verifier.type !== signal.signalType) return null;
   if (!rule.proof.sources.includes(signal.source)) return null;
   if (!targetMatches(rule, signal) || !metricMatches(rule, signal)) return null;

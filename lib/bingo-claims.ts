@@ -56,7 +56,10 @@ export async function reviewBingoClaim(input: {
   ).bind(input.claimId, input.eventId).first<ReviewableClaim>();
   if (!claim) throw new BingoError('That claim no longer exists.', 404);
   if (claim.status !== 'pending') throw new BingoError('That claim has already been reviewed.', 409);
-  if (input.action === 'approve' && claim.event_status !== 'live') throw new BingoError('Claims can only be approved while the bingo is live.', 409);
+  if (input.action === 'approve' && claim.event_status !== 'live'
+    && !(claim.event_status === 'complete' && claim.verification_candidate_id)) {
+    throw new BingoError('Claims can only be approved while the bingo is live.', 409);
+  }
 
   const now = new Date().toISOString();
   const reviewNote = (input.reviewNote ?? '').trim().slice(0, 500) || null;

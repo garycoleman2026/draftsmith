@@ -33,6 +33,15 @@ type CandidateRow = {
   status: string; progress_value: number; target_value: number; summary: string; details_json: string;
   created_at: string; updated_at: string; resolved_at: string | null;
 };
+type WomIntegrationRow = {
+  group_id: number | null; sync_interval_hours: number; auto_sync: number; status: string;
+  baseline_run_id: string | null; last_sync_at: string | null; next_sync_at: string | null; last_error: string | null;
+};
+type WomRunRow = {
+  id: string; phase: 'baseline' | 'checkpoint' | 'final'; status: string; source_mode: 'group_bulk' | 'player_details';
+  total_count: number; captured_count: number; failed_count: number; reconcile_offset: number; signals_count: number;
+  error_summary: string | null; started_at: string; completed_at: string | null;
+};
 
 export class BingoError extends Error {
   readonly status: number;
@@ -88,7 +97,8 @@ export async function loadBingoView(input: {
   const candidateScope = input.viewer === 'organizer' ? '' : input.viewer === 'team' ? ' AND team_id = ?' : ' AND 1 = 0';
   const candidateBindings = input.viewer === 'team' ? [event.id, input.teamId ?? ''] : [event.id];
 
-  const [teamResult, memberResult, taskResult, claimResult, completionResult, activityResult, snapshotResult, candidateResult, verificationCount] = await Promise.all([
+  const [teamResult, memberResult, taskResult, claimResult, completionResult, activityResult, snapshotResult, candidateResult, verificationCount,
+    womIntegration, womLatestRun, womBaselineCoverage] = await Promise.all([
     db.prepare('SELECT id, event_id, source_team_index, name, color, emblem FROM bingo_teams WHERE event_id = ? ORDER BY source_team_index')
       .bind(event.id).all<TeamRow>(),
     db.prepare(`SELECT btm.id, btm.team_id, btm.player_id, btm.display_name, btm.normalized_name, btm.role
@@ -116,6 +126,17 @@ export async function loadBingoView(input: {
       .bind(...candidateBindings).all<CandidateRow>(),
     db.prepare(`SELECT COUNT(*) AS count FROM bingo_verification_events WHERE event_id = ?${candidateScope}`)
       .bind(...candidateBindings).first<{ count: number }>(),
+    db.prepare(`SELECT group_id, sync_interval_hours, auto_sync, status, baseline_run_id,
+                       last_sync_at, next_sync_at, last_error
+                FROM bingo_wom_integrations WHERE event_id = ?`).bind(event.id).first<WomIntegrationRow>(),
+    db.prepare(`SELECT id, phase, status, source_mode, total_count, captured_count, failed_count,
+                       reconcile_offset, signals_count, error_summary, started_at, completed_at
+                FROM bingo_wom_sync_runs WHERE event_id = ? ORDER BY started_at DESC LIMIT 1`)
+      .bind(event.id).first<WomRunRow>(),
+    db.prepare(`SELECT COUNT(*) AS count FROM bingo_player_snapshots bps
+                JOIN bingo_wom_integrations bwi ON bwi.baseline_run_id = bps.sync_run_id
+                WHERE bwi.event_id = ? AND bps.source_state NOT IN ('error', 'missing')`)
+      .bind(event.id).first<{ count: number }>(),
   ]);
 
   const now = Date.now();
@@ -298,6 +319,26 @@ export async function loadBingoView(input: {
         details: input.viewer === 'public' ? {} : parseJson<Record<string, unknown>>(candidate.details_json, {}),
         createdAt: candidate.created_at, updatedAt: candidate.updated_at, resolvedAt: candidate.resolved_at,
       })),
+    },
+    wiseOldMan: {
+      configured: Boolean(womIntegration),
+      groupId: input.viewer === 'organizer' ? womIntegration?.group_id ?? null : null,
+      syncIntervalHours: womIntegration?.sync_interval_hours ?? 6,
+      autoSync: input.viewer === 'organizer' && Boolean(womIntegration?.auto_sync && womIntegration.group_id),
+      status: womIntegration?.status ?? 'idle',
+      baselineRunId: womIntegration?.baseline_run_id ?? null,
+      baselineCoverage: womBaselineCoverage?.count ?? 0,
+      lastSyncAt: womIntegration?.last_sync_at ?? null,
+      nextSyncAt: womIntegration?.next_sync_at ?? null,
+      lastError: input.viewer === 'organizer' ? womIntegration?.last_error ?? null : null,
+      latestRun: womLatestRun ? {
+        id: womLatestRun.id, phase: womLatestRun.phase, status: womLatestRun.status,
+        sourceMode: womLatestRun.source_mode, totalCount: womLatestRun.total_count,
+        capturedCount: womLatestRun.captured_count, failedCount: womLatestRun.failed_count,
+        reconcileOffset: womLatestRun.reconcile_offset, signalsCount: womLatestRun.signals_count,
+        errorSummary: input.viewer === 'organizer' ? womLatestRun.error_summary : null,
+        startedAt: womLatestRun.started_at, completedAt: womLatestRun.completed_at,
+      } : null,
     },
     viewer: { type: input.viewer, teamId: input.teamId ?? null },
   };

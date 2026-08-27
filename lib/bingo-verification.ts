@@ -60,14 +60,14 @@ export async function dryRunVerificationSignal(input: {
     signal,
     matches: tasks.flatMap((task) => {
       const rule = sanitizeBingoTaskRule(parseJson(task.rule_json, {}), task.verification_mode);
-      const match = matchVerificationSignal(rule, signal, rosterSize, input.memberId ?? null);
+      const match = matchVerificationSignal(rule, signal, rosterSize, input.memberId ?? null, task.id);
       return match ? [{ taskId: task.id, title: task.title, sortOrder: task.sort_order, match }] : [];
     }),
   };
 }
 
 export async function ingestVerificationSignal(input: {
-  eventId: string; teamId: string; memberId?: string | null; signal: unknown;
+  eventId: string; teamId: string; memberId?: string | null; signal: unknown; allowComplete?: boolean;
 }) {
   const signal = sanitizeVerificationSignal(input.signal);
   const db = getDatabase();
@@ -75,7 +75,10 @@ export async function ingestVerificationSignal(input: {
     'SELECT id, status, started_at, ended_at FROM bingo_events WHERE id = ?',
   ).bind(input.eventId).first<{ id: string; status: string; started_at: string | null; ended_at: string | null }>();
   if (!event) throw new BingoError('That bingo event does not exist.', 404);
-  if (event.status !== 'live') throw new BingoError('Verification signals are accepted only while the bingo is live.', 409);
+  const finalReconciliation = input.allowComplete && event.status === 'complete' && signal.source === 'wise_old_man';
+  if (event.status !== 'live' && !finalReconciliation) {
+    throw new BingoError('Verification signals are accepted only while the bingo is live.', 409);
+  }
   const observedAt = Date.parse(signal.observedAt);
   if (observedAt > Date.now() + 5 * 60_000) throw new BingoError('The verification signal is too far in the future.');
   if (event.started_at && observedAt < Date.parse(event.started_at) - 5 * 60_000) throw new BingoError('The signal predates the event window.');
@@ -158,7 +161,9 @@ export async function resolveVerificationCandidate(input: {
     id: string; event_id: string; task_id: string; team_id: string; member_id: string | null;
     source_summary: string; confidence: VerificationConfidence; summary: string; display_name: string | null; event_status: string;
   }>();
-  if (!row || row.event_status !== 'live') throw new BingoError('Candidates can only be accepted while the bingo is live.', 409);
+  if (!row || !['live', 'complete'].includes(row.event_status)) {
+    throw new BingoError('Candidates can only be accepted while the bingo is live or reconciling its final results.', 409);
+  }
   const claimId = crypto.randomUUID();
   try {
     await db.prepare(
@@ -184,7 +189,7 @@ async function evaluateStoredVerificationEvent(event: VerificationEventRow, task
   const candidates: BingoCandidateSnapshot[] = [];
   for (const task of tasks) {
     const rule = sanitizeBingoTaskRule(parseJson(task.rule_json, {}), task.verification_mode);
-    const match = matchVerificationSignal(rule, signal, rosterSize, event.member_id);
+    const match = matchVerificationSignal(rule, signal, rosterSize, event.member_id, task.id);
     if (!match) continue;
     const candidateId = await ensureCandidate(event, task, match);
     await db.prepare(

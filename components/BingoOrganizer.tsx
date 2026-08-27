@@ -10,6 +10,7 @@ import type { BingoMode } from '../lib/types';
 import { BingoBoard, BingoStandings } from './BingoBoard';
 import { BingoMaker } from './BingoMaker';
 import { BingoVerificationPanel } from './BingoVerificationPanel';
+import { BingoWiseOldManPanel } from './BingoWiseOldManPanel';
 import { SiteHeader } from './SiteHeader';
 
 type IssuedLink = { teamId: string; teamName: string; path: string };
@@ -89,8 +90,14 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   }
 
   async function lifecycle(action: 'start' | 'complete') {
+    if (action === 'complete' && data) {
+      const womNeeded = data.tasks.some((task) => task.rule.proof.sources.includes('wise_old_man'));
+      const finalReady = data.wiseOldMan.latestRun?.phase === 'final'
+        && ['complete', 'partial'].includes(data.wiseOldMan.latestRun.status);
+      if (womNeeded && !finalReady && !window.confirm('Wise Old Man final reconciliation has not finished. Complete the event anyway? You can still run it immediately afterward.')) return;
+    }
     await run(action, base, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) },
-      action === 'start' ? 'The bingo is live and baseline snapshots are running.' : 'The event is complete and final snapshots are running.');
+      action === 'start' ? 'The bingo is live. Capture the WOM baseline once players have updated.' : 'The event is complete. Final verified candidates can still be reviewed.');
   }
 
   async function rotateLinks(teamId?: string) {
@@ -185,12 +192,13 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
             <div className="grid min-w-72 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><button className="iron-button px-4 py-2.5 text-xs" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : 'Save as template'}</button></div>
           </div>
           <div className="mt-5"><BingoMaker initialTasks={tasksToDefinitions(data.tasks)} initialRules={data.event.rules} mode={data.event.mode} disabled={structuralLocked} saving={working === 'tasks'} onSave={saveBoard} /></div>
-          <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>Start snapshot:</b> {snapshotLabel(data, 'start')} · <b>End snapshot:</b> {snapshotLabel(data, 'end')} · <b>Snapshot worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
+          <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>WOM baseline:</b> {data.wiseOldMan.baselineCoverage} players · <b>Last sync:</b> {data.wiseOldMan.lastSyncAt ? new Date(data.wiseOldMan.lastSyncAt).toLocaleString() : 'Not run'} · <b>Worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
         </section>
 
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
           <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} /></section>
           <aside className="space-y-5">
+            <BingoWiseOldManPanel data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} />
             <BingoVerificationPanel data={data} working={working} preview={verificationPreview} onResolve={resolveCandidate} onReplay={replayVerification} onSignal={submitVerificationSignal} />
             <section className="wood-panel p-5"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Claim review</p><span className="rounded bg-[#d7ae50] px-2 py-1 text-[10px] font-black text-[#24180b]">{pendingClaims.length} pending</span></div><div className="mt-4 max-h-[540px] space-y-3 overflow-auto">{pendingClaims.map((claim) => { const task = data.tasks.find((item) => item.id === claim.taskId); const team = data.teams.find((item) => item.id === claim.teamId); return <article className="rounded border border-[#9d7932]/60 bg-black/20 p-3" key={claim.id}><p className="text-sm font-black text-[#f2d98f]">{task?.title ?? 'Task'}</p><p className="mt-1 text-xs text-[#c8b990]">{team?.name} · {claim.claimedByName} · {new Date(claim.submittedAt).toLocaleString()}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#d7ae50]">{claim.verificationSource.replaceAll('_', ' ')} · {claim.verificationConfidence}</p>{claim.note ? <p className="mt-2 text-xs leading-relaxed text-[#e0d1aa]">{claim.note}</p> : null}<div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">{claim.evidenceUploadId ? <a className="text-[#d9e7aa] underline" href={`${base}/evidence/${encodeURIComponent(claim.evidenceUploadId)}`} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim.evidenceUrl ? <a className="text-[#d9e7aa] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open evidence link ↗</a> : null}</div><div className="mt-3 grid grid-cols-2 gap-2"><button className="gold-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'approve')}>Approve</button><button className="scroll-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'reject')}>Reject</button></div></article>; })}{!pendingClaims.length ? <p className="text-sm text-[#ad9f7f]">No claims await review.</p> : null}</div></section>
             <section className="parchment-panel p-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Recent hall activity</p><div className="mt-3 space-y-3">{data.activity.slice(0, 10).map((item) => <article className="border-l-2 border-[#88682e] pl-3 text-xs" key={item.id}><p className="font-bold">{item.message}</p><p className="mt-1 text-[10px] text-[#75664b]">{new Date(item.createdAt).toLocaleString()}</p></article>)}</div></section>
@@ -209,7 +217,6 @@ function tasksToDefinitions(tasks: BingoViewTask[]): BingoTaskDefinition[] {
     maxCompletions: task.maxCompletions, hidden: task.hidden, freeSpace: task.freeSpace, iconKey: task.iconKey, rule: task.rule,
   }));
 }
-function snapshotLabel(data: BingoViewData, phase: string) { const snapshot = data.snapshots.find((item) => item.phase === phase); return snapshot ? `${snapshot.count} players · ${snapshot.capturedAt ? new Date(snapshot.capturedAt).toLocaleString() : 'captured'}` : 'Not captured'; }
 function toLocalInput(value: string | null) { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); }
 function toIso(value: string) { return value ? new Date(value).toISOString() : null; }
 function LoadingScreen({ error }: { error: string }) { return <main className="realm-bg grid min-h-screen place-items-center px-5 text-[#eadcb9]"><section className="wood-panel max-w-lg p-8 text-center"><p className="fantasy-title text-3xl font-bold">Opening the organizer hall…</p>{error ? <p className="mt-4 text-sm text-[#e8b69c]">{error}</p> : null}</section></main>; }

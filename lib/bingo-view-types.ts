@@ -30,6 +30,13 @@ export type BingoViewVerificationCandidate = {
   createdAt: string; updatedAt: string; resolvedAt: string | null;
 };
 
+export type BingoViewWomRun = {
+  id: string; phase: 'baseline' | 'checkpoint' | 'final'; status: string;
+  sourceMode: 'group_bulk' | 'player_details'; totalCount: number; capturedCount: number;
+  failedCount: number; reconcileOffset: number; signalsCount: number; errorSummary: string | null;
+  startedAt: string; completedAt: string | null;
+};
+
 export type BingoViewData = {
   event: {
     id: string; draftId: string | null; title: string; publicSlug: string; publicPath: string; mode: BingoMode;
@@ -45,5 +52,10 @@ export type BingoViewData = {
   activity: { id: string; teamId: string | null; taskId: string | null; type: string; message: string; metadata: Record<string, unknown>; createdAt: string }[];
   snapshots: { phase: string; count: number; capturedAt: string | null }[];
   verification: { eventCount: number; candidates: BingoViewVerificationCandidate[] };
+  wiseOldMan: {
+    configured: boolean; groupId: number | null; syncIntervalHours: number; autoSync: boolean; status: string;
+    baselineRunId: string | null; baselineCoverage: number; lastSyncAt: string | null; nextSyncAt: string | null;
+    lastError: string | null; latestRun: BingoViewWomRun | null;
+  };
   viewer: { type: 'public' | 'team' | 'organizer'; teamId: string | null };
 };
