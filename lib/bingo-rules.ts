@@ -1,6 +1,6 @@
 import type { BingoVerificationMode } from './types';
 
-export const BINGO_RULE_SCHEMA_VERSION = 1 as const;
+export const BINGO_RULE_SCHEMA_VERSION = 2 as const;
 
 export const BINGO_VERIFIERS = [
   'manual', 'item_acquired', 'pet_obtained', 'collection_log', 'xp_gain', 'level_reached',
@@ -13,6 +13,9 @@ export type BingoProofSource = typeof BINGO_PROOF_SOURCES[number];
 
 export const BINGO_TASK_SCOPES = ['any_member', 'single_member', 'team_total', 'exact_party', 'all_members'] as const;
 export type BingoTaskScope = typeof BINGO_TASK_SCOPES[number];
+
+export const BINGO_TASK_IMAGE_KINDS = ['none', 'item', 'boss'] as const;
+export type BingoTaskImageKind = typeof BINGO_TASK_IMAGE_KINDS[number];
 
 export type BingoTaskRule = {
   schemaVersion: typeof BINGO_RULE_SCHEMA_VERSION;
@@ -32,6 +35,23 @@ export type BingoTaskRule = {
   proof: {
     sources: BingoProofSource[];
     approval: 'review' | 'automatic' | 'hybrid';
+  };
+  presentation: {
+    imageKind: BingoTaskImageKind;
+    imageKey: string;
+  };
+  details: {
+    notes: string;
+    exclusions: string;
+    sourceUrl: string;
+  };
+  planning: {
+    dropRateNumerator: number | null;
+    dropRateDenominator: number | null;
+    efficientKillsPerHour: number | null;
+    efficientUnitsPerHour: number | null;
+    fixedHours: number | null;
+    quantity: number;
   };
   prerequisitePositions: number[];
 };
@@ -76,6 +96,12 @@ export function defaultBingoTaskRule(verificationMode: BingoVerificationMode = '
     },
     scope: { type: 'any_member', participantCount: null },
     proof: { sources, approval: sources.length > 1 ? 'hybrid' : 'review' },
+    presentation: { imageKind: 'none', imageKey: '' },
+    details: { notes: '', exclusions: '', sourceUrl: '' },
+    planning: {
+      dropRateNumerator: null, dropRateDenominator: null, efficientKillsPerHour: null,
+      efficientUnitsPerHour: null, fixedHours: null, quantity: 1,
+    },
     prerequisitePositions: [],
   };
 }
@@ -102,6 +128,9 @@ export function sanitizeBingoTaskRule(value: unknown, fallbackMode: BingoVerific
   const verifier = objectValue(input.verifier);
   const scope = objectValue(input.scope);
   const proof = objectValue(input.proof);
+  const presentation = objectValue(input.presentation);
+  const details = objectValue(input.details);
+  const planning = objectValue(input.planning);
   const verifierType = BINGO_VERIFIERS.includes(String(verifier.type) as BingoVerifierType)
     ? String(verifier.type) as BingoVerifierType
     : fallback.verifier.type;
@@ -120,6 +149,9 @@ export function sanitizeBingoTaskRule(value: unknown, fallbackMode: BingoVerific
   const participantCount = scopeType === 'exact_party'
     ? clampIntegerOrNull(scope.participantCount, 2, 100)
     : null;
+  const imageKind = BINGO_TASK_IMAGE_KINDS.includes(String(presentation.imageKind) as BingoTaskImageKind)
+    ? String(presentation.imageKind) as BingoTaskImageKind
+    : fallback.presentation.imageKind;
   const prerequisitePositions = Array.isArray(input.prerequisitePositions)
     ? [...new Set(input.prerequisitePositions.map((position) => Number(position)).filter(Number.isInteger))]
       .filter((position) => position >= 0 && position < 49).slice(0, 12).sort((left, right) => left - right)
@@ -137,6 +169,23 @@ export function sanitizeBingoTaskRule(value: unknown, fallbackMode: BingoVerific
     },
     scope: { type: scopeType, participantCount },
     proof: { sources: proofSources.length ? proofSources : ['organizer'], approval },
+    presentation: {
+      imageKind,
+      imageKey: imageKind === 'none' ? '' : textValue(presentation.imageKey, 120),
+    },
+    details: {
+      notes: textValue(details.notes, 1_000),
+      exclusions: textValue(details.exclusions, 1_000),
+      sourceUrl: safeHttpUrl(details.sourceUrl),
+    },
+    planning: {
+      dropRateNumerator: positiveNumberOrNull(planning.dropRateNumerator),
+      dropRateDenominator: positiveNumberOrNull(planning.dropRateDenominator),
+      efficientKillsPerHour: positiveNumberOrNull(planning.efficientKillsPerHour),
+      efficientUnitsPerHour: positiveNumberOrNull(planning.efficientUnitsPerHour),
+      fixedHours: positiveNumberOrNull(planning.fixedHours),
+      quantity: clampInteger(planning.quantity, 1, 100, fallback.planning.quantity),
+    },
     prerequisitePositions,
   };
 }
@@ -207,6 +256,50 @@ export function bingoRuleSummary(rule: BingoTaskRule) {
   return `${rule.verifier.type.replaceAll('_', ' ')}${target ? ` · ${target}` : ''} · ${scope}`;
 }
 
+export function expectedIndividualHours(rule: BingoTaskRule) {
+  if (rule.planning.fixedHours) return rule.planning.fixedHours;
+  const quantity = Math.max(1, rule.planning.quantity);
+  if (rule.planning.dropRateNumerator && rule.planning.dropRateDenominator && rule.planning.efficientKillsPerHour) {
+    return (rule.planning.dropRateDenominator / rule.planning.dropRateNumerator) * quantity
+      / rule.planning.efficientKillsPerHour;
+  }
+  if (rule.planning.efficientUnitsPerHour && rule.verifier.amount) {
+    return rule.verifier.amount / rule.planning.efficientUnitsPerHour;
+  }
+  if (rule.planning.efficientKillsPerHour && rule.verifier.amount
+    && ['boss_kc', 'raid_complete', 'clue_complete'].includes(rule.verifier.type)) {
+    return rule.verifier.amount / rule.planning.efficientKillsPerHour;
+  }
+  return null;
+}
+
+export function expectedTeamHours(rule: BingoTaskRule, teamSize: number) {
+  const individual = expectedIndividualHours(rule);
+  if (individual === null) return null;
+  const contributors = ['any_member', 'team_total'].includes(rule.scope.type) ? Math.max(1, teamSize) : 1;
+  return individual / contributors;
+}
+
+export function expectedPersonHours(rule: BingoTaskRule, teamSize: number) {
+  const individual = expectedIndividualHours(rule);
+  if (individual === null) return null;
+  if (rule.scope.type === 'all_members') return individual * Math.max(1, teamSize);
+  if (rule.scope.type === 'exact_party') return individual * Math.max(1, rule.scope.participantCount ?? 1);
+  return individual;
+}
+
+export function formatExpectedHours(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return 'Not estimated';
+  if (value < 0.1) return '<0.1 hr';
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: value < 10 ? 1 : 0 }).format(value)} hr${Math.abs(value - 1) < 0.001 ? '' : 's'}`;
+}
+
+export function bingoTaskImageUrl(rule: BingoTaskRule) {
+  if (rule.presentation.imageKind === 'none' || !rule.presentation.imageKey) return null;
+  const filename = `${rule.presentation.imageKey.trim().replace(/\s+/g, '_').replace(/\.png$/i, '')}.png`;
+  return `https://oldschool.runescape.wiki/w/Special:Redirect/file/${encodeURIComponent(filename)}`;
+}
+
 function objectValue(value: unknown): Record<string, unknown> { return value && typeof value === 'object' ? value as Record<string, unknown> : {}; }
 function textValue(value: unknown, maxLength: number) { return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : ''; }
 function clampInteger(value: unknown, minimum: number, maximum: number, fallback: number) {
@@ -220,5 +313,15 @@ function clampIntegerOrNull(value: unknown, minimum: number, maximum: number) {
 function positiveNumberOrNull(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.min(number, 1_000_000_000_000) : null;
+}
+function safeHttpUrl(value: unknown) {
+  const text = typeof value === 'string' ? value.trim().slice(0, 500) : '';
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
 }
 function formatAmount(value: number) { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value); }

@@ -54,6 +54,17 @@ type PresetOptions = {
   participantCount?: number;
   description?: string;
   sources?: BingoProofSource[];
+  imageKind?: BingoTaskRule['presentation']['imageKind'];
+  imageKey?: string;
+  notes?: string;
+  exclusions?: string;
+  sourceUrl?: string;
+  dropRateNumerator?: number;
+  dropRateDenominator?: number;
+  efficientKillsPerHour?: number;
+  efficientUnitsPerHour?: number;
+  fixedHours?: number;
+  quantity?: number;
 };
 
 function preset(title: string, points: number, category: string, verifierType: BingoVerifierType, options: PresetOptions = {}): BingoTaskDefinition {
@@ -66,6 +77,16 @@ function preset(title: string, points: number, category: string, verifierType: B
     },
     scope: { type: options.scope ?? 'any_member', participantCount: options.participantCount ?? null },
     proof: { sources, approval: sources.length > 1 ? 'hybrid' : 'review' },
+    presentation: { imageKind: options.imageKind ?? 'none', imageKey: options.imageKey ?? '' },
+    details: { notes: options.notes ?? '', exclusions: options.exclusions ?? '', sourceUrl: options.sourceUrl ?? '' },
+    planning: {
+      dropRateNumerator: options.dropRateNumerator ?? null,
+      dropRateDenominator: options.dropRateDenominator ?? null,
+      efficientKillsPerHour: options.efficientKillsPerHour ?? null,
+      efficientUnitsPerHour: options.efficientUnitsPerHour ?? null,
+      fixedHours: options.fixedHours ?? null,
+      quantity: options.quantity ?? 1,
+    },
     prerequisitePositions: [],
   });
   return {
@@ -85,71 +106,71 @@ function preset(title: string, points: number, category: string, verifierType: B
 }
 
 export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
-  preset('Get an Oathplate helm', 180, 'Gear', 'item_acquired', { target: 'Oathplate helm', difficulty: 'hard' }),
-  preset('Obtain the Baby mole pet', 900, 'Pets', 'pet_obtained', { target: 'Baby mole', difficulty: 'legendary' }),
-  preset('Receive a Twisted ancestral colour kit', 650, 'Raids', 'item_acquired', { target: 'Twisted ancestral colour kit', difficulty: 'legendary' }),
-  preset('Beat the GM Theatre of Blood trio time', 750, 'Speed', 'raid_time', { target: 'Theatre of Blood', metric: 'trio', unit: 'seconds', scope: 'exact_party', participantCount: 3, difficulty: 'legendary', description: 'Exactly three linked team members complete Theatre of Blood under the organizer-entered GM target time.' }),
-  preset('Beat the Chambers CM five-player time', 750, 'Speed', 'raid_time', { target: 'Chambers of Xeric: Challenge Mode', metric: 'five-player', unit: 'seconds', scope: 'exact_party', participantCount: 5, difficulty: 'legendary', description: 'Exactly five linked team members complete Challenge Mode under the organizer-entered target time.' }),
-  preset('Gain 10,000,000 team Agility XP', 500, 'Skilling', 'xp_gain', { metric: 'agility', amount: 10_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', sources: ['wise_old_man', 'runelite', 'screenshot'] }),
-  preset('Receive any boss unique', 80, 'Bossing', 'item_acquired', { target: 'Any boss unique', difficulty: 'medium' }),
-  preset('Complete any raid', 100, 'Raids', 'raid_complete', { target: 'Any raid', difficulty: 'medium' }),
-  preset('Receive a Chambers of Xeric purple', 220, 'Raids', 'item_acquired', { target: 'Chambers of Xeric unique', difficulty: 'hard' }),
-  preset('Receive a Theatre of Blood purple', 250, 'Raids', 'item_acquired', { target: 'Theatre of Blood unique', difficulty: 'hard' }),
-  preset('Receive a Tombs of Amascut purple', 220, 'Raids', 'item_acquired', { target: 'Tombs of Amascut unique', difficulty: 'hard' }),
-  preset("Receive Tumeken's shadow", 900, 'Raids', 'item_acquired', { target: "Tumeken's shadow", difficulty: 'legendary' }),
-  preset('Receive a twisted bow', 1_000, 'Raids', 'item_acquired', { target: 'Twisted bow', difficulty: 'legendary' }),
-  preset('Receive a scythe of Vitur', 1_000, 'Raids', 'item_acquired', { target: 'Scythe of Vitur', difficulty: 'legendary' }),
-  preset('Receive an enhanced crystal weapon seed', 300, 'Gear', 'item_acquired', { target: 'Enhanced crystal weapon seed', difficulty: 'hard' }),
-  preset('Obtain any new pet', 800, 'Pets', 'pet_obtained', { target: 'Any pet', difficulty: 'legendary' }),
-  preset('Add three collection-log slots', 120, 'Collection', 'collection_log', { amount: 3, unit: 'slots', difficulty: 'medium' }),
-  preset('Complete any combat achievement', 55, 'Combat', 'combat_achievement', { target: 'Any combat achievement', difficulty: 'easy' }),
-  preset('Complete a grandmaster combat achievement', 250, 'Combat', 'combat_achievement', { target: 'Grandmaster combat achievement', difficulty: 'hard' }),
-  preset('Complete a master clue', 90, 'Clues', 'clue_complete', { target: 'Master clue', difficulty: 'medium' }),
-  preset('Complete an elite clue', 65, 'Clues', 'clue_complete', { target: 'Elite clue', difficulty: 'medium' }),
-  preset('Gain 1,000,000 Runecraft XP', 150, 'Skilling', 'xp_gain', { metric: 'runecraft', amount: 1_000_000, unit: 'XP', difficulty: 'hard', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 5,000,000 team Slayer XP', 250, 'Skilling', 'xp_gain', { metric: 'slayer', amount: 5_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 25,000,000 total team XP', 350, 'Skilling', 'xp_gain', { metric: 'overall', amount: 25_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', sources: ['wise_old_man', 'runelite'] }),
-  preset('Reach level 99 in any skill', 180, 'Progress', 'level_reached', { amount: 99, unit: 'level', difficulty: 'hard', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 25 Giant Mole kill count', 70, 'Bossing', 'boss_kc', { metric: 'giant_mole', amount: 25, unit: 'KC', difficulty: 'easy', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 50 Zulrah kill count', 90, 'Bossing', 'boss_kc', { metric: 'zulrah', amount: 50, unit: 'KC', difficulty: 'medium', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 50 Vorkath kill count', 90, 'Bossing', 'boss_kc', { metric: 'vorkath', amount: 50, unit: 'KC', difficulty: 'medium', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 25 Nex kill count', 180, 'Bossing', 'boss_kc', { metric: 'nex', amount: 25, unit: 'KC', difficulty: 'hard', sources: ['wise_old_man', 'runelite'] }),
-  preset('Complete ten Theatre of Blood raids', 220, 'Raids', 'raid_complete', { target: 'Theatre of Blood', amount: 10, unit: 'completions', scope: 'team_total', difficulty: 'hard' }),
-  preset('Complete ten Chambers challenge modes', 220, 'Raids', 'raid_complete', { target: 'Chambers of Xeric: Challenge Mode', amount: 10, unit: 'completions', scope: 'team_total', difficulty: 'hard' }),
-  preset('Complete twenty expert Tombs of Amascut raids', 260, 'Raids', 'raid_complete', { target: 'Tombs of Amascut: Expert Mode', amount: 20, unit: 'completions', scope: 'team_total', difficulty: 'hard' }),
-  preset('Set a new raid personal best', 140, 'Speed', 'raid_time', { target: 'Any raid personal best', difficulty: 'hard' }),
+  preset('Get an Oathplate helm', 180, 'Gear', 'item_acquired', { target: 'Oathplate helm', difficulty: 'hard', imageKind: 'item', imageKey: 'Oathplate helm', dropRateNumerator: 1, dropRateDenominator: 600, efficientKillsPerHour: 10, notes: 'Planning assumes solo Yama kills at 100% contribution and an efficient 10 kills per hour.', exclusions: 'Purchased, smithed, traded, or contract-guaranteed helms do not count unless the organizer explicitly allows them.', sourceUrl: 'https://oldschool.runescape.wiki/w/Yama' }),
+  preset('Obtain the Baby mole pet', 900, 'Pets', 'pet_obtained', { target: 'Baby mole', difficulty: 'legendary', imageKind: 'item', imageKey: 'Baby mole', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 85, notes: 'The 85 kills/hour planning rate assumes an experienced player with the Falador Hard Diary and strong gear.', exclusions: 'Existing pets and metamorphosis changes do not count; the pet must be received during the event.', sourceUrl: 'https://oldschool.runescape.wiki/w/Giant_Mole' }),
+  preset('Receive a Twisted ancestral colour kit', 650, 'Raids', 'item_acquired', { target: 'Twisted ancestral colour kit', difficulty: 'legendary', imageKind: 'item', imageKey: 'Twisted ancestral colour kit', dropRateNumerator: 1, dropRateDenominator: 75, efficientKillsPerHour: 2.4, notes: 'Only Challenge Mode completions inside the kit-eligibility time can roll this tertiary reward. The rate assumes 25-minute efficient completions.', exclusions: 'Metamorphic dust, a standard purple, or a kit owned before the event does not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Twisted_ancestral_colour_kit' }),
+  preset('Beat the GM Theatre of Blood trio time', 750, 'Speed', 'raid_time', { target: 'Theatre of Blood', metric: 'trio', amount: 1_050, unit: 'seconds', scope: 'exact_party', participantCount: 3, difficulty: 'legendary', fixedHours: 4, imageKind: 'boss', imageKey: 'Verzik Vitur', notes: 'Complete Theatre of Blood with exactly three players in less than 17:30. The four-hour estimate is an editable practice/attempt budget, not a guaranteed completion time.', exclusions: 'Entry mode, hard mode, four-player raids, and times of exactly 17:30 or slower do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Theatre_(Trio)_Speed-Runner', description: 'Exactly three linked team members complete Theatre of Blood in less than 17 minutes and 30 seconds.' }),
+  preset('Beat the Chambers CM five-player time', 750, 'Speed', 'raid_time', { target: 'Chambers of Xeric: Challenge Mode', metric: 'five-player', amount: 1_500, unit: 'seconds', scope: 'exact_party', participantCount: 5, difficulty: 'legendary', fixedHours: 4, imageKind: 'boss', imageKey: 'Great Olm', notes: 'Complete Challenge Mode with exactly five players in less than 25:00. The four-hour estimate is an editable practice/attempt budget.', exclusions: 'Normal Chambers, other scales, and times of exactly 25:00 or slower do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Chambers_of_Xeric', description: 'Exactly five linked team members complete Chambers of Xeric: Challenge Mode in less than 25 minutes.' }),
+  preset('Gain 10,000,000 team Agility XP', 500, 'Skilling', 'xp_gain', { metric: 'agility', amount: 10_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 100_000, imageKind: 'item', imageKey: 'Agility cape', notes: 'The planning estimate uses 100,000 Agility XP/hour per active player. Edit this to match your clan’s expected methods and levels.', exclusions: 'Only XP gained between the event baseline and final checkpoint counts.', sources: ['wise_old_man', 'runelite', 'screenshot'] }),
+  preset('Receive a Berserker ring from Dagannoth Rex', 80, 'Bossing', 'item_acquired', { target: 'Berserker ring', difficulty: 'medium', imageKind: 'item', imageKey: 'Berserker ring', dropRateNumerator: 1, dropRateDenominator: 128, efficientKillsPerHour: 55, notes: 'Planning uses 55 Rex kills/hour for one individual.', exclusions: 'Other Dagannoth King rings do not count.' }),
+  preset('Complete one Chambers of Xeric raid', 100, 'Raids', 'raid_complete', { target: 'Chambers of Xeric', amount: 1, unit: 'completion', difficulty: 'medium', imageKind: 'boss', imageKey: 'Great Olm', efficientKillsPerHour: 2 }),
+  preset('Receive a dexterous prayer scroll', 220, 'Raids', 'item_acquired', { target: 'Dexterous prayer scroll', difficulty: 'hard', imageKind: 'item', imageKey: 'Dexterous prayer scroll', fixedHours: 45, notes: 'The starter estimate is fixed because Chambers unique chance changes with personal points and team scaling. Replace it with your clan’s expected raid level and points.', sourceUrl: 'https://oldschool.runescape.wiki/w/Chambers_of_Xeric/Rewards' }),
+  preset('Receive an avernic defender hilt', 250, 'Raids', 'item_acquired', { target: 'Avernic defender hilt', difficulty: 'hard', imageKind: 'item', imageKey: 'Avernic defender hilt', fixedHours: 20, notes: 'The starter estimate is editable because individual Theatre of Blood loot chance changes with party size, deaths, and performance.', sourceUrl: 'https://oldschool.runescape.wiki/w/Theatre_of_Blood/Rewards' }),
+  preset("Receive Osmumten's fang", 220, 'Raids', 'item_acquired', { target: "Osmumten's fang", difficulty: 'hard', imageKind: 'item', imageKey: "Osmumten's fang" }),
+  preset("Receive Tumeken's shadow", 900, 'Raids', 'item_acquired', { target: "Tumeken's shadow", difficulty: 'legendary', imageKind: 'item', imageKey: "Tumeken's shadow (uncharged)" }),
+  preset('Receive a twisted bow', 1_000, 'Raids', 'item_acquired', { target: 'Twisted bow', difficulty: 'legendary', imageKind: 'item', imageKey: 'Twisted bow' }),
+  preset('Receive a scythe of Vitur', 1_000, 'Raids', 'item_acquired', { target: 'Scythe of Vitur', difficulty: 'legendary', imageKind: 'item', imageKey: 'Scythe of vitur (uncharged)' }),
+  preset('Receive an enhanced crystal weapon seed', 300, 'Gear', 'item_acquired', { target: 'Enhanced crystal weapon seed', difficulty: 'hard', imageKind: 'item', imageKey: 'Enhanced crystal weapon seed', dropRateNumerator: 1, dropRateDenominator: 400, efficientKillsPerHour: 6 }),
+  preset('Obtain the Vorki pet from Vorkath', 800, 'Pets', 'pet_obtained', { target: 'Vorki', difficulty: 'legendary', imageKind: 'item', imageKey: 'Vorki', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 30 }),
+  preset('Add three collection-log slots', 120, 'Collection', 'collection_log', { amount: 3, unit: 'slots', difficulty: 'medium', fixedHours: 4, notes: 'Four hours is a broad starter assumption. Adjust it after choosing which missing slots your roster will pursue.' }),
+  preset('Complete the Perfect Vardorvis achievement', 55, 'Combat', 'combat_achievement', { target: 'Perfect Vardorvis', difficulty: 'easy', imageKind: 'boss', imageKey: 'Vardorvis', fixedHours: 2, notes: 'Editable practice-and-attempt budget for one prepared player.' }),
+  preset('Complete the Perfect Theatre achievement', 250, 'Combat', 'combat_achievement', { target: 'Perfect Theatre', difficulty: 'hard', imageKind: 'boss', imageKey: 'Verzik Vitur', fixedHours: 4, notes: 'Editable practice-and-attempt budget for the required team.' }),
+  preset('Complete a master clue', 90, 'Clues', 'clue_complete', { target: 'Master clue', amount: 1, unit: 'clue', difficulty: 'medium', efficientKillsPerHour: 0.5, imageKind: 'item', imageKey: 'Clue scroll (master)', notes: 'Starter rate assumes one master clue completion every two hours for an individual who already has the clue.' }),
+  preset('Complete an elite clue', 65, 'Clues', 'clue_complete', { target: 'Elite clue', amount: 1, unit: 'clue', difficulty: 'medium', efficientKillsPerHour: 1, imageKind: 'item', imageKey: 'Clue scroll (elite)' }),
+  preset('Gain 1,000,000 Runecraft XP', 150, 'Skilling', 'xp_gain', { metric: 'runecraft', amount: 1_000_000, unit: 'XP', difficulty: 'hard', efficientUnitsPerHour: 100_000, imageKind: 'item', imageKey: 'Runecraft cape', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 5,000,000 team Slayer XP', 250, 'Skilling', 'xp_gain', { metric: 'slayer', amount: 5_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 80_000, imageKind: 'item', imageKey: 'Slayer cape', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 25,000,000 total team XP', 350, 'Skilling', 'xp_gain', { metric: 'overall', amount: 25_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 1_000_000, imageKind: 'item', imageKey: 'Max cape', sources: ['wise_old_man', 'runelite'] }),
+  preset('Reach level 99 Agility', 180, 'Progress', 'level_reached', { metric: 'agility', amount: 99, unit: 'level', difficulty: 'hard', imageKind: 'item', imageKey: 'Agility cape', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 25 Giant Mole kill count', 70, 'Bossing', 'boss_kc', { metric: 'giant_mole', amount: 25, unit: 'KC', difficulty: 'easy', efficientKillsPerHour: 85, imageKind: 'boss', imageKey: 'Giant Mole', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 50 Zulrah kill count', 90, 'Bossing', 'boss_kc', { metric: 'zulrah', amount: 50, unit: 'KC', difficulty: 'medium', efficientKillsPerHour: 25, imageKind: 'boss', imageKey: 'Zulrah', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 50 Vorkath kill count', 90, 'Bossing', 'boss_kc', { metric: 'vorkath', amount: 50, unit: 'KC', difficulty: 'medium', efficientKillsPerHour: 30, imageKind: 'boss', imageKey: 'Vorkath', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 25 Nex kill count', 180, 'Bossing', 'boss_kc', { metric: 'nex', amount: 25, unit: 'KC', difficulty: 'hard', efficientKillsPerHour: 10, imageKind: 'boss', imageKey: 'Nex', sources: ['wise_old_man', 'runelite'] }),
+  preset('Complete ten Theatre of Blood raids', 220, 'Raids', 'raid_complete', { target: 'Theatre of Blood', amount: 10, unit: 'completions', scope: 'team_total', difficulty: 'hard', efficientKillsPerHour: 2.5, imageKind: 'boss', imageKey: 'Verzik Vitur' }),
+  preset('Complete ten Chambers challenge modes', 220, 'Raids', 'raid_complete', { target: 'Chambers of Xeric: Challenge Mode', amount: 10, unit: 'completions', scope: 'team_total', difficulty: 'hard', efficientKillsPerHour: 2.4, imageKind: 'boss', imageKey: 'Great Olm' }),
+  preset('Complete twenty expert Tombs of Amascut raids', 260, 'Raids', 'raid_complete', { target: 'Tombs of Amascut: Expert Mode', amount: 20, unit: 'completions', scope: 'team_total', difficulty: 'hard', efficientKillsPerHour: 3, imageKind: 'boss', imageKey: "Tumeken's Warden" }),
+  preset('Set a sub-17:00 solo Chambers personal best', 140, 'Speed', 'raid_time', { target: 'Chambers of Xeric', metric: 'solo', amount: 1_020, unit: 'seconds', difficulty: 'hard', fixedHours: 4, imageKind: 'boss', imageKey: 'Great Olm' }),
   preset('Earn an infernal cape', 500, 'Combat', 'item_acquired', { target: 'Infernal cape', difficulty: 'legendary' }),
   preset("Earn Dizana's quiver", 450, 'Combat', 'item_acquired', { target: "Dizana's quiver", difficulty: 'legendary' }),
   preset('Earn a fire cape', 100, 'Combat', 'item_acquired', { target: 'Fire cape', difficulty: 'medium' }),
-  preset('Complete one Barrows armour set', 180, 'Gear', 'team_challenge', { target: 'Complete Barrows armour set', difficulty: 'hard' }),
-  preset('Complete any godsword', 220, 'Gear', 'team_challenge', { target: 'Completed godsword', difficulty: 'hard' }),
+  preset('Complete one Barrows armour set', 180, 'Gear', 'team_challenge', { target: 'Complete Barrows armour set', difficulty: 'hard', fixedHours: 35, imageKind: 'item', imageKey: 'Barrows chest', notes: 'Editable starter estimate for completing any one named Barrows set from event drops.', exclusions: 'Mixing pieces from different brothers does not count.' }),
+  preset('Complete an Armadyl godsword', 220, 'Gear', 'team_challenge', { target: 'Armadyl godsword', difficulty: 'hard', imageKind: 'item', imageKey: 'Armadyl godsword' }),
   preset('Complete a crystal armour set', 260, 'Gear', 'team_challenge', { target: 'Crystal armour set', difficulty: 'hard' }),
-  preset('Receive an abyssal whip', 65, 'Slayer', 'item_acquired', { target: 'Abyssal whip', difficulty: 'easy' }),
-  preset('Receive a primordial crystal', 150, 'Slayer', 'item_acquired', { target: 'Primordial crystal', difficulty: 'hard' }),
-  preset('Receive a zenyte shard', 120, 'Gear', 'item_acquired', { target: 'Zenyte shard', difficulty: 'medium' }),
-  preset('Receive a dragon warhammer', 250, 'Gear', 'item_acquired', { target: 'Dragon warhammer', difficulty: 'hard' }),
-  preset('Receive any draconic visage', 220, 'Gear', 'item_acquired', { target: 'Any draconic visage', difficulty: 'hard' }),
-  preset('Receive a clue mega-rare', 700, 'Clues', 'item_acquired', { target: 'Clue mega-rare', difficulty: 'legendary' }),
-  preset('Complete a raid with three teammates', 120, 'Teamwork', 'raid_complete', { target: 'Any raid', scope: 'exact_party', participantCount: 4, difficulty: 'medium' }),
-  preset('Take a full-team victory photo', 40, 'Teamwork', 'team_challenge', { target: 'Full-team photo', scope: 'all_members', difficulty: 'easy', sources: ['screenshot'] }),
-  preset('Receive any skilling-boss unique', 90, 'Skilling', 'item_acquired', { target: 'Any skilling-boss unique', difficulty: 'medium' }),
-  preset('Receive a Tempoross unique', 75, 'Skilling', 'item_acquired', { target: 'Tempoross unique', difficulty: 'medium' }),
-  preset('Receive a tome of fire', 100, 'Skilling', 'item_acquired', { target: 'Tome of fire', difficulty: 'medium' }),
-  preset('Complete 100 Hallowed Sepulchre laps', 180, 'Skilling', 'team_challenge', { target: 'Hallowed Sepulchre', amount: 100, unit: 'laps', scope: 'team_total', difficulty: 'hard' }),
-  preset('Receive a drop worth at least 5m', 160, 'Fortune', 'item_acquired', { metric: 'ge_value', amount: 5_000_000, unit: 'GP', difficulty: 'hard' }),
-  preset('Complete a perfect boss kill', 150, 'Combat', 'combat_achievement', { target: 'Perfect boss kill', difficulty: 'hard' }),
-  preset('Complete any speed combat achievement', 150, 'Speed', 'combat_achievement', { target: 'Speed combat achievement', difficulty: 'hard' }),
-  preset('Defeat three different bosses in one hour', 100, 'Bossing', 'team_challenge', { target: 'Three different bosses', amount: 60, unit: 'minutes', difficulty: 'medium' }),
-  preset('Gain 10,000,000 team Hunter XP', 450, 'Skilling', 'xp_gain', { metric: 'hunter', amount: 10_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', sources: ['wise_old_man', 'runelite'] }),
-  preset('Gain 2,000,000 team Mining XP', 180, 'Skilling', 'xp_gain', { metric: 'mining', amount: 2_000_000, unit: 'XP', scope: 'team_total', difficulty: 'medium', sources: ['wise_old_man', 'runelite'] }),
-  preset('Receive a champion scroll', 240, 'Collection', 'item_acquired', { target: 'Any champion scroll', difficulty: 'hard' }),
-  preset('Receive any boss jar', 300, 'Collection', 'item_acquired', { target: 'Any boss jar', difficulty: 'hard' }),
-  preset('Complete the organizer final challenge', 500, 'Finale', 'manual', { target: 'Organizer final challenge', scope: 'all_members', difficulty: 'legendary', sources: ['screenshot', 'organizer'] }),
+  preset('Receive an abyssal whip', 65, 'Slayer', 'item_acquired', { target: 'Abyssal whip', difficulty: 'easy', imageKind: 'item', imageKey: 'Abyssal whip', dropRateNumerator: 1, dropRateDenominator: 512, efficientKillsPerHour: 180 }),
+  preset('Receive a primordial crystal', 150, 'Slayer', 'item_acquired', { target: 'Primordial crystal', difficulty: 'hard', imageKind: 'item', imageKey: 'Primordial crystal', dropRateNumerator: 1, dropRateDenominator: 512, efficientKillsPerHour: 35 }),
+  preset('Receive a zenyte shard', 120, 'Gear', 'item_acquired', { target: 'Zenyte shard', difficulty: 'medium', imageKind: 'item', imageKey: 'Zenyte shard', dropRateNumerator: 1, dropRateDenominator: 300, efficientKillsPerHour: 60 }),
+  preset('Receive a dragon warhammer', 250, 'Gear', 'item_acquired', { target: 'Dragon warhammer', difficulty: 'hard', imageKind: 'item', imageKey: 'Dragon warhammer', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 140 }),
+  preset('Receive a skeletal visage from Vorkath', 220, 'Gear', 'item_acquired', { target: 'Skeletal visage', difficulty: 'hard', imageKind: 'item', imageKey: 'Skeletal visage', dropRateNumerator: 1, dropRateDenominator: 5_000, efficientKillsPerHour: 30 }),
+  preset('Receive a 3rd age platebody from a clue', 700, 'Clues', 'item_acquired', { target: '3rd age platebody', difficulty: 'legendary', imageKind: 'item', imageKey: '3rd age platebody' }),
+  preset('Complete Chambers with exactly four teammates', 120, 'Teamwork', 'raid_complete', { target: 'Chambers of Xeric', amount: 1, unit: 'completion', scope: 'exact_party', participantCount: 5, difficulty: 'medium', imageKind: 'boss', imageKey: 'Great Olm' }),
+  preset('Take a full-team victory photo', 40, 'Teamwork', 'team_challenge', { target: 'Full-team photo', scope: 'all_members', difficulty: 'easy', fixedHours: 0.25, imageKind: 'item', imageKey: 'Camera', sources: ['screenshot'] }),
+  preset('Receive a Tome of water from Tempoross', 90, 'Skilling', 'item_acquired', { target: 'Tome of water', difficulty: 'medium', imageKind: 'item', imageKey: 'Tome of water', dropRateNumerator: 1, dropRateDenominator: 1_600, efficientKillsPerHour: 60, notes: 'The attempt rate is reward permits opened per individual hour, not Tempoross kills.', sourceUrl: 'https://oldschool.runescape.wiki/w/Tempoross#Rewards' }),
+  preset('Receive a Fish barrel from Tempoross', 75, 'Skilling', 'item_acquired', { target: 'Fish barrel', difficulty: 'medium', imageKind: 'item', imageKey: 'Fish barrel', dropRateNumerator: 1, dropRateDenominator: 400, efficientKillsPerHour: 60, notes: 'The attempt rate is reward permits opened per individual hour, not Tempoross kills.', sourceUrl: 'https://oldschool.runescape.wiki/w/Tempoross#Rewards' }),
+  preset('Receive a tome of fire from Wintertodt', 100, 'Skilling', 'item_acquired', { target: 'Tome of fire', difficulty: 'medium', imageKind: 'item', imageKey: 'Tome of fire', dropRateNumerator: 1, dropRateDenominator: 1_000, efficientKillsPerHour: 25, notes: 'The attempt rate is reward-cart rolls per individual hour. Edit it for your points and mass/solo method.', sourceUrl: 'https://oldschool.runescape.wiki/w/Wintertodt_drop_rates' }),
+  preset('Complete 100 Hallowed Sepulchre laps', 180, 'Skilling', 'team_challenge', { target: 'Hallowed Sepulchre', amount: 100, unit: 'laps', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 8, imageKind: 'item', imageKey: 'Hallowed ring' }),
+  preset('Receive an Ultor vestige from Vardorvis', 160, 'Fortune', 'item_acquired', { target: 'Ultor vestige', difficulty: 'hard', imageKind: 'item', imageKey: 'Ultor vestige' }),
+  preset('Complete the Perfect Zulrah achievement', 150, 'Combat', 'combat_achievement', { target: 'Perfect Zulrah', difficulty: 'hard', imageKind: 'boss', imageKey: 'Zulrah', fixedHours: 2, notes: 'Editable practice-and-attempt budget for one prepared player.' }),
+  preset('Complete the Vorkath Speed-Runner achievement', 150, 'Speed', 'combat_achievement', { target: 'Vorkath Speed-Runner', difficulty: 'hard', imageKind: 'boss', imageKey: 'Vorkath', fixedHours: 2, notes: 'Editable practice-and-attempt budget for one prepared player.' }),
+  preset('Defeat Giant Mole, Vorkath, and Zulrah in one hour', 100, 'Bossing', 'team_challenge', { target: 'Giant Mole, Vorkath, and Zulrah', amount: 60, unit: 'minutes', difficulty: 'medium', fixedHours: 1, imageKind: 'boss', imageKey: 'Vorkath' }),
+  preset('Gain 10,000,000 team Hunter XP', 450, 'Skilling', 'xp_gain', { metric: 'hunter', amount: 10_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 200_000, imageKind: 'item', imageKey: 'Hunter cape', sources: ['wise_old_man', 'runelite'] }),
+  preset('Gain 2,000,000 team Mining XP', 180, 'Skilling', 'xp_gain', { metric: 'mining', amount: 2_000_000, unit: 'XP', scope: 'team_total', difficulty: 'medium', efficientUnitsPerHour: 120_000, imageKind: 'item', imageKey: 'Mining cape', sources: ['wise_old_man', 'runelite'] }),
+  preset('Receive an imp champion scroll', 240, 'Collection', 'item_acquired', { target: 'Imp champion scroll', difficulty: 'hard', imageKind: 'item', imageKey: 'Champion scroll', dropRateNumerator: 1, dropRateDenominator: 5_000, efficientKillsPerHour: 650 }),
+  preset('Receive the jar of dirt from Kraken', 300, 'Collection', 'item_acquired', { target: 'Jar of dirt', difficulty: 'hard', imageKind: 'item', imageKey: 'Jar of dirt', dropRateNumerator: 1, dropRateDenominator: 1_000, efficientKillsPerHour: 80 }),
+  preset('Take a full-team victory photo at the Grand Exchange fountain', 500, 'Finale', 'manual', { target: 'Grand Exchange fountain team photo', scope: 'all_members', difficulty: 'legendary', fixedHours: 0.25, imageKind: 'item', imageKey: 'Camera', exclusions: 'Every rostered member must be visible and the screenshot must be taken during the event.', sources: ['screenshot', 'organizer'] }),
 ];
 
 function tasksFor(mode: BingoMode): BingoTaskDefinition[] {
   const selected = [
-    6, 19, 8, 21, 25, 46, 9, 16, 41, 26, 39, 52, 17, 47, 42, 32, 28, 36, 18, 48, 49, 22, 53, 44, 59,
+    6, 19, 8, 21, 25, 46, 9, 16, 41, 26, 39, 52, 17, 47, 42, 32, 28, 36, 18, 48, 49, 22, 53, 54, 59,
   ].map((index) => structuredClone(OSRS_BINGO_PRESETS[index]));
   if (mode === 'classic') {
     selected.forEach((task) => { task.points = 1; });
@@ -270,8 +291,21 @@ export function parseBingoTaskImport(value: string): BingoTaskDefinition[] {
         },
         scope: { type: scope, participantCount: fields[10]?.trim() },
         proof: { sources, approval: sources && sources.length > 1 ? 'hybrid' : 'review' },
+        presentation: { imageKind: fields[16]?.trim(), imageKey: fields[17]?.trim() },
+        details: {
+          notes: fields[18]?.trim(), exclusions: fields[19]?.trim(), sourceUrl: fields[20]?.trim(),
+        },
+        planning: {
+          dropRateNumerator: fields[21]?.trim(), dropRateDenominator: fields[22]?.trim(),
+          efficientKillsPerHour: fields[23]?.trim(), efficientUnitsPerHour: fields[24]?.trim(),
+          fixedHours: fields[25]?.trim(), quantity: fields[26]?.trim(),
+        },
         prerequisitePositions: prerequisites,
       },
+      difficulty: fields[27]?.trim(),
+      repeatable: /^(?:true|yes|1)$/i.test(fields[28]?.trim() ?? ''),
+      maxCompletions: fields[29]?.trim(),
+      hidden: /^(?:true|yes|1)$/i.test(fields[30]?.trim() ?? ''),
     }], 1);
   });
 }
@@ -283,6 +317,12 @@ export function serializeBingoTaskImport(tasks: BingoTaskDefinition[]) {
     task.rule.scope.type, task.rule.scope.participantCount ?? '',
     task.rule.prerequisitePositions.map((position) => position + 1).join(','), task.rule.proof.sources.join(','),
     task.rule.verifier.metric, task.rule.verifier.comparator, task.rule.verifier.targetId ?? '',
+    task.rule.presentation.imageKind, task.rule.presentation.imageKey,
+    task.rule.details.notes, task.rule.details.exclusions, task.rule.details.sourceUrl,
+    task.rule.planning.dropRateNumerator ?? '', task.rule.planning.dropRateDenominator ?? '',
+    task.rule.planning.efficientKillsPerHour ?? '', task.rule.planning.efficientUnitsPerHour ?? '',
+    task.rule.planning.fixedHours ?? '', task.rule.planning.quantity,
+    task.difficulty, task.repeatable, task.maxCompletions, task.hidden,
   ].map((value) => String(value).replace(/\|/g, '/')).join(' | ')).join('\n');
 }
 

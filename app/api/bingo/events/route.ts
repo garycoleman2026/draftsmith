@@ -2,7 +2,7 @@ import { createHashedCredential } from '@/lib/access-tokens';
 import { getSessionUser } from '@/lib/auth';
 import { recordAudit, requestId } from '@/lib/audit';
 import { BingoError, bingoErrorResponse, parseJson } from '@/lib/bingo';
-import { createBingoEventSnapshot } from '@/lib/bingo-event-creation';
+import { createBingoEventSnapshot, validBingoDate } from '@/lib/bingo-event-creation';
 import { sanitizeStandaloneBingoTeams } from '@/lib/bingo-roster';
 import { getBuiltinBingoTemplate, sanitizeBingoTemplate } from '@/lib/bingo-types';
 import { ensureSchema, getDatabase, json } from '@/lib/db';
@@ -38,9 +38,15 @@ export async function POST(request: Request) {
     if (typeof body.templateId === 'string' && body.templateId && !publicTemplate) {
       throw new BingoError('That community template is no longer publicly available.', 404);
     }
+    const customConfiguration = Boolean(body.configuration && typeof body.configuration === 'object' && !publicTemplate);
     const configuration = publicTemplate
       ? sanitizeBingoTemplate(parseJson(publicTemplate.configuration_json, {}), builtin)
-      : builtin;
+      : customConfiguration ? sanitizeBingoTemplate(body.configuration, builtin) : builtin;
+    const startAt = validBingoDate(body.startAt);
+    const endAt = validBingoDate(body.endAt);
+    if (body.startAt && !startAt) throw new BingoError('Choose a valid bingo start time.', 400);
+    if (body.endAt && !endAt) throw new BingoError('Choose a valid bingo end time.', 400);
+    if (endAt && !startAt) throw new BingoError('Add a start time before setting an end time.', 400);
 
     const db = getDatabase();
     const sessionUser = await getSessionUser(request);
@@ -98,8 +104,10 @@ export async function POST(request: Request) {
       configuration,
       mode: configuration.mode,
       boardScope: configuration.mode === 'lockout' ? 'shared' : configuration.boardScope,
+      startAt,
+      endAt,
       createdByUserId: sessionUser?.id ?? null,
-      templateKey: publicTemplate ? null : builtin.key,
+      templateKey: publicTemplate || customConfiguration ? null : builtin.key,
       teamNames: Object.fromEntries(roster.teams.map((team, index) => [index, team.name])),
     });
     await recordAudit(db, {
@@ -109,7 +117,7 @@ export async function POST(request: Request) {
       eventType: 'bingo.created',
       metadata: {
         eventId: created.id,
-        source: 'standalone',
+        source: customConfiguration ? 'standalone_custom' : 'standalone',
         mode: configuration.mode,
         teamCount: roster.teams.length,
         playerCount: roster.playerCount,

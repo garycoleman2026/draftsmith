@@ -28,7 +28,7 @@ export default function ClanBingoGuidePage() {
     <p>Together/apart constraints solve a different problem. Together is useful for a mentor and learner or shared-account schedule; apart can separate household members, known conflicts, or two specialists who would otherwise overload one team. Record why a constraint exists outside the public result.</p>
 
     <h2>4. Build a board with several ways to matter.</h2>
-    <p>A durable 5 × 5 points board might use roughly eight accessible tasks, ten medium tasks, five difficult tasks, and two headline challenges. That is a starting shape, not a formula. Every team should see useful work in skilling, PvM, clues, collection, and cooperative play.</p>
+    <p>A durable 5 × 5 points board might use roughly eight accessible tasks, ten medium tasks, five difficult tasks, and two headline challenges. That is a starting shape, not a formula. Every team should see useful work in skilling, PvM, clues, collection, and cooperative play. Enter the event dates and expected team size in the maker, then compare the board’s estimated player-hours with the available capacity before publishing it.</p>
     <table><thead><tr><th>Task role</th><th>Example</th><th>Why it exists</th></tr></thead><tbody>
       <tr><td>Quick win</td><td>Complete a hard clue</td><td>Gets every team moving and teaches the claim flow.</td></tr>
       <tr><td>Progress</td><td>As a team, gain 10m Agility XP</td><td>Rewards steady contribution from several members.</td></tr>

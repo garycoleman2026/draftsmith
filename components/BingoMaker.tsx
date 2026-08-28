@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import {
-  BINGO_PROOF_SOURCES, BINGO_TASK_SCOPES, BINGO_VERIFIERS, bingoRuleSummary,
+  BINGO_PROOF_SOURCES, BINGO_TASK_IMAGE_KINDS, BINGO_TASK_SCOPES, BINGO_VERIFIERS, bingoRuleSummary,
+  expectedIndividualHours, expectedTeamHours, formatExpectedHours,
   sanitizeBingoEventRules, sanitizeBingoTaskRule, validateBingoBoard, verificationModeFromRule,
   type BingoEventRules, type BingoProofSource, type BingoTaskRule,
 } from '../lib/bingo-rules';
@@ -11,6 +12,8 @@ import {
 } from '../lib/bingo-types';
 import { copyText } from '../lib/client';
 import type { BingoMode } from '../lib/types';
+import { BingoPlanningSummary } from './BingoPlanningSummary';
+import { BingoTaskArtwork } from './BingoTaskArtwork';
 
 type Props = {
   initialTasks: BingoTaskDefinition[];
@@ -18,6 +21,10 @@ type Props = {
   mode: BingoMode;
   disabled: boolean;
   saving: boolean;
+  teamSize?: number;
+  startAt?: string | null;
+  endAt?: string | null;
+  saveLabel?: string;
   onSave: (tasks: BingoTaskDefinition[], rules: BingoEventRules) => Promise<void>;
 };
 
@@ -29,9 +36,12 @@ const LABELS: Record<string, string> = {
   any_member: 'Any member', single_member: 'One named member', team_total: 'Team total',
   exact_party: 'Exact party size', all_members: 'Every team member',
   organizer: 'Organizer review', screenshot: 'Screenshot', runelite: 'RuneLite', wise_old_man: 'Wise Old Man',
+  none: 'No artwork', item: 'Show item', boss: 'Show boss',
 };
 
-export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving, onSave }: Props) {
+export function BingoMaker({
+  initialTasks, initialRules, mode, disabled, saving, teamSize = 1, startAt, endAt, saveLabel, onSave,
+}: Props) {
   const [tasks, setTasks] = useState(() => cloneTasks(initialTasks));
   const [rules, setRules] = useState(() => sanitizeBingoEventRules(initialRules, initialRules.layout.rows, initialRules.scoring.winCondition));
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -59,7 +69,8 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
 
   function updateRule(mutator: (rule: BingoTaskRule) => BingoTaskRule) {
     updateSelected((task) => {
-      task.rule = sanitizeBingoTaskRule(mutator(structuredClone(task.rule)), task.verificationMode);
+      // Keep in-progress text intact (including trailing spaces and partial URLs); sanitize once on save.
+      task.rule = mutator(structuredClone(task.rule));
       task.verificationMode = verificationModeFromRule(task.rule);
       return task;
     });
@@ -133,8 +144,13 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
       setMessage(validation.errors[0] ?? 'Fix the board before saving.');
       return;
     }
-    await onSave(tasks, rules);
-    setImportText(serializeBingoTaskImport(tasks));
+    const cleaned = tasks.map((task) => ({
+      ...structuredClone(task),
+      rule: sanitizeBingoTaskRule(task.rule, task.verificationMode),
+    }));
+    setTasks(cleaned);
+    await onSave(cleaned, rules);
+    setImportText(serializeBingoTaskImport(cleaned));
   }
 
   return (
@@ -148,6 +164,7 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
             </select>
           </label>
           <p className="mt-3 text-xs leading-relaxed text-[#6e5e43]"><b>{modeLabel(mode)}</b><br />{modeHelp(mode)}</p>
+          <div className="mt-4"><BingoPlanningSummary compact tasks={tasks} teamSize={teamSize} startAt={startAt} endAt={endAt} /></div>
           {mode === 'categories' ? <label className="mt-3 block text-[10px] font-black uppercase text-[#65583f]">Tasks needed per category<input className="realm-field mt-1 h-10 w-full px-3 text-sm" type="number" min={1} max={100} disabled={disabled} value={rules.scoring.categoryTarget} onChange={(event) => setRules((current) => ({ ...current, scoring: { ...current.scoring, categoryTarget: Math.max(1, Number(event.target.value) || 1) } }))} /></label> : null}
           {mode === 'classic' ? <label className="mt-3 block text-[10px] font-black uppercase text-[#65583f]">Lines needed to win<input className="realm-field mt-1 h-10 w-full px-3 text-sm" type="number" min={1} max={20} disabled={disabled} value={rules.scoring.targetValue || 1} onChange={(event) => setRules((current) => ({ ...current, scoring: { ...current.scoring, targetValue: Math.max(1, Number(event.target.value) || 1) } }))} /></label> : null}
           <div className="mt-4 grid gap-2">
@@ -181,8 +198,10 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
                   type="button"
                 >
                   <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#7b643d]">#{index + 1} · {task.category}</span>
+                  <BingoTaskArtwork alt="" className="mx-auto mt-1 h-10 w-10" rule={task.rule} />
                   <p className="mt-1 line-clamp-3 text-xs font-black leading-tight text-[#332616]">{task.title}</p>
                   <p className="mt-2 text-[9px] text-[#75603d]">{task.points} pts · {task.rule.verifier.type.replaceAll('_', ' ')}</p>
+                  {expectedIndividualHours(task.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">~{formatExpectedHours(expectedIndividualHours(task.rule))} solo</p> : null}
                   {task.rule.prerequisitePositions.length ? <p className="mt-1 text-[9px] font-bold text-[#805821]">Unlocks after {task.rule.prerequisitePositions.map((position) => '#' + (position + 1)).join(', ')}</p> : null}
                 </button>
               ))}
@@ -192,7 +211,7 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
       </div>
 
       <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_420px]">
-        <TaskEditor disabled={disabled} expected={expected} selected={selected} selectedIndex={selectedIndex} updateRule={updateRule} updateSelected={updateSelected} />
+        <TaskEditor disabled={disabled} expected={expected} selected={selected} selectedIndex={selectedIndex} teamSize={teamSize} updateRule={updateRule} updateSelected={updateSelected} />
         <aside className="rounded border border-[#8b6a32]/35 bg-[#f5e5b8]/55 p-4 sm:p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#80642b]">OSRS task library · {OSRS_BINGO_PRESETS.length} presets</p>
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_145px] gap-2">
@@ -211,9 +230,10 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
                 onDragStart={(event) => event.dataTransfer.setData('terry/preset', String(presetIndex))}
                 type="button"
               >
-                <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.points} pts</span>
-                <p className="mt-1 text-xs font-black text-[#392b18]">{preset.title}</p>
-                <p className="mt-1 text-[9px] leading-relaxed text-[#6e5e43]">{bingoRuleSummary(preset.rule)}</p>
+                <div className="flex gap-3"><BingoTaskArtwork alt="" className="h-12 w-12 shrink-0" rule={preset.rule} /><div className="min-w-0 flex-1"><span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.points} pts</span>
+                  <p className="mt-1 text-xs font-black text-[#392b18]">{preset.title}</p>
+                  <p className="mt-1 text-[9px] leading-relaxed text-[#59472f]">{bingoRuleSummary(preset.rule)}</p>
+                  {expectedIndividualHours(preset.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">Expected {formatExpectedHours(expectedIndividualHours(preset.rule))} solo</p> : null}</div></div>
               </button>;
             })}
           </div>
@@ -233,18 +253,21 @@ export function BingoMaker({ initialTasks, initialRules, mode, disabled, saving,
       {message ? <p role="status" className="rounded border border-[#8b6a32]/35 bg-[#efe0b6] px-4 py-3 text-xs font-bold text-[#5a482d]">{message}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#8b6a32]/25 pt-4">
         <p className="text-xs text-[#6e5e43]">Saving creates an immutable rule definition for the event. Existing live events stay locked.</p>
-        <button className="gold-button px-6 py-3 text-sm" disabled={disabled || saving || !validation.valid} onClick={() => void save()}>{saving ? 'Saving custom board…' : 'Save ' + tasks.length + '-tile custom board'}</button>
+        <button className="gold-button px-6 py-3 text-sm" disabled={disabled || saving || !validation.valid} onClick={() => void save()}>{saving ? 'Saving custom board…' : saveLabel ?? 'Save ' + tasks.length + '-tile custom board'}</button>
       </div>
     </div>
   );
 }
 
-function TaskEditor({ disabled, expected, selected, selectedIndex, updateRule, updateSelected }: {
+function TaskEditor({ disabled, expected, selected, selectedIndex, teamSize, updateRule, updateSelected }: {
   disabled: boolean; expected: number; selected: BingoTaskDefinition | undefined; selectedIndex: number;
+  teamSize: number;
   updateRule: (mutator: (rule: BingoTaskRule) => BingoTaskRule) => void;
   updateSelected: (mutator: (task: BingoTaskDefinition) => BingoTaskDefinition) => void;
 }) {
   if (!selected) return null;
+  const individualHours = expectedIndividualHours(selected.rule);
+  const teamHours = expectedTeamHours(selected.rule, teamSize);
   return (
     <section className="rounded border border-[#8b6a32]/35 bg-[#f5e5b8]/55 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -263,6 +286,27 @@ function TaskEditor({ disabled, expected, selected, selectedIndex, updateRule, u
         <Field label="Numeric target"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0} placeholder="e.g. 10000000" value={selected.rule.verifier.amount ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, amount: event.target.value ? Number(event.target.value) : null } }))} /></Field>
         <Field label="Unit"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="XP, KC, seconds…" value={selected.rule.verifier.unit} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, unit: event.target.value } }))} /></Field>
         {selected.rule.scope.type === 'exact_party' ? <Field label="Required players"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled} type="number" min={2} max={100} value={selected.rule.scope.participantCount ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, scope: { ...rule.scope, participantCount: Number(event.target.value) || null } }))} /></Field> : null}
+        <div className="sm:col-span-2 mt-2 rounded border border-[#8b6a32]/30 bg-[#f7e9bd]/55 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#65583f]">Artwork & task details</p><p className="mt-1 text-xs normal-case text-[#58492f]">Choose an item or boss image from the OSRS Wiki, then add the exact edge cases players need.</p></div><BingoTaskArtwork alt="Selected task artwork" className="h-16 w-16" rule={selected.rule} /></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Field label="Tile artwork"><select className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} value={selected.rule.presentation.imageKind} onChange={(event) => updateRule((rule) => ({ ...rule, presentation: { imageKind: event.target.value as BingoTaskRule['presentation']['imageKind'], imageKey: event.target.value === 'none' ? '' : rule.presentation.imageKey || rule.verifier.target } }))}>{BINGO_TASK_IMAGE_KINDS.map((item) => <option key={item} value={item}>{LABELS[item]}</option>)}</select></Field>
+            <Field label="Wiki image name"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace || selected.rule.presentation.imageKind === 'none'} placeholder="Oathplate helm or Yama" value={selected.rule.presentation.imageKey} onChange={(event) => updateRule((rule) => ({ ...rule, presentation: { ...rule.presentation, imageKey: event.target.value } }))} /></Field>
+            <Field label="Notes" wide><textarea className="realm-field mt-1 min-h-20 w-full p-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="What exactly must happen?" value={selected.rule.details.notes} onChange={(event) => updateRule((rule) => ({ ...rule, details: { ...rule.details, notes: event.target.value } }))} /></Field>
+            <Field label="Exclusions" wide><textarea className="realm-field mt-1 min-h-20 w-full p-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="What does not count?" value={selected.rule.details.exclusions} onChange={(event) => updateRule((rule) => ({ ...rule, details: { ...rule.details, exclusions: event.target.value } }))} /></Field>
+            <Field label="Planning source URL" wide><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} type="url" placeholder="https://oldschool.runescape.wiki/…" value={selected.rule.details.sourceUrl} onBlur={() => updateRule((rule) => rule)} onChange={(event) => updateSelected((task) => ({ ...task, rule: { ...task.rule, details: { ...task.rule.details, sourceUrl: event.target.value } } }))} /></Field>
+          </div>
+        </div>
+        <div className="sm:col-span-2 rounded border border-[#8b6a32]/30 bg-[#e1e8c8]/70 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#425b35]">Expected-time planner</p><p className="mt-1 text-xs normal-case text-[#3f5035]">All rates are per individual and editable. Drop estimate = rate denominator ÷ numerator ÷ efficient kills per hour.</p></div><div className="rounded bg-[#315b39] px-3 py-2 text-right text-[10px] font-black text-white"><span className="block">{formatExpectedHours(individualHours)} solo</span><span className="block opacity-80">{formatExpectedHours(teamHours)} with {teamSize}</span></div></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <Field label="Drop-rate numerator"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="1" value={selected.rule.planning.dropRateNumerator ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, dropRateNumerator: nullableNumber(event.target.value) } }))} /></Field>
+            <Field label="Drop-rate denominator"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="3000" value={selected.rule.planning.dropRateDenominator ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, dropRateDenominator: nullableNumber(event.target.value) } }))} /></Field>
+            <Field label="Quantity needed"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={1} max={100} value={selected.rule.planning.quantity} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, quantity: Number(event.target.value) || 1 } }))} /></Field>
+            <Field label="Efficient kills / attempts per hour"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="85" value={selected.rule.planning.efficientKillsPerHour ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, efficientKillsPerHour: nullableNumber(event.target.value) } }))} /></Field>
+            <Field label="Efficient XP / units per hour"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="100000" value={selected.rule.planning.efficientUnitsPerHour ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, efficientUnitsPerHour: nullableNumber(event.target.value) } }))} /></Field>
+            <Field label="Fixed expected hours"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="Overrides calculated estimate" value={selected.rule.planning.fixedHours ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, fixedHours: nullableNumber(event.target.value) } }))} /></Field>
+          </div>
+        </div>
         <Field label="Prerequisite tile numbers" wide><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="Example: 1, 6, 11" value={selected.rule.prerequisitePositions.map((position) => position + 1).join(', ')} onChange={(event) => updateRule((rule) => ({ ...rule, prerequisitePositions: parsePositions(event.target.value, expected) }))} /></Field>
         <div className="sm:col-span-2">
           <p className="text-[10px] font-black uppercase text-[#65583f]">Accepted proof</p>
@@ -286,6 +330,7 @@ function parsePositions(value: string, maximum: number) {
   return [...new Set(value.split(/[+,;\s]+/).map((item) => Number(item) - 1)
     .filter((position) => Number.isInteger(position) && position >= 0 && position < maximum))].sort((left, right) => left - right);
 }
+function nullableNumber(value: string) { return value ? Number(value) : null; }
 function toggleSource(current: BingoProofSource[], source: BingoProofSource) {
   const next = current.includes(source) ? current.filter((item) => item !== source) : [...current, source];
   return next.length ? next : ['organizer'] as BingoProofSource[];

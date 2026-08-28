@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 export default function CustomMakerGuidePage() {
   return <ContentPage eyebrow="Custom bingo maker" title="Make unusual rules without commissioning a new feature." intro="Most custom ideas can be expressed as data: a title, target, amount, contributor scope, evidence source, points value, and relationship to other tiles. Code is reserved for genuinely new kinds of game evidence.">
     <h2>Start with drafted teams or paste the teams you already have.</h2>
-    <p>The <Link href="/bingo#create">bingo hall</Link> accepts pre-made rosters directly. Separate teams with a blank line, put the team name first, and add one OSRS name per line. Terry creates the organizer room, one private link per team, and the spectator board in a single step. The first listed player is only the displayed team lead; it does not grant extra scoring power.</p>
+    <p>The <Link href="/bingo#create">bingo hall</Link> accepts pre-made rosters directly. Enter the event name and dates, paste the teams, then choose <strong>Customize board before launch</strong>. The complete editor opens on that same page, before any event or private link is created. Separate teams with a blank line, put the team name first, and add one OSRS name per line. The first listed player is only the displayed team lead; it does not grant extra scoring power.</p>
 
     <h2>What organizers can build today.</h2>
-    <p>The maker supports 3 × 3 through 7 × 7 boards, six built-in game styles, more than sixty editable OSRS presets, hidden tiles, free spaces, repeat limits, task prerequisites, shared or per-team ownership, and saved clan templates. You can paste tasks as rows for fast bulk editing or tune each rule in the visual editor.</p>
+    <p>The maker supports 3 × 3 through 7 × 7 boards, six built-in game styles, sixty editable OSRS presets, item or boss artwork, notes, exclusions, source links, expected-time assumptions, hidden tiles, free spaces, repeat limits, task prerequisites, shared or per-team ownership, and saved clan templates. You can paste tasks as rows for fast bulk editing or tune each rule in the visual editor.</p>
 
     <h2>The anatomy of a precise tile.</h2>
     <table><thead><tr><th>Field</th><th>Question it answers</th><th>Example</th></tr></thead><tbody>
@@ -24,8 +24,14 @@ export default function CustomMakerGuidePage() {
       <tr><td>Amount/comparator</td><td>How much, or how fast?</td><td>1 item; at least 1</td></tr>
       <tr><td>Scope</td><td>One member, any member, exact party, or whole team?</td><td>Any team member</td></tr>
       <tr><td>Proof</td><td>Which sources may support the claim?</td><td>RuneLite plus organizer review</td></tr>
+      <tr><td>Artwork/details</td><td>What image, notes, exclusions, and source should players see?</td><td>Oathplate helm image; contract reward excluded</td></tr>
+      <tr><td>Planning</td><td>What is the individual drop rate and efficient attempts per hour?</td><td>1/600 at 10 Yama kills/hour</td></tr>
       <tr><td>Scoring</td><td>What is the completion worth and can it repeat?</td><td>150 points, once</td></tr>
     </tbody></table>
+
+    <h2>Plan the board against the event window.</h2>
+    <p>For a straightforward drop, Terry estimates an individual average as <strong>drop-rate denominator ÷ numerator ÷ efficient individual attempts per hour</strong>. A 1/600 drop at 10 kills per hour therefore contributes 60 expected player-hours. A five-player team pursuing it in parallel has an idealized 12-hour elapsed estimate. XP and quantity tasks use target amount ÷ efficient individual units per hour; execution tasks can use a fixed practice-and-attempt budget.</p>
+    <p>Add a start and end time to compare the sum of estimated player-hours with the team’s available capacity. Choose “no end date” for an open-ended event. These are planning averages, not promises: random drops have long tails, players are not active every hour, and several tasks may compete for the same specialist. Edit the starter assumptions to match your clan.</p>
 
     <h2>Five concrete preset patterns.</h2>
     <h3>Get an Oathplate helm</h3>

@@ -9,6 +9,7 @@ import type { BingoVerificationSignal } from '../lib/bingo-verification';
 import type { BingoMode } from '../lib/types';
 import { BingoBoard, BingoStandings } from './BingoBoard';
 import { BingoMaker } from './BingoMaker';
+import { BingoPlanningSummary } from './BingoPlanningSummary';
 import { BingoRuneliteOrganizerPanel } from './BingoRuneliteOrganizerPanel';
 import { BingoVerificationPanel } from './BingoVerificationPanel';
 import { BingoWiseOldManPanel } from './BingoWiseOldManPanel';
@@ -162,6 +163,8 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   const structuralLocked = ['live', 'complete', 'archived'].includes(data.event.status);
   const pendingClaims = data.claims.filter((claim) => claim.status === 'pending');
   const allLinks = issuedLinks.map((item) => `${item.teamName}: ${absoluteUrl(item.path)}`).join('\n');
+  const taskDefinitions = tasksToDefinitions(data.tasks);
+  const teamSize = Math.max(1, Math.min(...data.teams.map((team) => team.members.length)));
   return (
     <main className="realm-bg min-h-screen text-[#eadcb9]">
       <SiteHeader badge="Bingo organizer" />
@@ -188,6 +191,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
               <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b]"><input type="checkbox" checked={publicSpectator} onChange={(event) => setPublicSpectator(event.target.checked)} /> Public spectator board</label>
               <label className="flex items-center gap-2 text-sm font-bold text-[#4e402b] sm:col-span-2"><input type="checkbox" disabled={!publicSpectator} checked={publicSpectator && publicListed} onChange={(event) => setPublicListed(event.target.checked)} /> List this event in public discovery and clan history</label>
             </div>
+            <div className="mt-4"><BingoPlanningSummary tasks={taskDefinitions} teamSize={teamSize} startAt={startAt} endAt={endAt} /></div>
             <button className="gold-button mt-5 px-5 py-3 text-sm" disabled={working === 'settings'} onClick={() => void saveSettings()}>{working === 'settings' ? 'Saving…' : 'Save event settings'}</button>
           </section>
 
@@ -204,7 +208,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
             <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">No-code custom bingo maker</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Build the clan’s game, not just a spreadsheet.</h2><p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#6e5e43]">Choose a layout, arrange OSRS presets, define who contributes, set proof sources, and add unlock rules. Advanced boards still copy cleanly to and from spreadsheets.</p></div>
             <div className="grid min-w-72 gap-2 sm:min-w-[520px] sm:grid-cols-[minmax(0,1fr)_170px]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><select aria-label="Template category" className="realm-field h-11 w-full px-3 text-xs" value={templateCategory} onChange={(event) => setTemplateCategory(event.target.value)}>{['Mixed', 'Bossing', 'Raids', 'Skilling', 'Speed', 'Progression', 'Casual', 'Competitive'].map((item) => <option key={item}>{item}</option>)}</select><input aria-label="Template summary" className="realm-field h-11 w-full px-3 text-xs normal-case sm:col-span-2" maxLength={240} value={templateSummary} onChange={(event) => setTemplateSummary(event.target.value)} placeholder="What makes this board useful?" /><input aria-label="Template tags" className="realm-field h-11 w-full px-3 text-xs normal-case" value={templateTags} onChange={(event) => setTemplateTags(event.target.value)} placeholder="raids, weekend, mixed levels" /><label className="flex items-center gap-2 rounded border border-[#8b6a32]/30 bg-white/20 px-3 text-[10px] font-black uppercase text-[#5d4b30]"><input type="checkbox" checked={templatePublic} onChange={(event) => setTemplatePublic(event.target.checked)} /> Publish publicly</label><button className="iron-button px-4 py-2.5 text-xs sm:col-span-2" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : templatePublic ? 'Publish community template' : 'Save private template'}</button>{publishedTemplatePath ? <a className="text-center text-xs font-black text-[#315b39] underline sm:col-span-2" href={publishedTemplatePath} target="_blank" rel="noreferrer">Open published template ↗</a> : null}</div>
           </div>
-          <div className="mt-5"><BingoMaker initialTasks={tasksToDefinitions(data.tasks)} initialRules={data.event.rules} mode={data.event.mode} disabled={structuralLocked} saving={working === 'tasks'} onSave={saveBoard} /></div>
+          <div className="mt-5"><BingoMaker initialTasks={taskDefinitions} initialRules={data.event.rules} mode={data.event.mode} disabled={structuralLocked} saving={working === 'tasks'} teamSize={teamSize} startAt={startAt} endAt={endAt} onSave={saveBoard} /></div>
           <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>WOM baseline:</b> {data.wiseOldMan.baselineCoverage} players · <b>Last sync:</b> {data.wiseOldMan.lastSyncAt ? new Date(data.wiseOldMan.lastSyncAt).toLocaleString() : 'Not run'} · <b>Worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
         </section>
 

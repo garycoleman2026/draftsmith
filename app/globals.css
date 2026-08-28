@@ -3,6 +3,17 @@
 :root {
   --background: #15110c;
   --foreground: #eadcb9;
+  --parchment-surface: #dfc88f;
+  --parchment-text: #2d2316;
+  --parchment-muted: #58492f;
+  --wood-surface: #26351f;
+  --wood-text: #f1e1b6;
+  --wood-muted: #c8bb99;
+  --hidden-task-surface: #625746;
+  --hidden-task-text: #fff0c9;
+  --field-surface: #f7ebc6;
+  --field-text: #241b10;
+  --field-placeholder: #675837;
 }
 
 @theme inline {
@@ -85,13 +96,24 @@ body {
 }
 
 .realm-field {
-  color: #241b10;
+  color: var(--field-text);
   border: 1px solid #7e612d;
   border-radius: 4px;
-  background: #f7ebc6;
+  background: var(--field-surface);
+  color-scheme: light;
   box-shadow:
     inset 0 2px 7px rgba(78, 52, 20, 0.18),
     0 1px 0 rgba(255, 250, 222, 0.7);
+}
+
+.realm-field::placeholder {
+  color: var(--field-placeholder);
+  opacity: 1;
+}
+
+.realm-field option {
+  color: var(--field-text);
+  background: var(--field-surface);
 }
 
 .realm-field:focus {
@@ -106,7 +128,35 @@ body {
   border: 1px solid #947331;
   border-radius: 4px;
   background: rgba(8, 12, 7, 0.62);
+  color-scheme: dark;
   box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.dark-field::placeholder {
+  color: #c2b590;
+  opacity: 1;
+}
+
+.dark-field option {
+  color: #f2e3b9;
+  background: #182216;
+}
+
+.parchment-muted { color: var(--parchment-muted); }
+.wood-muted { color: var(--wood-muted); }
+.hidden-task { color: var(--hidden-task-text); background: var(--hidden-task-surface); }
+
+/* Legacy utility colours appeared on several surfaces before semantic tokens existed. */
+[class~="text-[#756748]"],
+[class~="text-[#6e5e43]"],
+[class~="text-[#6f5c3c]"],
+[class~="text-[#746244]"],
+[class~="text-[#6d6048]"] {
+  color: var(--parchment-muted) !important;
+}
+
+[class~="text-[#9f9272]"] {
+  color: var(--wood-muted) !important;
 }
 
 .gold-button,

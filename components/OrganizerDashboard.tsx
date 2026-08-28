@@ -235,10 +235,11 @@ export function OrganizerDashboard() {
             <h1 className="fantasy-title mt-3 text-4xl font-bold text-[#f5df9b] sm:text-6xl">
               {data.user.displayName || data.user.username}&apos;s event hall.
             </h1>
-            <p className="mt-3 max-w-2xl text-sm text-[#b5a888]">Create, reopen, archive, and duplicate every clan draft from one place.</p>
+            <p className="mt-3 max-w-2xl text-sm text-[#c8bb99]">Create and reopen clan drafts, custom bingo boards, reusable templates, and event history from one place.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className="gold-button px-5 py-3 text-sm" href="/">Create event</Link>
+            <Link className="gold-button px-5 py-3 text-sm" href="/bingo#create">Create bingo</Link>
+            <Link className="scroll-button px-5 py-3 text-sm" href="/">Create draft</Link>
             <button className="iron-button px-4 py-3 text-xs" type="button" onClick={() => void signOut()}>Sign out</button>
           </div>
         </div>

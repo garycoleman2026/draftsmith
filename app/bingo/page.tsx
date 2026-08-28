@@ -12,18 +12,18 @@ export const metadata: Metadata = {
 };
 
 const previewTiles = [
-  ['First blood', 25, 'verified'], ['Treasure trail', 40, 'open'], ['Boss unique', 80, 'pending'], ['Gain a level', 30, 'open'], ['Mystery task', 60, 'hidden'],
-  ['Team photo', 25, 'open'], ['Raid clear', 100, 'verified'], ['Collection slot', 75, 'locked'], ['Clue reward', 45, 'open'], ['Million XP', 90, 'open'],
-  ['Slayer drop', 55, 'open'], ['Perfect kill', 85, 'pending'], ['Terry\'s choice', 0, 'free'], ['Skill challenge', 50, 'open'], ['Rare catch', 65, 'verified'],
-  ['Speed task', 70, 'open'], ['Group boss', 110, 'open'], ['Gear upgrade', 60, 'locked'], ['Diary task', 35, 'open'], ['Pet chance', 125, 'open'],
-  ['Minigame win', 40, 'open'], ['Resource stack', 30, 'verified'], ['Combat feat', 95, 'open'], ['Fashion task', 20, 'open'], ['Final challenge', 150, 'hidden'],
+  ['Get an Oathplate helm', 180, 'verified'], ['Complete a master clue', 90, 'open'], ['Receive a Berserker ring', 80, 'pending'], ['Gain 1m Runecraft XP', 150, 'open'], ['Mystery finale', 600, 'hidden'],
+  ['Full-team GE photo', 40, 'open'], ['Complete one Chambers raid', 100, 'verified'], ['Receive a Twisted kit', 650, 'locked'], ['Receive 3rd age platebody', 700, 'open'], ['Gain 10m Agility XP', 500, 'open'],
+  ['Receive an abyssal whip', 65, 'open'], ['Perfect Vardorvis', 55, 'pending'], ['Terry\'s choice', 0, 'free'], ['100 Sepulchre laps', 180, 'open'], ['Receive a skeletal visage', 220, 'verified'],
+  ['Sub-17 solo Chambers', 140, 'open'], ['25 Nex kill count', 180, 'open'], ['Complete an Armadyl godsword', 220, 'locked'], ['Reach 99 Agility', 180, 'open'], ['Obtain the Baby mole pet', 900, 'open'],
+  ['Receive a Fish barrel', 75, 'open'], ['Gain 2m Mining XP', 180, 'verified'], ['Perfect Theatre', 250, 'open'], ['Receive an imp champion scroll', 240, 'open'], ['GM ToB trio time', 750, 'hidden'],
 ] as const;
 
 const stateClasses: Record<string, string> = {
   verified: 'border-[#4e7d52] bg-[#d6e1bd] shadow-[inset_0_0_0_2px_rgba(67,108,68,.18)]',
   pending: 'border-[#b27b2e] bg-[#f1d79a]',
   locked: 'border-[#756d61] bg-[#bdb3a0] opacity-80',
-  hidden: 'border-[#4f473d] bg-[#625746] text-[#f0dfb7]',
+  hidden: 'border-[#4f473d] bg-[#625746]',
   free: 'border-[#b08a30] bg-[#f6e6ac]',
   open: 'border-[#9c7933] bg-[#efe0b6]',
 };
@@ -41,6 +41,7 @@ export default async function BingoHallPage() {
       name: template.name,
       summary: template.summary,
       meta: `${template.gridSize}×${template.gridSize} · ${template.mode.replaceAll('_', ' ')}`,
+      configuration: template.configuration,
     }));
   return (
     <main className="realm-bg min-h-screen text-[#eadcb9]">
@@ -65,7 +66,7 @@ export default async function BingoHallPage() {
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
               {previewTiles.map(([name, points, state], index) => (
-                <article className={`relative min-h-28 rounded border p-3 text-[#392d1b] ${stateClasses[state]}`} key={`${name}-${index}`}>
+                <article className={`relative min-h-28 rounded border p-3 ${state === 'hidden' ? 'text-[#fff0c9]' : 'text-[#392d1b]'} ${stateClasses[state]}`} key={`${name}-${index}`}>
                   <span className="text-[10px] font-black uppercase tracking-[0.08em] opacity-70">{state === 'verified' ? '✓ Claimed' : state === 'pending' ? '⏳ Review' : state === 'hidden' ? '???' : state}</span>
                   <p className="mt-2 text-sm font-black leading-tight">{state === 'hidden' ? 'Unrevealed task' : name}</p>
                   <p className="absolute bottom-2 right-3 text-xs font-black">{points ? `${points} pts` : 'FREE'}</p>

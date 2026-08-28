@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { calculateBingoStandings, claimAvailability, countCompletedLines } from '../lib/bingo-scoring';
-import { OSRS_BINGO_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, serializeBingoTaskImport } from '../lib/bingo-types';
-import { defaultBingoEventRules, validateBingoBoard } from '../lib/bingo-rules';
+import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, serializeBingoTaskImport } from '../lib/bingo-types';
+import {
+  defaultBingoEventRules,
+  expectedIndividualHours,
+  expectedTeamHours,
+  sanitizeBingoTaskRule,
+  validateBingoBoard,
+} from '../lib/bingo-rules';
 
 const tasks = Array.from({ length: 25 }, (_, index) => ({
   id: `task-${index}`, sortOrder: index, points: index === 12 ? 0 : 10, freeSpace: index === 12,
@@ -89,16 +95,49 @@ describe('bingo task imports', () => {
     ]);
   });
 
-  it('round-trips advanced verifier, scope, proof, and prerequisite rules', () => {
+  it('round-trips verifier, scope, proof, presentation, planning, details, and prerequisites', () => {
     const source = structuredClone(OSRS_BINGO_PRESETS.find((task) => task.title.includes('Agility XP'))!);
     source.rule.prerequisitePositions = [0, 4];
+    source.rule.details.notes = 'Use the event baseline.';
+    source.rule.details.exclusions = 'No XP before the start time.';
+    source.rule.details.sourceUrl = 'https://oldschool.runescape.wiki/w/Agility';
     const [parsed] = parseBingoTaskImport(serializeBingoTaskImport([source]));
     expect(parsed.rule).toMatchObject({
       verifier: { type: 'xp_gain', metric: 'agility', amount: 10_000_000, unit: 'XP' },
       scope: { type: 'team_total' },
+      presentation: { imageKind: 'item', imageKey: 'Agility cape' },
+      planning: { efficientUnitsPerHour: 100_000, quantity: 1 },
+      details: {
+        notes: 'Use the event baseline.',
+        exclusions: 'No XP before the start time.',
+        sourceUrl: 'https://oldschool.runescape.wiki/w/Agility',
+      },
       prerequisitePositions: [0, 4],
     });
     expect(parsed.rule.proof.sources).toEqual(['wise_old_man', 'runelite', 'screenshot']);
+  });
+
+  it('calculates expected solo and parallel team hours from editable task assumptions', () => {
+    const oathplate = OSRS_BINGO_PRESETS.find((task) => task.title === 'Get an Oathplate helm')!;
+    const agility = OSRS_BINGO_PRESETS.find((task) => task.title.includes('Agility XP'))!;
+    expect(expectedIndividualHours(oathplate.rule)).toBe(60);
+    expect(expectedTeamHours(oathplate.rule, 10)).toBe(6);
+    expect(expectedIndividualHours(agility.rule)).toBe(100);
+    expect(expectedTeamHours(agility.rule, 10)).toBe(10);
+  });
+
+  it('sanitizes unsafe source links and impossible planning values', () => {
+    const rule = sanitizeBingoTaskRule({
+      details: { sourceUrl: 'javascript:alert(1)' },
+      planning: { dropRateNumerator: -1, dropRateDenominator: 'nope', efficientKillsPerHour: 0, quantity: 900 },
+    });
+    expect(rule.details.sourceUrl).toBe('');
+    expect(rule.planning).toMatchObject({
+      dropRateNumerator: null,
+      dropRateDenominator: null,
+      efficientKillsPerHour: null,
+      quantity: 100,
+    });
   });
 
   it('ships a broad OSRS library with the requested headline presets', () => {
@@ -108,6 +147,13 @@ describe('bingo task imports', () => {
       'Beat the GM Theatre of Blood trio time', 'Beat the Chambers CM five-player time',
       'Gain 10,000,000 team Agility XP',
     ]));
+  });
+
+  it('gives every non-free official starter tile an editable time estimate', () => {
+    for (const template of BUILTIN_BINGO_TEMPLATES) {
+      expect(template.tasks.filter((task) => !task.freeSpace && expectedIndividualHours(task.rule) === null))
+        .toEqual([]);
+    }
   });
 
   it('validates variable grid boards and structured task requirements', () => {
