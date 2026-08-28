@@ -8,7 +8,7 @@ import {
   type BingoEventRules, type BingoProofSource, type BingoTaskRule,
 } from '../lib/bingo-rules';
 import {
-  OSRS_BINGO_PRESETS, parseBingoTaskImport, serializeBingoTaskImport, type BingoTaskDefinition,
+  OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, serializeBingoTaskImport, type BingoTaskDefinition,
 } from '../lib/bingo-types';
 import { copyText } from '../lib/client';
 import type { BingoBoardScope, BingoMode } from '../lib/types';
@@ -93,7 +93,7 @@ export function BingoMaker({
       },
     }, size, current.scoring.winCondition));
     setTasks((current) => Array.from({ length: count }, (_, index) =>
-      current[index] ? structuredClone(current[index]) : structuredClone(OSRS_BINGO_PRESETS[index % OSRS_BINGO_PRESETS.length])));
+      current[index] ? structuredClone(current[index]) : structuredClone(OSRS_DEFAULT_BOARD_PRESETS[index % OSRS_DEFAULT_BOARD_PRESETS.length])));
     setSelectedIndex((current) => Math.min(current, count - 1));
     setMessage('Board resized to ' + size + ' × ' + size + '. Review new or removed tiles before saving.');
   }
@@ -138,9 +138,9 @@ export function BingoMaker({
   }
 
   function fillWithPresets() {
-    setTasks(Array.from({ length: expected }, (_, index) => structuredClone(OSRS_BINGO_PRESETS[index % OSRS_BINGO_PRESETS.length])));
+    setTasks(Array.from({ length: expected }, (_, index) => structuredClone(OSRS_DEFAULT_BOARD_PRESETS[index % OSRS_DEFAULT_BOARD_PRESETS.length])));
     setSelectedIndex(0);
-    setMessage('Filled all ' + expected + ' tiles from the OSRS preset library.');
+    setMessage('Filled all ' + expected + ' tiles from the curated OSRS starter pool.');
   }
 
   function applyImport() {
@@ -264,6 +264,7 @@ export function BingoMaker({
         <TaskEditor disabled={disabled} expected={expected} selected={selected} selectedIndex={selectedIndex} teamSize={teamSize} updateRule={updateRule} updateSelected={updateSelected} />
         <aside className="rounded border border-[#8b6a32]/35 bg-[#f5e5b8]/55 p-4 sm:p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#80642b]">OSRS task library · {OSRS_BINGO_PRESETS.length} presets</p>
+          <p className="mt-1 text-[9px] leading-relaxed text-[#655339]">Collection-log milestones remain selectable here, but starter boards and autofill skip them because account baselines vary.</p>
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_145px] gap-2">
             <input className="realm-field h-10 w-full px-3 text-xs normal-case" placeholder="Search tasks…" value={search} onChange={(event) => setSearch(event.target.value)} />
             <select className="realm-field h-10 w-full px-2 text-xs" value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
@@ -280,7 +281,7 @@ export function BingoMaker({
                 onDragStart={(event) => event.dataTransfer.setData('terry/preset', String(presetIndex))}
                 type="button"
               >
-                <div className="flex gap-3"><BingoTaskArtwork alt="" className="h-12 w-12 shrink-0" rule={preset.rule} /><div className="min-w-0 flex-1"><span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.points} pts</span>
+                <div className="flex gap-3"><BingoTaskArtwork alt="" className="h-12 w-12 shrink-0" rule={preset.rule} /><div className="min-w-0 flex-1"><span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.points} pts{preset.rule.verifier.type === 'collection_log' ? ' · optional only' : ''}</span>
                   <p className="mt-1 text-xs font-black text-[#392b18]">{preset.title}</p>
                   <p className="mt-1 text-[9px] leading-relaxed text-[#59472f]">{bingoRuleSummary(preset.rule)}</p>
                   {expectedIndividualHours(preset.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">{taskTimeCaption(preset.rule)}</p> : null}</div></div>

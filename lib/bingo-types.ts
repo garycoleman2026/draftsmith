@@ -124,9 +124,7 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   preset('Receive a scythe of Vitur', 1_000, 'Raids', 'item_acquired', { target: 'Scythe of Vitur', difficulty: 'legendary', imageKind: 'item', imageKey: 'Scythe of Vitur (uncharged)' }),
   preset('Receive an enhanced crystal weapon seed', 300, 'Gear', 'item_acquired', { target: 'Enhanced crystal weapon seed', difficulty: 'hard', imageKind: 'item', imageKey: 'Enhanced crystal weapon seed', dropRateNumerator: 1, dropRateDenominator: 400, efficientKillsPerHour: 6 }),
   preset('Obtain the Vorki pet from Vorkath', 800, 'Pets', 'pet_obtained', { target: 'Vorki', difficulty: 'legendary', imageKind: 'item', imageKey: 'Vorki', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 30 }),
-  preset('Add three collection-log slots', 120, 'Collection', 'collection_log', { amount: 3, unit: 'slots', difficulty: 'medium', fixedHours: 4, imageKind: 'item', imageKey: 'Collection log', notes: 'Four hours is a broad starter assumption. Adjust it after choosing which missing slots your roster will pursue.' }),
-  preset('Complete the Perfect Vardorvis achievement', 55, 'Combat', 'combat_achievement', { target: 'Perfect Vardorvis', difficulty: 'easy', imageKind: 'boss', imageKey: 'Vardorvis', fixedHours: 2, notes: 'Editable practice-and-attempt budget for one prepared player.' }),
-  preset('Complete the Perfect Theatre achievement', 250, 'Combat', 'combat_achievement', { target: 'Perfect Theatre', difficulty: 'hard', imageKind: 'boss', imageKey: 'Verzik Vitur', fixedHours: 4, notes: 'Editable practice-and-attempt budget for the required team.' }),
+  preset('Add three collection-log slots', 120, 'Collection', 'collection_log', { amount: 3, unit: 'slots', difficulty: 'medium', fixedHours: 4, imageKind: 'item', imageKey: 'Collection log', description: 'Optionally track three new collection-log slots for a player or team with a fair event baseline.', notes: 'Optional library task only: this is excluded from every starter board because players with fuller collection logs have fewer easy unlocks. Use it only when teams have comparable baselines or after assigning account-specific targets.' }),
   preset('Complete a master clue', 90, 'Clues', 'clue_complete', { target: 'Master clue', amount: 1, unit: 'clue', difficulty: 'medium', efficientKillsPerHour: 0.5, imageKind: 'item', imageKey: 'Clue scroll (master)', notes: 'Starter rate assumes one master clue completion every two hours for an individual who already has the clue.' }),
   preset('Complete an elite clue', 65, 'Clues', 'clue_complete', { target: 'Elite clue', amount: 1, unit: 'clue', difficulty: 'medium', efficientKillsPerHour: 1, imageKind: 'item', imageKey: 'Clue scroll (elite)' }),
   preset('Gain 1,000,000 Runecraft XP', 150, 'Skilling', 'xp_gain', { metric: 'runecraft', amount: 1_000_000, unit: 'XP', difficulty: 'hard', efficientUnitsPerHour: 100_000, imageKind: 'item', imageKey: 'Runecraft cape', sources: ['wise_old_man', 'runelite'] }),
@@ -154,20 +152,16 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   preset('Receive a skeletal visage from Vorkath', 220, 'Gear', 'item_acquired', { target: 'Skeletal visage', difficulty: 'hard', imageKind: 'item', imageKey: 'Skeletal visage', dropRateNumerator: 1, dropRateDenominator: 5_000, efficientKillsPerHour: 30 }),
   preset('Receive a 3rd age platebody from a clue', 700, 'Clues', 'item_acquired', { target: '3rd age platebody', difficulty: 'legendary', imageKind: 'item', imageKey: '3rd Age platebody' }),
   preset('Complete Chambers with exactly four teammates', 120, 'Teamwork', 'raid_complete', { target: 'Chambers of Xeric', amount: 1, unit: 'completion', scope: 'exact_party', participantCount: 5, difficulty: 'medium', imageKind: 'boss', imageKey: 'Great Olm' }),
-  preset('Take a full-team victory photo', 40, 'Teamwork', 'team_challenge', { target: 'Full-team photo', scope: 'all_members', difficulty: 'easy', fixedHours: 0.25, imageKind: 'item', imageKey: 'Oculus orb', sources: ['screenshot'] }),
   preset('Receive a Tome of water from Tempoross', 90, 'Skilling', 'item_acquired', { target: 'Tome of water', difficulty: 'medium', imageKind: 'item', imageKey: 'Tome of Water (empty)', dropRateNumerator: 1, dropRateDenominator: 1_600, efficientKillsPerHour: 60, notes: 'The attempt rate is reward permits opened per individual hour, not Tempoross kills.', sourceUrl: 'https://oldschool.runescape.wiki/w/Tempoross#Rewards' }),
   preset('Receive a Fish barrel from Tempoross', 75, 'Skilling', 'item_acquired', { target: 'Fish barrel', difficulty: 'medium', imageKind: 'item', imageKey: 'Fish barrel', dropRateNumerator: 1, dropRateDenominator: 400, efficientKillsPerHour: 60, notes: 'The attempt rate is reward permits opened per individual hour, not Tempoross kills.', sourceUrl: 'https://oldschool.runescape.wiki/w/Tempoross#Rewards' }),
   preset('Receive a tome of fire from Wintertodt', 100, 'Skilling', 'item_acquired', { target: 'Tome of fire', difficulty: 'medium', imageKind: 'item', imageKey: 'Tome of Fire (empty)', dropRateNumerator: 1, dropRateDenominator: 1_000, efficientKillsPerHour: 25, notes: 'The attempt rate is reward-cart rolls per individual hour. Edit it for your points and mass/solo method.', sourceUrl: 'https://oldschool.runescape.wiki/w/Wintertodt_drop_rates' }),
   preset('Complete 100 Hallowed Sepulchre laps', 180, 'Skilling', 'team_challenge', { target: 'Hallowed Sepulchre', amount: 100, unit: 'laps', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 8, imageKind: 'item', imageKey: 'Hallowed ring' }),
   preset('Receive an Ultor vestige from Vardorvis', 160, 'Fortune', 'item_acquired', { target: 'Ultor vestige', difficulty: 'hard', imageKind: 'item', imageKey: 'Ultor vestige' }),
-  preset('Complete the Perfect Zulrah achievement', 150, 'Combat', 'combat_achievement', { target: 'Perfect Zulrah', difficulty: 'hard', imageKind: 'boss', imageKey: 'Zulrah (serpentine)', fixedHours: 2, notes: 'Editable practice-and-attempt budget for one prepared player.' }),
-  preset('Complete the Vorkath Speed-Runner achievement', 150, 'Speed', 'combat_achievement', { target: 'Vorkath Speed-Runner', difficulty: 'hard', imageKind: 'boss', imageKey: 'Vorkath', fixedHours: 2, notes: 'Editable practice-and-attempt budget for one prepared player.' }),
   preset('Defeat Giant Mole, Vorkath, and Zulrah in one hour', 100, 'Bossing', 'team_challenge', { target: 'Giant Mole, Vorkath, and Zulrah', amount: 60, unit: 'minutes', difficulty: 'medium', fixedHours: 1, imageKind: 'boss', imageKey: 'Vorkath' }),
   preset('Gain 10,000,000 team Hunter XP', 450, 'Skilling', 'xp_gain', { metric: 'hunter', amount: 10_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 200_000, imageKind: 'item', imageKey: 'Hunter cape', sources: ['wise_old_man', 'runelite'] }),
   preset('Gain 2,000,000 team Mining XP', 180, 'Skilling', 'xp_gain', { metric: 'mining', amount: 2_000_000, unit: 'XP', scope: 'team_total', difficulty: 'medium', efficientUnitsPerHour: 120_000, imageKind: 'item', imageKey: 'Mining cape', sources: ['wise_old_man', 'runelite'] }),
   preset('Receive an imp champion scroll', 240, 'Collection', 'item_acquired', { target: 'Imp champion scroll', difficulty: 'hard', imageKind: 'item', imageKey: 'Imp champion scroll', dropRateNumerator: 1, dropRateDenominator: 5_000, efficientKillsPerHour: 650 }),
   preset('Receive the jar of dirt from Kraken', 300, 'Collection', 'item_acquired', { target: 'Jar of dirt', difficulty: 'hard', imageKind: 'item', imageKey: 'Jar of Dirt', dropRateNumerator: 1, dropRateDenominator: 1_000, efficientKillsPerHour: 80 }),
-  preset('Take a full-team victory photo at the Grand Exchange fountain', 500, 'Finale', 'manual', { target: 'Grand Exchange fountain team photo', scope: 'all_members', difficulty: 'legendary', fixedHours: 0.25, imageKind: 'item', imageKey: 'Oculus orb', exclusions: 'Every rostered member must be visible and the screenshot must be taken during the event.', sources: ['screenshot', 'organizer'] }),
   preset('Receive an elite clue from any Dagannoth King', 95, 'Clues', 'item_acquired', { target: 'Clue scroll (elite)', difficulty: 'medium', imageKind: 'item', imageKey: 'Clue scroll (elite)', dropRateNumerator: 1, dropRateDenominator: 750, efficientKillsPerHour: 100, notes: 'Any elite clue dropped by Dagannoth Rex, Prime, or Supreme counts. The planning rate combines efficient tribrid kills across all three kings.', exclusions: 'Elite clues from other sources and clues owned before the event do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Dagannoth_Kings' }),
   ...OSRS_BOSS_UNIQUE_DROPS.map(({ boss, item, sourceUrl }) => preset(
     `Receive ${item} from ${boss}`,
@@ -185,10 +179,49 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   )),
 ];
 
+/**
+ * Presets that may be placed automatically on a new board. Collection-log
+ * milestones stay in the full library for deliberate use, but account progress
+ * makes them too uneven for starter boards and one-click autofill.
+ */
+export const OSRS_DEFAULT_BOARD_PRESETS = OSRS_BINGO_PRESETS.filter(
+  (task) => task.rule.verifier.type !== 'collection_log',
+);
+
+const STARTER_TASK_TITLES = [
+  'Receive a Berserker ring from Dagannoth Rex',
+  'Complete a master clue',
+  'Receive a dexterous prayer scroll',
+  'Gain 1,000,000 Runecraft XP',
+  'Gain 25 Giant Mole kill count',
+  'Receive an avernic defender hilt',
+  'Receive a zenyte shard',
+  'Gain 50 Zulrah kill count',
+  'Receive an abyssal whip',
+  'Receive a Tome of water from Tempoross',
+  'Receive a dragon warhammer',
+  'Set a sub-17:00 solo Chambers personal best',
+  'Gain 25 Nex kill count',
+  'Complete one Barrows armour set',
+  'Receive a Fish barrel from Tempoross',
+  'Receive a tome of fire from Wintertodt',
+  'Gain 5,000,000 team Slayer XP',
+  'Defeat Giant Mole, Vorkath, and Zulrah in one hour',
+  'Gain 10,000,000 team Hunter XP',
+  'Gain 2,000,000 team Mining XP',
+  'Receive an elite clue from any Dagannoth King',
+  'Receive a primordial crystal',
+  'Receive a skeletal visage from Vorkath',
+  'Complete ten Theatre of Blood raids',
+  'Complete ten Chambers challenge modes',
+] as const;
+
 function tasksFor(mode: BingoMode): BingoTaskDefinition[] {
-  const selected = [
-    6, 19, 8, 21, 25, 46, 9, 16, 41, 26, 39, 52, 17, 47, 42, 32, 28, 36, 18, 48, 49, 22, 53, 54, 59,
-  ].map((index) => structuredClone(OSRS_BINGO_PRESETS[index]));
+  const selected = STARTER_TASK_TITLES.map((title) => {
+    const task = OSRS_DEFAULT_BOARD_PRESETS.find((presetTask) => presetTask.title === title);
+    if (!task) throw new Error(`Missing starter bingo preset: ${title}`);
+    return structuredClone(task);
+  });
   if (mode === 'classic') {
     selected.forEach((task) => { task.points = 1; });
     selected[12] = freeSpace();
@@ -218,7 +251,7 @@ function centerOutTemplate(): BingoTemplateDefinition {
   const rules = defaultBingoEventRules(7, 'points');
   rules.visibility.hideLockedTasks = true;
   rules.progression = { unlockPattern: 'orthogonal', startPosition: 24, tileOwnership: 'each_team' };
-  const estimated = OSRS_BINGO_PRESETS.filter((task) => expectedIndividualHours(task.rule) !== null);
+  const estimated = OSRS_DEFAULT_BOARD_PRESETS.filter((task) => expectedIndividualHours(task.rule) !== null);
   const tasks = Array.from({ length: 49 }, (_, index) => {
     const task = structuredClone(estimated[index % estimated.length]);
     task.points = 1;
