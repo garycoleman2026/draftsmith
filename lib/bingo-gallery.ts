@@ -1,7 +1,7 @@
 import { getDatabase } from './db';
 import { sanitizeBingoTemplate } from './bingo-types';
 import {
-  builtinGalleryTemplates, sanitizeGallerySort, sanitizeTemplateCategory, sanitizeTemplateSummary,
+  builtinGalleryTemplates, overallBoardDifficulty, sanitizeGalleryDifficulty, sanitizeGallerySort, sanitizeTemplateCategory, sanitizeTemplateSummary,
   sanitizeTemplateTags, type GalleryTemplate, type TemplateGallerySort,
 } from './bingo-gallery-core';
 
@@ -18,8 +18,8 @@ type GalleryRow = {
   board_scope: string;
   configuration_json: string;
   clone_count: number;
-  rating_count: number;
-  rating_total: number;
+  upvote_count: number;
+  downvote_count: number;
   published_at: string | null;
   updated_at: string;
   clan_name: string | null;
@@ -32,6 +32,7 @@ export async function listGalleryTemplates(input: {
   query?: string;
   category?: string;
   mode?: string;
+  difficulty?: string;
   sort?: string;
 } = {}) {
   const rows = await loadCommunityRows();
@@ -42,10 +43,12 @@ export async function listGalleryTemplates(input: {
   const query = (input.query ?? '').trim().toLocaleLowerCase('en-US').slice(0, 80);
   const category = (input.category ?? '').trim();
   const mode = (input.mode ?? '').trim();
+  const difficulty = sanitizeGalleryDifficulty(input.difficulty);
   const sort = sanitizeGallerySort(input.sort);
   const filtered = [...builtinGalleryTemplates(), ...community].filter((template) => {
     if (category && category !== 'All' && template.category !== category) return false;
     if (mode && mode !== 'all' && template.mode !== mode) return false;
+    if (difficulty !== 'all' && template.difficulty !== difficulty) return false;
     if (!query) return true;
     const haystack = [template.name, template.summary, template.category, ...template.tags]
       .join(' ').toLocaleLowerCase('en-US');
@@ -58,12 +61,19 @@ async function loadCommunityRows() {
   try {
     const result = await getDatabase().prepare(
       `SELECT bt.id, bt.public_slug, bt.name, bt.summary, bt.category, bt.tags_json, bt.mode,
-              bt.board_scope, bt.configuration_json, bt.clone_count, bt.rating_count, bt.rating_total,
+              bt.board_scope, bt.configuration_json, bt.clone_count,
+              COALESCE(tv.upvote_count, 0) AS upvote_count, COALESCE(tv.downvote_count, 0) AS downvote_count,
               bt.published_at, bt.updated_at, c.name AS clan_name, c.slug AS clan_slug,
               COALESCE(u.display_name, u.username) AS author_name
        FROM bingo_templates bt
        LEFT JOIN clans c ON c.id = bt.clan_id
        LEFT JOIN users u ON u.id = bt.owner_user_id
+       LEFT JOIN (
+         SELECT template_id,
+                SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS upvote_count,
+                SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS downvote_count
+         FROM bingo_template_votes GROUP BY template_id
+       ) tv ON tv.template_id = bt.id
        WHERE bt.visibility = 'public' AND bt.public_slug IS NOT NULL
        ORDER BY bt.updated_at DESC LIMIT 200`,
     ).all<GalleryRow>();
@@ -78,12 +88,19 @@ export async function loadGalleryTemplate(slug: string) {
   if (builtin) return builtin;
   const row = await getDatabase().prepare(
     `SELECT bt.id, bt.public_slug, bt.name, bt.summary, bt.category, bt.tags_json, bt.mode,
-            bt.board_scope, bt.configuration_json, bt.clone_count, bt.rating_count, bt.rating_total,
+            bt.board_scope, bt.configuration_json, bt.clone_count,
+            COALESCE(tv.upvote_count, 0) AS upvote_count, COALESCE(tv.downvote_count, 0) AS downvote_count,
             bt.published_at, bt.updated_at, c.name AS clan_name, c.slug AS clan_slug,
             COALESCE(u.display_name, u.username) AS author_name
      FROM bingo_templates bt
      LEFT JOIN clans c ON c.id = bt.clan_id
      LEFT JOIN users u ON u.id = bt.owner_user_id
+     LEFT JOIN (
+       SELECT template_id,
+              SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS upvote_count,
+              SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS downvote_count
+       FROM bingo_template_votes GROUP BY template_id
+     ) tv ON tv.template_id = bt.id
      WHERE bt.public_slug = ? AND bt.visibility = 'public'`,
   ).bind(slug).first<GalleryRow>();
   return row ? rowToGalleryTemplate(row) : null;
@@ -116,9 +133,11 @@ function rowToGalleryTemplate(row: GalleryRow): GalleryTemplate | null {
       boardScope: configuration.boardScope,
       gridSize: configuration.gridSize,
       taskCount: configuration.tasks.length,
+      difficulty: overallBoardDifficulty(configuration.tasks),
       cloneCount: Math.max(0, Number(row.clone_count) || 0),
-      ratingCount: Math.max(0, Number(row.rating_count) || 0),
-      ratingAverage: row.rating_count > 0 ? row.rating_total / row.rating_count : null,
+      upvoteCount: Math.max(0, Number(row.upvote_count) || 0),
+      downvoteCount: Math.max(0, Number(row.downvote_count) || 0),
+      voteScore: (Number(row.upvote_count) || 0) - (Number(row.downvote_count) || 0),
       creatorName: row.clan_name || row.author_name || 'Community organizer',
       creatorClanSlug: row.clan_slug,
       publishedAt: row.published_at ?? row.updated_at,
@@ -131,17 +150,23 @@ function rowToGalleryTemplate(row: GalleryRow): GalleryTemplate | null {
 }
 
 function compareTemplates(left: GalleryTemplate, right: GalleryTemplate, sort: TemplateGallerySort) {
-  if (left.official !== right.official) return left.official ? -1 : 1;
   if (sort === 'name') return left.name.localeCompare(right.name);
   if (sort === 'newest') return Date.parse(right.publishedAt ?? '1970-01-01') - Date.parse(left.publishedAt ?? '1970-01-01');
-  if (sort === 'rating') {
-    const ratingDelta = (right.ratingAverage ?? 0) - (left.ratingAverage ?? 0);
-    return ratingDelta || right.ratingCount - left.ratingCount || right.cloneCount - left.cloneCount;
-  }
+  if (sort === 'votes') return right.voteScore - left.voteScore || right.upvoteCount - left.upvoteCount || right.cloneCount - left.cloneCount || left.name.localeCompare(right.name);
+  if (sort === 'difficulty') return difficultyRank(left.difficulty) - difficultyRank(right.difficulty) || left.name.localeCompare(right.name);
+  if (sort === 'type') return modeLabel(left.mode).localeCompare(modeLabel(right.mode)) || left.name.localeCompare(right.name);
   return right.cloneCount - left.cloneCount
-    || right.ratingCount - left.ratingCount
-    || (right.ratingAverage ?? 0) - (left.ratingAverage ?? 0)
+    || right.voteScore - left.voteScore
+    || right.upvoteCount - left.upvoteCount
     || left.name.localeCompare(right.name);
+}
+
+function difficultyRank(value: GalleryTemplate['difficulty']) {
+  return ({ easy: 1, medium: 2, hard: 3, expert: 4, experimental: 5 })[value];
+}
+
+function modeLabel(value: GalleryTemplate['mode']) {
+  return ({ classic: 'Classic lines', points: 'Points', lockout: 'Lockout', blackout: 'Blackout', progression: 'Progression', categories: 'Categories' })[value];
 }
 
 function parseJson(value: string, fallback: unknown) {

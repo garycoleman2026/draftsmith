@@ -8,17 +8,17 @@
 - [x] Public community boards are available directly inside organizer rooms and clone into immutable event tasks and rules.
 - [x] Organizers can save private templates by default, explicitly publish a community template, and remove templates they manage.
 - [x] Public publishing is bounded and rate limited; titles, summaries, categories, and tags are sanitized.
-- [x] Community templates accept one updatable one-to-five rating per browser token without exposing a public identity.
+- [x] Community boards accept one changeable upvote or downvote per browser token without exposing a public identity.
 - [x] Clan owners/admins can opt a clan profile into the public directory and describe it without publishing member names.
 - [x] Each bingo event separately defaults to unlisted and can be opted into discovery only while public spectating remains enabled.
 - [x] Public clan history includes only explicitly listed spectator events and publicly published templates.
 - [x] Listed events receive indexable, event-specific metadata; unlisted public-link events remain `noindex`.
 - [x] The sitemap includes static pages, official/community templates, opt-in clans, and explicitly listed events.
-- [x] Privacy and terms pages disclose public listings, community content, ratings, and the browser-scoped rating token.
+- [x] Privacy and terms pages disclose public listings, community content, votes, and the browser-scoped voting token.
 
 ## Verification gate
 
-- [x] Versioned migration 0009 adds listing, gallery, aggregate rating, and public-profile state with private defaults.
+- [x] Versioned migrations add listing, gallery, browser-scoped voting, and public-profile state with private defaults.
 - [x] Migration validation passes against fresh and legacy databases.
 - [x] Pure metadata, official-template completeness, category, tag, visibility, and sort tests pass.
 - [x] TypeScript, ESLint, the full unit suite, and the production build pass.

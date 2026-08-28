@@ -1,4 +1,7 @@
-import { BUILTIN_BINGO_TEMPLATES, type BingoTemplateDefinition } from './bingo-types';
+import {
+  BINGO_TASK_DIFFICULTIES, BUILTIN_BINGO_TEMPLATES, type BingoTaskDefinition,
+  type BingoTaskDifficulty, type BingoTemplateDefinition,
+} from './bingo-types';
 import type { BingoMode } from './types';
 
 export const TEMPLATE_CATEGORIES = [
@@ -7,7 +10,7 @@ export const TEMPLATE_CATEGORIES = [
 
 export type TemplateCategory = typeof TEMPLATE_CATEGORIES[number];
 export type TemplateVisibility = 'private' | 'public';
-export type TemplateGallerySort = 'popular' | 'rating' | 'newest' | 'name';
+export type TemplateGallerySort = 'popular' | 'votes' | 'newest' | 'name' | 'difficulty' | 'type';
 
 export type GalleryTemplate = {
   id: string | null;
@@ -20,9 +23,11 @@ export type GalleryTemplate = {
   boardScope: string;
   gridSize: number;
   taskCount: number;
+  difficulty: BingoTaskDifficulty;
   cloneCount: number;
-  ratingCount: number;
-  ratingAverage: number | null;
+  upvoteCount: number;
+  downvoteCount: number;
+  voteScore: number;
   creatorName: string;
   creatorClanSlug: string | null;
   publishedAt: string | null;
@@ -61,9 +66,27 @@ export function sanitizeTemplateVisibility(value: unknown): TemplateVisibility {
 }
 
 export function sanitizeGallerySort(value: unknown): TemplateGallerySort {
-  return ['popular', 'rating', 'newest', 'name'].includes(String(value))
+  return ['popular', 'votes', 'newest', 'name', 'difficulty', 'type'].includes(String(value))
     ? String(value) as TemplateGallerySort
     : 'popular';
+}
+
+export function sanitizeGalleryDifficulty(value: unknown): 'all' | BingoTaskDifficulty {
+  return BINGO_TASK_DIFFICULTIES.includes(String(value) as BingoTaskDifficulty)
+    ? String(value) as BingoTaskDifficulty
+    : 'all';
+}
+
+export function overallBoardDifficulty(tasks: BingoTaskDefinition[]): BingoTaskDifficulty {
+  const scored = tasks.filter((task) => !task.freeSpace);
+  if (!scored.length) return 'easy';
+  if (scored.some((task) => task.difficulty === 'experimental')) return 'experimental';
+  const values: Record<BingoTaskDifficulty, number> = { easy: 1, medium: 2, hard: 3, expert: 4, experimental: 0 };
+  const average = scored.reduce((total, task) => total + values[task.difficulty], 0) / scored.length;
+  if (average < 1.5) return 'easy';
+  if (average < 2.5) return 'medium';
+  if (average < 3.5) return 'hard';
+  return 'expert';
 }
 
 export function builtinGalleryTemplates(): GalleryTemplate[] {
@@ -78,9 +101,11 @@ export function builtinGalleryTemplates(): GalleryTemplate[] {
     boardScope: configuration.boardScope,
     gridSize: configuration.gridSize,
     taskCount: configuration.tasks.length,
+    difficulty: overallBoardDifficulty(configuration.tasks),
     cloneCount: 0,
-    ratingCount: 0,
-    ratingAverage: null,
+    upvoteCount: 0,
+    downvoteCount: 0,
+    voteScore: 0,
     creatorName: "Terry's Drafting",
     creatorClanSlug: null,
     publishedAt: null,

@@ -7,7 +7,7 @@ type BingoEventSummary = {
   id: string; title: string; mode: string; status: string; task_count: number; pending_count: number;
   created_at: string; managePath: string; publicPath: string;
 };
-type TemplateChoice = { key?: string; id?: string; name: string; description: string; mode: string; boardScope: string; gridSize?: number; source?: string; category?: string; visibility?: string; publicPath?: string | null; ratingAverage?: number | null };
+type TemplateChoice = { key?: string; id?: string; name: string; description: string; mode: string; boardScope: string; gridSize?: number; source?: string; category?: string; visibility?: string; publicPath?: string | null };
 type IssuedLink = { teamId: string; teamName: string; path: string };
 
 export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string; hasResult: boolean; draftTitle: string }) {
@@ -94,7 +94,7 @@ export function BingoLaunchpad({ token, hasResult, draftTitle }: { token: string
           <h3 className="font-black text-[#f2d98f]">Open a new bingo event</h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_260px]">
             <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Event title<input className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-            <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Starting board<select className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={templateChoice} onChange={(event) => setTemplateChoice(event.target.value)}>{templates.filter((item) => item.key).map((item) => <option value={`builtin:${item.key}`} key={item.key}>{item.name}</option>)}{templates.filter((item) => item.id).map((item) => <option value={`custom:${item.id}`} key={item.id}>{item.source === 'community' ? 'Community' : item.source === 'clan' ? 'Clan' : 'Saved'} · {item.name}{item.ratingAverage ? ` · ${item.ratingAverage.toFixed(1)}★` : ''}</option>)}</select></label>
+            <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#c4b48c]">Starting board<select className="dark-field mt-1 h-11 w-full px-3 text-sm normal-case" value={templateChoice} onChange={(event) => setTemplateChoice(event.target.value)}>{templates.filter((item) => item.key).map((item) => <option value={`builtin:${item.key}`} key={item.key}>{item.name}</option>)}{templates.filter((item) => item.id).map((item) => <option value={`custom:${item.id}`} key={item.id}>{item.source === 'community' ? 'Community' : item.source === 'clan' ? 'Clan' : 'Saved'} · {item.name}</option>)}</select></label>
           </div>
           <p className="mt-3 text-xs text-[#a99c7d]">{templates.find((item) => templateChoice.endsWith(item.key ?? item.id ?? ''))?.description ?? 'Pick a built-in, private, clan, or community board.'} <a className="font-black text-[#d9e7aa] underline" href="/templates" target="_blank" rel="noreferrer">Browse gallery ↗</a></p>
           <button className="gold-button mt-4 px-5 py-3 text-sm" disabled={!hasResult || !title.trim() || working} onClick={() => void createEvent()}>{working ? 'Forging the hall…' : hasResult ? 'Create bingo event →' : 'Finish the draft first'}</button>

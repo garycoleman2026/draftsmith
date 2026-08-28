@@ -55,6 +55,6 @@ export default function ClanBingoGuidePage() {
     <h2>8. Close the event deliberately.</h2>
     <p>Stop new claims, run the final Wise Old Man capture, resolve every pending item, then mark the bingo complete. Share the final spectator board and a short recap: closest race, memorable drop, strongest comeback, and one rule you would change next time. Save the board as a clan template so the next event starts from evidence rather than memory.</p>
 
-    <p><Link href="/">Draft the teams</Link> or continue with the <Link href="/guides/custom-bingo-maker">custom board design guide</Link>.</p>
+    <p><Link href="/draft">Draft the teams</Link> or continue with the <Link href="/guides/custom-bingo-maker">custom board design guide</Link>.</p>
   </ContentPage>;
 }

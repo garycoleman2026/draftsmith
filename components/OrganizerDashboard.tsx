@@ -239,7 +239,7 @@ export function OrganizerDashboard() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link className="gold-button px-5 py-3 text-sm" href="/bingo#create">Create bingo</Link>
-            <Link className="scroll-button px-5 py-3 text-sm" href="/">Create draft</Link>
+            <Link className="scroll-button px-5 py-3 text-sm" href="/draft">Create draft</Link>
             <button className="iron-button px-4 py-3 text-xs" type="button" onClick={() => void signOut()}>Sign out</button>
           </div>
         </div>

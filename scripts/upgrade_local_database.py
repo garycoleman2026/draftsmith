@@ -49,6 +49,8 @@ def main() -> None:
         migrations.append(ROOT / "drizzle" / "0009_short_king_cobra.sql")
     if "bingo_manual_progress" not in tables:
         migrations.append(ROOT / "drizzle" / "0010_motionless_siren.sql")
+    if "bingo_template_votes" not in tables:
+        migrations.append(ROOT / "drizzle" / "0011_chunky_molly_hayes.sql")
     if not migrations:
         connection.close()
         print(f"Local database is already current: {database}")

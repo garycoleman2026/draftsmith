@@ -7,7 +7,7 @@ export const DEFAULT_RUNELITE_SCOPES: RuneliteScope[] = [...RUNELITE_SCOPES];
 
 export const RUNELITE_OBSERVATION_TYPES = [
   'xp_delta', 'level_reached', 'item_drop', 'pet_drop', 'collection_log', 'boss_kill',
-  'raid_complete', 'raid_time', 'combat_achievement', 'clue_complete',
+  'raid_complete', 'raid_time', 'clue_complete',
 ] as const;
 export type RuneliteObservationType = typeof RUNELITE_OBSERVATION_TYPES[number];
 
@@ -174,10 +174,6 @@ function observationDescriptor(type: RuneliteObservationType, values: {
   if (type === 'raid_time') {
     if (!values.target || values.numeric === null) throw new Error('Raid-time observations need a raid name and duration.');
     return descriptor('raid_time', values.target, null, values.metric, values.numeric, 'seconds', 'duration');
-  }
-  if (type === 'combat_achievement') {
-    requireTarget(values);
-    return descriptor('combat_achievement', values.target, values.targetId, values.metric, 1, 'task', 'occurrence');
   }
   if (!values.target) throw new Error('Clue observations need a clue tier.');
   return descriptor('clue_complete', values.target, null, values.metric, occurrence, 'clues', 'delta');

@@ -16,7 +16,7 @@ const LABELS: Record<RuneliteScope, { name: string; detail: string }> = {
   loot: { name: 'Loot & collection log', detail: 'Item IDs/names, quantities, pets, and new log slots.' },
   kills: { name: 'Boss kills', detail: 'Supported boss kill-count observations.' },
   raids: { name: 'Raids & times', detail: 'Raid completions, anonymous party size, and completion seconds.' },
-  achievements: { name: 'Achievements & clues', detail: 'Combat achievements and clue completions.' },
+  achievements: { name: 'Clues', detail: 'Supported clue completions.' },
 };
 
 export function BingoRuneliteOrganizerPanel({ base, onNotice, onError }: {

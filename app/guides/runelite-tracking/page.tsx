@@ -13,7 +13,7 @@ export default function TrackingGuidePage() {
     <h2>How often does the board update?</h2>
     <table><thead><tr><th>Source</th><th>Typical cadence</th><th>Good for</th></tr></thead><tbody>
       <tr><td>RuneLite overlay</td><td>Polls the event revision about every 5 seconds while logged in and sharing is enabled.</td><td>Team score, standing, open tasks, and capture plan.</td></tr>
-      <tr><td>RuneLite observations</td><td>Queued in memory and sent in batches within about 10 seconds, or sooner when a batch fills.</td><td>Relevant XP, levels, loot, boss kills, supported raid messages, achievements, and clues.</td></tr>
+      <tr><td>RuneLite observations</td><td>Queued in memory and sent in batches within about 10 seconds, or sooner when a batch fills.</td><td>Relevant XP, levels, loot, boss kills, supported raid messages, and clues.</td></tr>
       <tr><td>Wise Old Man</td><td>Organizer baseline/checkpoint/final runs; optional interval from 1–24 hours, default 6.</td><td>Public XP, levels, and supported kill-count deltas across a roster.</td></tr>
       <tr><td>Manual/screenshot</td><td>Visible immediately as pending; score changes after organizer approval.</td><td>Visual conditions, unusual rules, or integration gaps.</td></tr>
     </tbody></table>

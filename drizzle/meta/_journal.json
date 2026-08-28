@@ -78,6 +78,13 @@
       "when": 1787934972880,
       "tag": "0010_motionless_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1787947678590,
+      "tag": "0011_chunky_molly_hayes",
+      "breakpoints": true
     }
   ]
 }

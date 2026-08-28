@@ -1,39 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { copyText } from '../lib/client';
+
+type VoteResult = {
+  error?: string;
+  upvoteCount: number;
+  downvoteCount: number;
+  voteScore: number;
+  userVote: number;
+};
 
 export function TemplateActions({
   slug,
   preferredValue,
   importText,
   official,
-  initialRatingAverage,
-  initialRatingCount,
+  initialUpvoteCount,
+  initialDownvoteCount,
 }: {
   slug: string;
   preferredValue: string;
   importText: string;
   official: boolean;
-  initialRatingAverage: number | null;
-  initialRatingCount: number;
+  initialUpvoteCount: number;
+  initialDownvoteCount: number;
 }) {
-  const [ratingAverage, setRatingAverage] = useState(initialRatingAverage);
-  const [ratingCount, setRatingCount] = useState(initialRatingCount);
-  const [userRating, setUserRating] = useState<number | null>(null);
+  const [upvoteCount, setUpvoteCount] = useState(initialUpvoteCount);
+  const [downvoteCount, setDownvoteCount] = useState(initialDownvoteCount);
+  const [userVote, setUserVote] = useState(0);
   const [message, setMessage] = useState('');
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
     if (official) return;
     let active = true;
-    void fetch(`/api/gallery/templates/${encodeURIComponent(slug)}/rating`, { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) return;
-        const result = await response.json() as { ratingAverage: number | null; ratingCount: number; userRating: number | null };
-        if (active) {
-          setRatingAverage(result.ratingAverage); setRatingCount(result.ratingCount); setUserRating(result.userRating);
+    void fetch(`/api/gallery/templates/${encodeURIComponent(slug)}/vote`, { cache: 'no-store' })
+      .then(async (response) => response.ok ? response.json() as Promise<VoteResult> : null)
+      .then((result) => {
+        if (active && result) {
+          setUpvoteCount(result.upvoteCount);
+          setDownvoteCount(result.downvoteCount);
+          setUserVote(result.userVote);
         }
       });
     return () => { active = false; };
@@ -41,53 +50,50 @@ export function TemplateActions({
 
   function chooseTemplate() {
     window.localStorage.setItem('terrys_preferred_bingo_template', preferredValue);
-    setMessage('Saved for this browser. Create or open a completed team draft and Terry will preselect this board.');
+    setMessage('Saved. Terry will pick this board when you start a bingo after drafting.');
   }
 
   async function copyBoard() {
     await copyText(importText);
-    setMessage('Copied the complete task sheet and advanced rules. Paste it into the custom bingo maker.');
+    setMessage('Task sheet copied. Paste it into the board studio.');
   }
 
-  async function rate(rating: number) {
-    setWorking(true); setMessage('');
+  async function vote(value: 1 | -1) {
+    setWorking(true);
+    setMessage('');
     try {
-      const response = await fetch(`/api/gallery/templates/${encodeURIComponent(slug)}/rating`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating }),
+      const response = await fetch(`/api/gallery/templates/${encodeURIComponent(slug)}/vote`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vote: value }),
       });
-      const result = await response.json() as { error?: string; ratingAverage?: number | null; ratingCount?: number; userRating?: number };
-      if (!response.ok) throw new Error(result.error || 'The rating could not be saved.');
-      setRatingAverage(result.ratingAverage ?? null); setRatingCount(result.ratingCount ?? 0);
-      setUserRating(result.userRating ?? rating); setMessage('Rating saved. You can change it at any time from this browser.');
+      const result = await response.json() as VoteResult;
+      if (!response.ok) throw new Error(result.error || 'The vote could not be saved.');
+      setUpvoteCount(result.upvoteCount);
+      setDownvoteCount(result.downvoteCount);
+      setUserVote(result.userVote);
+      setMessage(result.userVote === 0 ? 'Vote removed.' : 'Vote saved.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'The rating could not be saved.');
-    } finally { setWorking(false); }
+      setMessage(error instanceof Error ? error.message : 'The vote could not be saved.');
+    } finally {
+      setWorking(false);
+    }
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Link className="gold-button px-5 py-3 text-sm" href={`/bingo/studio?template=${encodeURIComponent(slug)}`}>Customize in board studio →</Link>
+        <Link className="gold-button px-5 py-3 text-sm" href={`/bingo/studio?template=${encodeURIComponent(slug)}`}>Make it yours →</Link>
         <button className="scroll-button px-5 py-3 text-sm" type="button" onClick={chooseTemplate}>Use after a draft</button>
         <button className="scroll-button px-5 py-3 text-sm" type="button" onClick={() => void copyBoard()}>Copy task sheet</button>
       </div>
       {official ? (
-        <p className="text-xs text-[#756748]">Official starter boards are maintained by Terry’s Drafting and do not accept community ratings.</p>
+        <p className="text-xs text-[#756748]">This is a Terry’s starter board.</p>
       ) : (
         <div className="rounded border border-[#8b6a32]/35 bg-[#f2dfae]/65 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">Community rating</p><p className="mt-1 text-sm font-black">{ratingAverage === null ? 'Not rated yet' : `${ratingAverage.toFixed(1)} / 5`} · {ratingCount} vote{ratingCount === 1 ? '' : 's'}</p></div>
-            <div className="flex gap-1" aria-label="Rate this template from one to five">
-              {[1, 2, 3, 4, 5].map((rating) => <button
-                aria-label={`${rating} star${rating === 1 ? '' : 's'}`}
-                aria-pressed={userRating === rating}
-                className={`grid h-10 w-10 place-items-center rounded border text-lg ${userRating === rating ? 'border-[#4f7348] bg-[#dce8c6] text-[#355332]' : 'border-[#9b792f]/45 bg-[#f6e8bf] text-[#8a6523]'}`}
-                disabled={working}
-                key={rating}
-                onClick={() => void rate(rating)}
-                type="button"
-              >★</button>)}
-            </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">Was this board useful?</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Vote on this board">
+            <button aria-label="Upvote this board" aria-pressed={userVote === 1} className={`rounded border px-4 py-2 text-sm font-black ${userVote === 1 ? 'border-[#4f7348] bg-[#dce8c6] text-[#355332]' : 'border-[#9b792f]/45 bg-[#f6e8bf] text-[#5b471d]'}`} disabled={working} onClick={() => void vote(1)} type="button">↑ {upvoteCount}</button>
+            <button aria-label="Downvote this board" aria-pressed={userVote === -1} className={`rounded border px-4 py-2 text-sm font-black ${userVote === -1 ? 'border-[#8a523b] bg-[#ead0be] text-[#713923]' : 'border-[#9b792f]/45 bg-[#f6e8bf] text-[#5b471d]'}`} disabled={working} onClick={() => void vote(-1)} type="button">↓ {downvoteCount}</button>
+            <span className="ml-auto text-xs font-black text-[#66563d]">Score {upvoteCount - downvoteCount}</span>
           </div>
         </div>
       )}

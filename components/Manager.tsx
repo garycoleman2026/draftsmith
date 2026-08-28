@@ -270,7 +270,7 @@ export function Manager({ token }: { token: string }) {
           <p className="text-5xl">↗</p>
           <h1 className="fantasy-title mt-5 text-3xl font-bold text-[#f5df9b]">Organizer link unavailable</h1>
           <p className="mt-3 text-[#b5a888]">{error || 'Check that the whole private organizer link was copied.'}</p>
-          <Link className="gold-button mt-7 inline-block px-5 py-3 text-sm" href="/">Start a new draft</Link>
+          <Link className="gold-button mt-7 inline-block px-5 py-3 text-sm" href="/draft">Start a new draft</Link>
         </section>
       </main>
     );

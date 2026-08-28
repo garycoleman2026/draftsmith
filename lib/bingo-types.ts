@@ -14,13 +14,16 @@ import {
 import type { BingoBoardScope, BingoMode, BingoVerificationMode } from './types';
 import { OSRS_BOSS_UNIQUE_DROPS } from './osrs-boss-uniques';
 
+export const BINGO_TASK_DIFFICULTIES = ['easy', 'medium', 'hard', 'expert', 'experimental'] as const;
+export type BingoTaskDifficulty = typeof BINGO_TASK_DIFFICULTIES[number];
+
 export type BingoTaskDefinition = {
   id?: string;
   title: string;
   description: string;
   points: number;
   category: string;
-  difficulty: 'easy' | 'medium' | 'hard' | 'legendary';
+  difficulty: BingoTaskDifficulty;
   verificationMode: BingoVerificationMode;
   repeatable: boolean;
   maxCompletions: number;
@@ -109,21 +112,21 @@ function preset(title: string, points: number, category: string, verifierType: B
 
 export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   preset('Get an Oathplate helm', 180, 'Gear', 'item_acquired', { target: 'Oathplate helm', difficulty: 'hard', imageKind: 'item', imageKey: 'Oathplate helm', dropRateNumerator: 1, dropRateDenominator: 600, efficientKillsPerHour: 10, notes: 'Planning assumes solo Yama kills at 100% contribution and an efficient 10 kills per hour.', exclusions: 'Purchased, smithed, traded, or contract-guaranteed helms do not count unless the organizer explicitly allows them.', sourceUrl: 'https://oldschool.runescape.wiki/w/Yama' }),
-  preset('Obtain the Baby mole pet', 900, 'Pets', 'pet_obtained', { target: 'Baby mole', difficulty: 'legendary', imageKind: 'item', imageKey: 'Baby Mole', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 85, notes: 'The 85 kills/hour planning rate assumes an experienced player with the Falador Hard Diary and strong gear.', exclusions: 'Existing pets and metamorphosis changes do not count; the pet must be received during the event.', sourceUrl: 'https://oldschool.runescape.wiki/w/Giant_Mole' }),
-  preset('Receive a Twisted ancestral colour kit', 650, 'Raids', 'item_acquired', { target: 'Twisted ancestral colour kit', difficulty: 'legendary', imageKind: 'item', imageKey: 'Twisted ancestral colour kit', dropRateNumerator: 1, dropRateDenominator: 75, efficientKillsPerHour: 2.4, notes: 'Only Challenge Mode completions inside the kit-eligibility time can roll this tertiary reward. The rate assumes 25-minute efficient completions.', exclusions: 'Metamorphic dust, a standard purple, or a kit owned before the event does not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Twisted_ancestral_colour_kit' }),
-  preset('Beat the GM Theatre of Blood trio time', 750, 'Speed', 'raid_time', { target: 'Theatre of Blood', metric: 'trio', amount: 1_050, unit: 'seconds', scope: 'exact_party', participantCount: 3, difficulty: 'legendary', imageKind: 'boss', imageKey: 'Verzik Vitur', notes: 'Complete Theatre of Blood with exactly three players in less than 17:30. The displayed time is the required speed target.', exclusions: 'Entry mode, hard mode, four-player raids, and times of exactly 17:30 or slower do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Theatre_(Trio)_Speed-Runner', description: 'Exactly three linked team members complete Theatre of Blood in less than 17 minutes and 30 seconds.' }),
-  preset('Beat the Chambers CM five-player time', 750, 'Speed', 'raid_time', { target: 'Chambers of Xeric: Challenge Mode', metric: 'five-player', amount: 1_500, unit: 'seconds', scope: 'exact_party', participantCount: 5, difficulty: 'legendary', imageKind: 'boss', imageKey: 'Great Olm', notes: 'Complete Challenge Mode with exactly five players in less than 25:00. The displayed time is the required speed target.', exclusions: 'Normal Chambers, other scales, and times of exactly 25:00 or slower do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Chambers_of_Xeric', description: 'Exactly five linked team members complete Chambers of Xeric: Challenge Mode in less than 25 minutes.' }),
+  preset('Obtain the Baby mole pet', 900, 'Pets', 'pet_obtained', { target: 'Baby mole', difficulty: 'expert', imageKind: 'item', imageKey: 'Baby Mole', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 85, notes: 'The 85 kills/hour planning rate assumes an experienced player with the Falador Hard Diary and strong gear.', exclusions: 'Existing pets and metamorphosis changes do not count; the pet must be received during the event.', sourceUrl: 'https://oldschool.runescape.wiki/w/Giant_Mole' }),
+  preset('Receive a Twisted ancestral colour kit', 650, 'Raids', 'item_acquired', { target: 'Twisted ancestral colour kit', difficulty: 'expert', imageKind: 'item', imageKey: 'Twisted ancestral colour kit', dropRateNumerator: 1, dropRateDenominator: 75, efficientKillsPerHour: 2.4, notes: 'Only Challenge Mode completions inside the kit-eligibility time can roll this tertiary reward. The rate assumes 25-minute efficient completions.', exclusions: 'Metamorphic dust, a standard purple, or a kit owned before the event does not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Twisted_ancestral_colour_kit' }),
+  preset('Beat the GM Theatre of Blood trio time', 750, 'Speed', 'raid_time', { target: 'Theatre of Blood', metric: 'trio', amount: 1_050, unit: 'seconds', scope: 'exact_party', participantCount: 3, difficulty: 'expert', imageKind: 'boss', imageKey: 'Verzik Vitur', notes: 'Complete Theatre of Blood with exactly three players in less than 17:30. The displayed time is the required speed target.', exclusions: 'Entry mode, hard mode, four-player raids, and times of exactly 17:30 or slower do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Theatre_(Trio)_Speed-Runner', description: 'Exactly three linked team members complete Theatre of Blood in less than 17 minutes and 30 seconds.' }),
+  preset('Beat the Chambers CM five-player time', 750, 'Speed', 'raid_time', { target: 'Chambers of Xeric: Challenge Mode', metric: 'five-player', amount: 1_500, unit: 'seconds', scope: 'exact_party', participantCount: 5, difficulty: 'expert', imageKind: 'boss', imageKey: 'Great Olm', notes: 'Complete Challenge Mode with exactly five players in less than 25:00. The displayed time is the required speed target.', exclusions: 'Normal Chambers, other scales, and times of exactly 25:00 or slower do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Chambers_of_Xeric', description: 'Exactly five linked team members complete Chambers of Xeric: Challenge Mode in less than 25 minutes.' }),
   preset('Gain 10,000,000 team Agility XP', 500, 'Skilling', 'xp_gain', { metric: 'agility', amount: 10_000_000, unit: 'XP', scope: 'team_total', difficulty: 'hard', efficientUnitsPerHour: 100_000, imageKind: 'item', imageKey: 'Agility cape', notes: 'The planning estimate uses 100,000 Agility XP/hour per active player. Edit this to match your clan’s expected methods and levels.', exclusions: 'Only XP gained between the event baseline and final checkpoint counts.', sources: ['wise_old_man', 'runelite', 'screenshot'] }),
   preset('Receive a Berserker ring from Dagannoth Rex', 80, 'Bossing', 'item_acquired', { target: 'Berserker ring', difficulty: 'medium', imageKind: 'item', imageKey: 'Berserker ring', dropRateNumerator: 1, dropRateDenominator: 128, efficientKillsPerHour: 55, notes: 'Planning uses 55 Rex kills/hour for one individual.', exclusions: 'Other Dagannoth King rings do not count.' }),
   preset('Complete one Chambers of Xeric raid', 100, 'Raids', 'raid_complete', { target: 'Chambers of Xeric', amount: 1, unit: 'completion', difficulty: 'medium', imageKind: 'boss', imageKey: 'Great Olm', efficientKillsPerHour: 2 }),
   preset('Receive a dexterous prayer scroll', 220, 'Raids', 'item_acquired', { target: 'Dexterous prayer scroll', difficulty: 'hard', imageKind: 'item', imageKey: 'Dexterous prayer scroll', fixedHours: 45, notes: 'The starter estimate is fixed because Chambers unique chance changes with personal points and team scaling. Replace it with your clan’s expected raid level and points.', sourceUrl: 'https://oldschool.runescape.wiki/w/Chambers_of_Xeric/Rewards' }),
   preset('Receive an avernic defender hilt', 250, 'Raids', 'item_acquired', { target: 'Avernic defender hilt', difficulty: 'hard', imageKind: 'item', imageKey: 'Avernic defender hilt', fixedHours: 20, notes: 'The starter estimate is editable because individual Theatre of Blood loot chance changes with party size, deaths, and performance.', sourceUrl: 'https://oldschool.runescape.wiki/w/Theatre_of_Blood/Rewards' }),
   preset("Receive Osmumten's fang", 220, 'Raids', 'item_acquired', { target: "Osmumten's fang", difficulty: 'hard', imageKind: 'item', imageKey: "Osmumten's fang" }),
-  preset("Receive Tumeken's shadow", 900, 'Raids', 'item_acquired', { target: "Tumeken's shadow", difficulty: 'legendary', imageKind: 'item', imageKey: "Tumeken's shadow (uncharged)" }),
-  preset('Receive a twisted bow', 1_000, 'Raids', 'item_acquired', { target: 'Twisted bow', difficulty: 'legendary', imageKind: 'item', imageKey: 'Twisted bow' }),
-  preset('Receive a scythe of Vitur', 1_000, 'Raids', 'item_acquired', { target: 'Scythe of Vitur', difficulty: 'legendary', imageKind: 'item', imageKey: 'Scythe of Vitur (uncharged)' }),
+  preset("Receive Tumeken's shadow", 900, 'Raids', 'item_acquired', { target: "Tumeken's shadow", difficulty: 'expert', imageKind: 'item', imageKey: "Tumeken's shadow (uncharged)" }),
+  preset('Receive a twisted bow', 1_000, 'Raids', 'item_acquired', { target: 'Twisted bow', difficulty: 'expert', imageKind: 'item', imageKey: 'Twisted bow' }),
+  preset('Receive a scythe of Vitur', 1_000, 'Raids', 'item_acquired', { target: 'Scythe of Vitur', difficulty: 'expert', imageKind: 'item', imageKey: 'Scythe of Vitur (uncharged)' }),
   preset('Receive an enhanced crystal weapon seed', 300, 'Gear', 'item_acquired', { target: 'Enhanced crystal weapon seed', difficulty: 'hard', imageKind: 'item', imageKey: 'Enhanced crystal weapon seed', dropRateNumerator: 1, dropRateDenominator: 400, efficientKillsPerHour: 6 }),
-  preset('Obtain the Vorki pet from Vorkath', 800, 'Pets', 'pet_obtained', { target: 'Vorki', difficulty: 'legendary', imageKind: 'item', imageKey: 'Vorki', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 30 }),
+  preset('Obtain the Vorki pet from Vorkath', 800, 'Pets', 'pet_obtained', { target: 'Vorki', difficulty: 'expert', imageKind: 'item', imageKey: 'Vorki', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 30 }),
   preset('Add three collection-log slots', 120, 'Collection', 'collection_log', { amount: 3, unit: 'slots', difficulty: 'medium', fixedHours: 4, imageKind: 'item', imageKey: 'Collection log', description: 'Optionally track three new collection-log slots for a player or team with a fair event baseline.', notes: 'Optional library task only: this is excluded from every starter board because players with fuller collection logs have fewer easy unlocks. Use it only when teams have comparable baselines or after assigning account-specific targets.' }),
   preset('Complete a master clue', 90, 'Clues', 'clue_complete', { target: 'Master clue', amount: 1, unit: 'clue', difficulty: 'medium', efficientKillsPerHour: 0.5, imageKind: 'item', imageKey: 'Clue scroll (master)', notes: 'Starter rate assumes one master clue completion every two hours for an individual who already has the clue.' }),
   preset('Complete an elite clue', 65, 'Clues', 'clue_complete', { target: 'Elite clue', amount: 1, unit: 'clue', difficulty: 'medium', efficientKillsPerHour: 1, imageKind: 'item', imageKey: 'Clue scroll (elite)' }),
@@ -139,8 +142,8 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   preset('Complete ten Chambers challenge modes', 220, 'Raids', 'raid_complete', { target: 'Chambers of Xeric: Challenge Mode', amount: 10, unit: 'completions', scope: 'team_total', difficulty: 'hard', efficientKillsPerHour: 2.4, imageKind: 'boss', imageKey: 'Great Olm' }),
   preset('Complete twenty expert Tombs of Amascut raids', 260, 'Raids', 'raid_complete', { target: 'Tombs of Amascut: Expert Mode', amount: 20, unit: 'completions', scope: 'team_total', difficulty: 'hard', efficientKillsPerHour: 3, imageKind: 'boss', imageKey: "Tumeken's Warden" }),
   preset('Set a sub-17:00 solo Chambers personal best', 140, 'Speed', 'raid_time', { target: 'Chambers of Xeric', metric: 'solo', amount: 1_020, unit: 'seconds', difficulty: 'hard', imageKind: 'boss', imageKey: 'Great Olm', notes: 'Complete solo Chambers of Xeric in less than 17:00. The displayed time is the required speed target.' }),
-  preset('Earn an infernal cape', 500, 'Combat', 'item_acquired', { target: 'Infernal cape', difficulty: 'legendary', imageKind: 'item', imageKey: 'Infernal cape' }),
-  preset("Earn Dizana's quiver", 450, 'Combat', 'item_acquired', { target: "Dizana's quiver", difficulty: 'legendary', imageKind: 'item', imageKey: "Dizana's quiver" }),
+  preset('Earn an infernal cape', 500, 'Combat', 'item_acquired', { target: 'Infernal cape', difficulty: 'expert', imageKind: 'item', imageKey: 'Infernal cape' }),
+  preset("Earn Dizana's quiver", 450, 'Combat', 'item_acquired', { target: "Dizana's quiver", difficulty: 'expert', imageKind: 'item', imageKey: "Dizana's quiver" }),
   preset('Earn a fire cape', 100, 'Combat', 'item_acquired', { target: 'Fire cape', difficulty: 'medium', imageKind: 'item', imageKey: 'Fire cape' }),
   preset('Complete one Barrows armour set', 180, 'Gear', 'team_challenge', { target: 'Complete Barrows armour set', difficulty: 'hard', fixedHours: 35, imageKind: 'item', imageKey: 'Chest (Barrows)', notes: 'Editable starter estimate for completing any one named Barrows set from event drops.', exclusions: 'Mixing pieces from different brothers does not count.' }),
   preset('Complete an Armadyl godsword', 220, 'Gear', 'team_challenge', { target: 'Armadyl godsword', difficulty: 'hard', imageKind: 'item', imageKey: 'Armadyl godsword' }),
@@ -150,7 +153,7 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   preset('Receive a zenyte shard', 120, 'Gear', 'item_acquired', { target: 'Zenyte shard', difficulty: 'medium', imageKind: 'item', imageKey: 'Zenyte shard', dropRateNumerator: 1, dropRateDenominator: 300, efficientKillsPerHour: 60 }),
   preset('Receive a dragon warhammer', 250, 'Gear', 'item_acquired', { target: 'Dragon warhammer', difficulty: 'hard', imageKind: 'item', imageKey: 'Dragon warhammer', dropRateNumerator: 1, dropRateDenominator: 3_000, efficientKillsPerHour: 140 }),
   preset('Receive a skeletal visage from Vorkath', 220, 'Gear', 'item_acquired', { target: 'Skeletal visage', difficulty: 'hard', imageKind: 'item', imageKey: 'Skeletal visage', dropRateNumerator: 1, dropRateDenominator: 5_000, efficientKillsPerHour: 30 }),
-  preset('Receive a 3rd age platebody from a clue', 700, 'Clues', 'item_acquired', { target: '3rd age platebody', difficulty: 'legendary', imageKind: 'item', imageKey: '3rd Age platebody' }),
+  preset('Receive a 3rd age platebody from a clue', 700, 'Clues', 'item_acquired', { target: '3rd age platebody', difficulty: 'expert', imageKind: 'item', imageKey: '3rd Age platebody' }),
   preset('Complete Chambers with exactly four teammates', 120, 'Teamwork', 'raid_complete', { target: 'Chambers of Xeric', amount: 1, unit: 'completion', scope: 'exact_party', participantCount: 5, difficulty: 'medium', imageKind: 'boss', imageKey: 'Great Olm' }),
   preset('Receive a Tome of water from Tempoross', 90, 'Skilling', 'item_acquired', { target: 'Tome of water', difficulty: 'medium', imageKind: 'item', imageKey: 'Tome of Water (empty)', dropRateNumerator: 1, dropRateDenominator: 1_600, efficientKillsPerHour: 60, notes: 'The attempt rate is reward permits opened per individual hour, not Tempoross kills.', sourceUrl: 'https://oldschool.runescape.wiki/w/Tempoross#Rewards' }),
   preset('Receive a Fish barrel from Tempoross', 75, 'Skilling', 'item_acquired', { target: 'Fish barrel', difficulty: 'medium', imageKind: 'item', imageKey: 'Fish barrel', dropRateNumerator: 1, dropRateDenominator: 400, efficientKillsPerHour: 60, notes: 'The attempt rate is reward permits opened per individual hour, not Tempoross kills.', sourceUrl: 'https://oldschool.runescape.wiki/w/Tempoross#Rewards' }),
@@ -170,6 +173,7 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
     'item_acquired',
     {
       target: item,
+      difficulty: 'experimental',
       imageKind: 'item',
       imageKey: item,
       notes: `Receive this boss-specific reward from ${boss} during the event. Add the current individual drop rate and efficient attempts per hour when balancing the board.`,
@@ -180,12 +184,12 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
 ];
 
 /**
- * Presets that may be placed automatically on a new board. Collection-log
- * milestones stay in the full library for deliberate use, but account progress
- * makes them too uneven for starter boards and one-click autofill.
+ * Presets that may be placed automatically on a new board. Collection-log and
+ * experimental tasks stay available for deliberate use, but are skipped by
+ * starter boards and one-click autofill.
  */
 export const OSRS_DEFAULT_BOARD_PRESETS = OSRS_BINGO_PRESETS.filter(
-  (task) => task.rule.verifier.type !== 'collection_log',
+  (task) => task.rule.verifier.type !== 'collection_log' && task.difficulty !== 'experimental',
 );
 
 const STARTER_TASK_TITLES = [
@@ -321,9 +325,7 @@ export function sanitizeBingoTasks(value: unknown, expectedCount: number): Bingo
     const verificationMode = ['manual', 'screenshot', 'stat_delta', 'hybrid'].includes(String(item.verificationMode))
       ? String(item.verificationMode) as BingoVerificationMode
       : 'manual';
-    const difficulty = ['easy', 'medium', 'hard', 'legendary'].includes(String(item.difficulty))
-      ? String(item.difficulty) as BingoTaskDefinition['difficulty']
-      : 'medium';
+    const difficulty = sanitizeBingoTaskDifficulty(item.difficulty);
     const free = item.freeSpace === true || /^free(?:\s+space)?$/i.test(title);
     const rule = free ? defaultBingoTaskRule('manual') : sanitizeBingoTaskRule(item.rule, verificationMode);
     return [{
@@ -341,6 +343,13 @@ export function sanitizeBingoTasks(value: unknown, expectedCount: number): Bingo
       rule,
     }];
   });
+}
+
+export function sanitizeBingoTaskDifficulty(value: unknown): BingoTaskDifficulty {
+  if (value === 'legendary') return 'expert';
+  return BINGO_TASK_DIFFICULTIES.includes(String(value) as BingoTaskDifficulty)
+    ? String(value) as BingoTaskDifficulty
+    : 'medium';
 }
 
 export function parseBingoTaskImport(value: string): BingoTaskDefinition[] {

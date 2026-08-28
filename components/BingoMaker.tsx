@@ -8,7 +8,8 @@ import {
   type BingoEventRules, type BingoProofSource, type BingoTaskRule,
 } from '../lib/bingo-rules';
 import {
-  OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, serializeBingoTaskImport, type BingoTaskDefinition,
+  BINGO_TASK_DIFFICULTIES, OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport,
+  serializeBingoTaskImport, type BingoTaskDefinition, type BingoTaskDifficulty,
 } from '../lib/bingo-types';
 import { copyText } from '../lib/client';
 import type { BingoBoardScope, BingoMode } from '../lib/types';
@@ -33,7 +34,7 @@ const LABELS: Record<string, string> = {
   manual: 'Manual challenge', item_acquired: 'Item acquired', pet_obtained: 'Pet obtained',
   collection_log: 'Collection-log unlock', xp_gain: 'XP gained', level_reached: 'Level reached',
   boss_kc: 'Boss kill count', raid_complete: 'Raid completed', raid_time: 'Raid time under target',
-  combat_achievement: 'Combat achievement', clue_complete: 'Clue completed', team_challenge: 'Team challenge',
+  clue_complete: 'Clue completed', team_challenge: 'Team challenge',
   any_member: 'Any member', single_member: 'One named member', team_total: 'Team total',
   exact_party: 'Exact party size', all_members: 'Every team member',
   organizer: 'Organizer review', screenshot: 'Screenshot', runelite: 'RuneLite', wise_old_man: 'Wise Old Man',
@@ -48,6 +49,7 @@ export function BingoMaker({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [difficulty, setDifficulty] = useState<'all' | BingoTaskDifficulty>('all');
   const [importText, setImportText] = useState(() => serializeBingoTaskImport(initialTasks));
   const [message, setMessage] = useState('');
   const [onePointPerTile, setOnePointPerTile] = useState(() => initialTasks.filter((task) => !task.freeSpace).every((task) => task.points === 1));
@@ -55,7 +57,8 @@ export function BingoMaker({
   const categories = useMemo(() => ['All', ...new Set(OSRS_BINGO_PRESETS.map((preset) => preset.category))], []);
   const visiblePresets = useMemo(() => OSRS_BINGO_PRESETS.filter((preset) =>
     (category === 'All' || preset.category === category)
-    && (preset.title + ' ' + preset.category + ' ' + preset.rule.verifier.target).toLowerCase().includes(search.trim().toLowerCase())), [category, search]);
+    && (difficulty === 'all' || preset.difficulty === difficulty)
+    && (preset.title + ' ' + preset.category + ' ' + preset.rule.verifier.target).toLowerCase().includes(search.trim().toLowerCase())), [category, difficulty, search]);
   const selected = tasks[selectedIndex] ?? tasks[0];
   const expected = rules.layout.rows * rules.layout.columns;
 
@@ -264,10 +267,11 @@ export function BingoMaker({
         <TaskEditor disabled={disabled} expected={expected} selected={selected} selectedIndex={selectedIndex} teamSize={teamSize} updateRule={updateRule} updateSelected={updateSelected} />
         <aside className="rounded border border-[#8b6a32]/35 bg-[#f5e5b8]/55 p-4 sm:p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#80642b]">OSRS task library · {OSRS_BINGO_PRESETS.length} presets</p>
-          <p className="mt-1 text-[9px] leading-relaxed text-[#655339]">Collection-log milestones remain selectable here, but starter boards and autofill skip them because account baselines vary.</p>
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_145px] gap-2">
+          <p className="mt-1 text-[9px] leading-relaxed text-[#655339]">Experimental tasks still need balancing. They and collection-log milestones stay out of autofill, but you can choose them here.</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <input className="realm-field h-10 w-full px-3 text-xs normal-case" placeholder="Search tasks…" value={search} onChange={(event) => setSearch(event.target.value)} />
             <select className="realm-field h-10 w-full px-2 text-xs" value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
+            <select className="realm-field h-10 w-full px-2 text-xs sm:col-span-2" value={difficulty} onChange={(event) => setDifficulty(event.target.value as 'all' | BingoTaskDifficulty)}><option value="all">All difficulty tiers</option>{BINGO_TASK_DIFFICULTIES.map((item) => <option key={item} value={item}>{item[0].toUpperCase() + item.slice(1)}</option>)}</select>
           </div>
           <div className="mt-3 max-h-[560px] space-y-2 overflow-auto pr-1">
             {visiblePresets.map((preset) => {
@@ -281,7 +285,7 @@ export function BingoMaker({
                 onDragStart={(event) => event.dataTransfer.setData('terry/preset', String(presetIndex))}
                 type="button"
               >
-                <div className="flex gap-3"><BingoTaskArtwork alt="" className="h-12 w-12 shrink-0" rule={preset.rule} /><div className="min-w-0 flex-1"><span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.points} pts{preset.rule.verifier.type === 'collection_log' ? ' · optional only' : ''}</span>
+                <div className="flex gap-3"><BingoTaskArtwork alt="" className="h-12 w-12 shrink-0" rule={preset.rule} /><div className="min-w-0 flex-1"><span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.difficulty} · {preset.points} pts{preset.rule.verifier.type === 'collection_log' ? ' · optional only' : ''}</span>
                   <p className="mt-1 text-xs font-black text-[#392b18]">{preset.title}</p>
                   <p className="mt-1 text-[9px] leading-relaxed text-[#59472f]">{bingoRuleSummary(preset.rule)}</p>
                   {expectedIndividualHours(preset.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">{taskTimeCaption(preset.rule)}</p> : null}</div></div>
@@ -332,6 +336,7 @@ function TaskEditor({ disabled, expected, selected, selectedIndex, teamSize, upd
         <Field label="Description" wide><textarea className="realm-field mt-1 min-h-20 w-full p-3 text-sm normal-case" disabled={disabled} value={selected.description} onChange={(event) => updateSelected((task) => ({ ...task, description: event.target.value }))} /></Field>
         <Field label="Points"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" type="number" min={0} max={10000} disabled={disabled || selected.freeSpace} value={selected.points} onChange={(event) => updateSelected((task) => ({ ...task, points: Number(event.target.value) }))} /></Field>
         <Field label="Category"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} value={selected.category} onChange={(event) => updateSelected((task) => ({ ...task, category: event.target.value }))} /></Field>
+        <Field label="Difficulty"><select className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} value={selected.difficulty} onChange={(event) => updateSelected((task) => ({ ...task, difficulty: event.target.value as BingoTaskDifficulty }))}>{BINGO_TASK_DIFFICULTIES.map((item) => <option key={item} value={item}>{item[0].toUpperCase() + item.slice(1)}</option>)}</select></Field>
         <Field label="Rule type"><select className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} value={selected.rule.verifier.type} onChange={(event) => updateRule((rule) => {
           const type = event.target.value as BingoTaskRule['verifier']['type'];
           return {

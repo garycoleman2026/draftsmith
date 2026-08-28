@@ -33,19 +33,18 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
     '@context': 'https://schema.org', '@type': 'CreativeWork', name: template.name,
     description: template.summary, url: `${origin}/templates/${template.slug}`,
     author: { '@type': 'Organization', name: template.creatorName },
-    interactionStatistic: template.official ? undefined : {
-      '@type': 'InteractionCounter', interactionType: 'https://schema.org/UseAction', userInteractionCount: template.cloneCount,
-    },
-    aggregateRating: template.ratingAverage === null ? undefined : {
-      '@type': 'AggregateRating', ratingValue: template.ratingAverage, ratingCount: template.ratingCount, bestRating: 5, worstRating: 1,
-    },
+    interactionStatistic: template.official ? undefined : [
+      { '@type': 'InteractionCounter', interactionType: 'https://schema.org/UseAction', userInteractionCount: template.cloneCount },
+      { '@type': 'InteractionCounter', interactionType: 'https://schema.org/LikeAction', userInteractionCount: template.upvoteCount },
+      { '@type': 'InteractionCounter', interactionType: 'https://schema.org/DislikeAction', userInteractionCount: template.downvoteCount },
+    ],
   };
   return (
     <main className="realm-bg min-h-screen text-[#eadcb9]">
       <SiteHeader badge="Template preview" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(schema) }} />
       <section className="mx-auto max-w-[1500px] px-4 pb-20 pt-9 sm:px-8">
-        <Link className="text-xs font-black text-[#d7c48e] underline" href="/templates">← Community templates</Link>
+        <Link className="text-xs font-black text-[#d7c48e] underline" href="/templates">← Board archives</Link>
         <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
           <div>
             <div className="flex flex-wrap items-center gap-2"><span className="seal-badge px-3 py-1.5 text-[10px] font-black uppercase">{template.official ? 'Official starter' : template.category}</span><span className="rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-[10px] font-black uppercase text-[#ddc27b]">{modeLabel(template.mode)}</span></div>
@@ -54,8 +53,8 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
             <p className="mt-3 text-xs text-[#9f9272]">Published by {template.creatorName}{template.publishedAt ? ` · ${new Date(template.publishedAt).toLocaleDateString()}` : ''}</p>
           </div>
           <aside className="parchment-panel p-5 text-[#342817]">
-            <dl className="grid grid-cols-2 gap-3"><Metric label="Layout" value={`${template.gridSize} × ${template.gridSize}`} /><Metric label="Tasks" value={String(template.taskCount)} /><Metric label="Board type" value={template.boardScope === 'shared' ? 'Shared board' : 'Per team'} /><Metric label="Community uses" value={template.official ? 'Maintained starter' : String(template.cloneCount)} /></dl>
-            <div className="mt-5"><TemplateActions slug={template.slug} preferredValue={preferredValue} importText={serializeBingoTaskImport(configuration.tasks)} official={template.official} initialRatingAverage={template.ratingAverage} initialRatingCount={template.ratingCount} /></div>
+            <dl className="grid grid-cols-2 gap-3"><Metric label="Layout" value={`${template.gridSize} × ${template.gridSize}`} /><Metric label="Difficulty" value={template.difficulty} /><Metric label="Board type" value={template.boardScope === 'shared' ? 'Shared board' : 'Per team'} /><Metric label="Uses" value={template.official ? 'Terry’s starter' : String(template.cloneCount)} /></dl>
+            <div className="mt-5"><TemplateActions slug={template.slug} preferredValue={preferredValue} importText={serializeBingoTaskImport(configuration.tasks)} official={template.official} initialUpvoteCount={template.upvoteCount} initialDownvoteCount={template.downvoteCount} /></div>
           </aside>
         </div>
 
@@ -63,7 +62,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#8b6a32]/25 pb-4"><div><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#80642b]">Editable board preview</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Every tile can be changed before launch.</h2></div><div className="flex flex-wrap gap-1.5">{template.tags.map((tag) => <span className="rounded bg-[#7c642f]/10 px-2 py-1 text-[9px] font-black uppercase text-[#765d2c]" key={tag}>{tag}</span>)}</div></div>
           <div className="mt-5 overflow-x-auto pb-2">
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${template.gridSize}, minmax(128px, 1fr))`, minWidth: Math.max(640, template.gridSize * 138) }}>
-              {configuration.tasks.map((task, index) => <article className="min-h-36 rounded border border-[#9c7933] bg-[#efe0b6] p-3 shadow-[0_2px_0_#735629]" key={`${index}-${task.title}`}><p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#7b643d]">#{index + 1} · {task.category}</p><h3 className="mt-2 text-sm font-black leading-tight">{task.title}</h3><p className="mt-2 line-clamp-3 text-[10px] leading-relaxed text-[#6d5b3e]">{task.description}</p><p className="mt-3 text-[9px] font-black uppercase text-[#80642b]">{task.points} pts · {task.rule.verifier.type.replaceAll('_', ' ')}</p></article>)}
+              {configuration.tasks.map((task, index) => <article className="min-h-36 rounded border border-[#9c7933] bg-[#efe0b6] p-3 shadow-[0_2px_0_#735629]" key={`${index}-${task.title}`}><p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#7b643d]">#{index + 1} · {task.category} · {task.difficulty}</p><h3 className="mt-2 text-sm font-black leading-tight">{task.title}</h3><p className="mt-2 line-clamp-3 text-[10px] leading-relaxed text-[#6d5b3e]">{task.description}</p><p className="mt-3 text-[9px] font-black uppercase text-[#80642b]">{task.points} pts · {task.rule.verifier.type.replaceAll('_', ' ')}</p></article>)}
             </div>
           </div>
         </section>

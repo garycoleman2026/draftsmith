@@ -743,6 +743,18 @@ export const bingoTemplateRatings = sqliteTable(
   ],
 );
 
+export const bingoTemplateVotes = sqliteTable(
+  'bingo_template_votes',
+  {
+    templateId: text('template_id').notNull().references(() => bingoTemplates.id, { onDelete: 'cascade' }),
+    voterHash: text('voter_hash').notNull(),
+    vote: integer('vote').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.templateId, table.voterHash] })],
+);
+
 export const bingoWomSyncRuns = sqliteTable(
   'bingo_wom_sync_runs',
   {

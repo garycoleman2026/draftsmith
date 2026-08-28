@@ -34,8 +34,8 @@ export type PublicClanTemplate = {
   summary: string;
   category: string;
   cloneCount: number;
-  ratingCount: number;
-  ratingAverage: number | null;
+  upvoteCount: number;
+  downvoteCount: number;
 };
 
 type ClanRow = {
@@ -91,7 +91,9 @@ export async function loadPublicClan(slug: string) {
                 COALESCE(be.started_at, be.created_at) DESC LIMIT 100`,
     ).bind(clan.id).all<Record<string, string | number | null>>(),
     db.prepare(
-      `SELECT id, public_slug, name, summary, category, clone_count, rating_count, rating_total
+      `SELECT id, public_slug, name, summary, category, clone_count,
+              (SELECT COUNT(*) FROM bingo_template_votes vote WHERE vote.template_id = bingo_templates.id AND vote.vote = 1) AS upvote_count,
+              (SELECT COUNT(*) FROM bingo_template_votes vote WHERE vote.template_id = bingo_templates.id AND vote.vote = -1) AS downvote_count
        FROM bingo_templates WHERE clan_id = ? AND visibility = 'public' AND public_slug IS NOT NULL
        ORDER BY clone_count DESC, updated_at DESC LIMIT 50`,
     ).bind(clan.id).all<Record<string, string | number | null>>(),
@@ -108,8 +110,8 @@ export async function loadPublicClan(slug: string) {
     templates: templateResult.results.map((template): PublicClanTemplate => ({
       id: String(template.id), slug: String(template.public_slug), name: String(template.name),
       summary: String(template.summary), category: String(template.category), cloneCount: Number(template.clone_count),
-      ratingCount: Number(template.rating_count),
-      ratingAverage: Number(template.rating_count) ? Number(template.rating_total) / Number(template.rating_count) : null,
+      upvoteCount: Number(template.upvote_count) || 0,
+      downvoteCount: Number(template.downvote_count) || 0,
     })),
   };
 }

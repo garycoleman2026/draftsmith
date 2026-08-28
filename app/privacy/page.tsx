@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       <li><strong>Account data:</strong> when Discord sign-in is used, the service processes the profile identifiers needed to create a session and administer a clan workspace.</li>
       <li><strong>Bingo data:</strong> boards, claims, notes, evidence links or uploaded screenshots, decisions, scores, and activity history.</li>
       <li><strong>Community discovery:</strong> clan owners may opt a clan profile into the public directory, organizers may separately list individual spectator boards, and signed-in clan administrators may publish reusable templates. Private workspaces, private templates, and unlisted events are excluded.</li>
-      <li><strong>Template ratings:</strong> a random browser token is stored as an essential cookie and saved only as a hash so one browser can update its own rating without creating a public identity.</li>
+      <li><strong>Board votes:</strong> a random browser token is stored as an essential cookie and saved only as a hash so one browser can change or remove its own vote without creating a public identity.</li>
       <li><strong>Public OSRS data:</strong> official Hiscores and Wise Old Man information requested for roster insights or event snapshots.</li>
       <li><strong>RuneLite data:</strong> the paired character, task-relevant normalized observations, timestamps, anonymous party size when needed, plugin version, and revocable device information. Raw chat and other players’ names are rejected.</li>
       <li><strong>Operational data:</strong> request metadata such as IP address may be processed by hosting, rate-limiting, and security infrastructure.</li>

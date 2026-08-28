@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   builtinGalleryTemplates,
+  overallBoardDifficulty,
+  sanitizeGalleryDifficulty,
   sanitizeGallerySort,
   sanitizeTemplateCategory,
   sanitizeTemplateSummary,
@@ -36,8 +38,21 @@ describe('bingo template gallery', () => {
   });
 
   it('accepts only supported gallery sort modes', () => {
-    expect(sanitizeGallerySort('rating')).toBe('rating');
+    expect(sanitizeGallerySort('votes')).toBe('votes');
+    expect(sanitizeGallerySort('difficulty')).toBe('difficulty');
+    expect(sanitizeGallerySort('type')).toBe('type');
+    expect(sanitizeGallerySort('rating')).toBe('popular');
     expect(sanitizeGallerySort('unexpected')).toBe('popular');
+    expect(sanitizeGalleryDifficulty('expert')).toBe('expert');
+    expect(sanitizeGalleryDifficulty('legendary')).toBe('all');
+  });
+
+  it('summarizes the overall board difficulty and flags experimental tasks', () => {
+    const tasks = structuredClone(builtinGalleryTemplates()[0].configuration.tasks);
+    tasks.forEach((task) => { task.difficulty = 'hard'; });
+    expect(overallBoardDifficulty(tasks)).toBe('hard');
+    tasks[0].difficulty = 'experimental';
+    expect(overallBoardDifficulty(tasks)).toBe('experimental');
   });
 
   it('escapes user-authored structured data before embedding it in a script tag', () => {

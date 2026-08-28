@@ -18,7 +18,7 @@ RuneLite reports are authenticated client observations, not cryptographic proof.
 - `loot`: item drops, pets, and collection-log slots.
 - `kills`: boss-kill observations.
 - `raids`: raid completions, anonymous party size when required, and completion times.
-- `achievements`: combat achievements and clues.
+- `achievements`: supported clue completions. (The stable scope name is kept for beta-device compatibility.)
 
 Raw chat, other players' names, credentials, bank contents, full inventory/equipment, friends lists, and continuous location history are not accepted by the contract. Unknown fields are discarded during normalization.
 
@@ -36,6 +36,6 @@ Shared boss and raid observations may also include an 8–64 character `correlat
 
 ## Accepted observation types
 
-`xp_delta`, `level_reached`, `item_drop`, `pet_drop`, `collection_log`, `boss_kill`, `raid_complete`, `raid_time`, `combat_achievement`, and `clue_complete`.
+`xp_delta`, `level_reached`, `item_drop`, `pet_drop`, `collection_log`, `boss_kill`, `raid_complete`, `raid_time`, and `clue_complete`.
 
 The overlay capture plan tells the plugin which verifier targets are currently relevant. The plugin should not transmit unrelated gameplay events.

@@ -4,7 +4,7 @@ export const BINGO_RULE_SCHEMA_VERSION = 2 as const;
 
 export const BINGO_VERIFIERS = [
   'manual', 'item_acquired', 'pet_obtained', 'collection_log', 'xp_gain', 'level_reached',
-  'boss_kc', 'raid_complete', 'raid_time', 'combat_achievement', 'clue_complete', 'team_challenge',
+  'boss_kc', 'raid_complete', 'raid_time', 'clue_complete', 'team_challenge',
 ] as const;
 export type BingoVerifierType = typeof BINGO_VERIFIERS[number];
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateBingoStandings, claimAvailability, countCompletedLines } from '../lib/bingo-scoring';
-import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, serializeBingoTaskImport } from '../lib/bingo-types';
+import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, sanitizeBingoTaskDifficulty, serializeBingoTaskImport } from '../lib/bingo-types';
 import {
   defaultBingoEventRules,
   bingoUnlockPrerequisites,
@@ -196,11 +196,17 @@ describe('bingo task imports', () => {
   it('keeps starter boards progression-focused and account-fair', () => {
     expect(OSRS_BINGO_PRESETS.some((task) => task.rule.verifier.type === 'collection_log')).toBe(true);
     expect(OSRS_DEFAULT_BOARD_PRESETS.some((task) => task.rule.verifier.type === 'collection_log')).toBe(false);
-    expect(OSRS_BINGO_PRESETS.some((task) => task.rule.verifier.type === 'combat_achievement')).toBe(false);
+    expect(OSRS_BINGO_PRESETS.some((task) => task.difficulty === 'experimental')).toBe(true);
+    expect(OSRS_DEFAULT_BOARD_PRESETS.some((task) => task.difficulty === 'experimental')).toBe(false);
+    expect(OSRS_BINGO_PRESETS.some((task) => task.difficulty === 'expert')).toBe(true);
+    expect(OSRS_BINGO_PRESETS.some((task) => String(task.difficulty) === 'legendary')).toBe(false);
+    expect(sanitizeBingoTaskDifficulty('legendary')).toBe('expert');
+    expect(OSRS_BINGO_PRESETS.some((task) => String(task.rule.verifier.type) === 'combat_achievement')).toBe(false);
     expect(OSRS_BINGO_PRESETS.some((task) => /team photo/i.test(task.title))).toBe(false);
     for (const template of BUILTIN_BINGO_TEMPLATES) {
       expect(template.tasks.some((task) => task.rule.verifier.type === 'collection_log')).toBe(false);
-      expect(template.tasks.some((task) => task.rule.verifier.type === 'combat_achievement')).toBe(false);
+      expect(template.tasks.some((task) => task.difficulty === 'experimental')).toBe(false);
+      expect(template.tasks.some((task) => String(task.rule.verifier.type) === 'combat_achievement')).toBe(false);
       expect(template.tasks.some((task) => /team photo/i.test(task.title))).toBe(false);
     }
   });
