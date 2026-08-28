@@ -38,7 +38,7 @@ def validate_database(path: Path, seed_legacy: bool) -> None:
     required = {
         "drafts", "users", "sessions", "draft_runs", "player_insight_cache", "webhook_deliveries",
         "bingo_events", "bingo_teams", "bingo_team_members", "bingo_tasks", "bingo_evidence_uploads",
-        "bingo_claims", "bingo_completions", "bingo_activity", "bingo_templates", "bingo_player_snapshots",
+        "bingo_claims", "bingo_completions", "bingo_manual_progress", "bingo_activity", "bingo_templates", "bingo_player_snapshots",
     }
     assert required <= tables, f"Missing tables: {required - tables}"
     columns = {row[1] for row in connection.execute("PRAGMA table_info(drafts)")}

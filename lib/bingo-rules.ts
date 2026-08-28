@@ -72,6 +72,11 @@ export type BingoEventRules = {
   visibility: {
     hideLockedTasks: boolean;
   };
+  progression: {
+    unlockPattern: 'custom' | 'orthogonal';
+    startPosition: number;
+    tileOwnership: 'each_team' | 'first_team';
+  };
 };
 
 export type BingoBoardValidation = {
@@ -118,6 +123,7 @@ export function defaultBingoEventRules(gridSize = 5, winCondition: BingoEventRul
       linePatterns: ['rows', 'columns', 'diagonals'],
     },
     visibility: { hideLockedTasks: true },
+    progression: { unlockPattern: 'custom', startPosition: Math.floor((size * size) / 2), tileOwnership: 'each_team' },
   };
 }
 
@@ -197,6 +203,7 @@ export function sanitizeBingoEventRules(value: unknown, gridSize = 5, winConditi
   const layout = objectValue(input.layout);
   const scoring = objectValue(input.scoring);
   const visibility = objectValue(input.visibility);
+  const progression = objectValue(input.progression);
   const rows = clampInteger(layout.rows, 3, 7, fallback.layout.rows);
   const columns = clampInteger(layout.columns, 3, 7, rows);
   const validWinCondition = ['lines', 'points', 'blackout', 'categories'].includes(String(scoring.winCondition))
@@ -216,7 +223,36 @@ export function sanitizeBingoEventRules(value: unknown, gridSize = 5, winConditi
       linePatterns: linePatterns.length ? linePatterns : fallback.scoring.linePatterns,
     },
     visibility: { hideLockedTasks: visibility.hideLockedTasks !== false },
+    progression: {
+      unlockPattern: progression.unlockPattern === 'orthogonal' ? 'orthogonal' : 'custom',
+      startPosition: clampInteger(progression.startPosition, 0, rows * columns - 1, Math.floor((rows * columns) / 2)),
+      tileOwnership: progression.tileOwnership === 'first_team' ? 'first_team' : 'each_team',
+    },
   };
+}
+
+export function orthogonalNeighborPositions(position: number, rows: number, columns: number) {
+  if (!Number.isInteger(position) || position < 0 || position >= rows * columns) return [];
+  const row = Math.floor(position / columns);
+  const column = position % columns;
+  return [
+    row > 0 ? position - columns : null,
+    row + 1 < rows ? position + columns : null,
+    column > 0 ? position - 1 : null,
+    column + 1 < columns ? position + 1 : null,
+  ].filter((candidate): candidate is number => candidate !== null);
+}
+
+export function bingoUnlockPrerequisites(position: number, taskRule: BingoTaskRule, eventRules: BingoEventRules) {
+  if (eventRules.progression.unlockPattern === 'orthogonal') {
+    return {
+      positions: position === eventRules.progression.startPosition
+        ? []
+        : orthogonalNeighborPositions(position, eventRules.layout.rows, eventRules.layout.columns),
+      mode: 'any' as const,
+    };
+  }
+  return { positions: taskRule.prerequisitePositions, mode: 'all' as const };
 }
 
 export function verificationModeFromRule(rule: BingoTaskRule): BingoVerificationMode {

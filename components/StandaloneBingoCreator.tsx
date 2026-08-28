@@ -203,6 +203,7 @@ export function StandaloneBingoCreator({ templates }: { templates: StandaloneBin
           initialRules={selectedTemplate.configuration.rules}
           initialTasks={selectedTemplate.configuration.tasks}
           mode={selectedTemplate.configuration.mode}
+          boardScope={selectedTemplate.configuration.boardScope}
           onSave={createCustomEvent}
           saveLabel="Create bingo with this custom board →"
           saving={working}

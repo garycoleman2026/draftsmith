@@ -6,9 +6,10 @@ import type { BingoTaskDefinition } from '../lib/bingo-types';
 import type { BingoEventRules } from '../lib/bingo-rules';
 import type { BingoViewData, BingoViewTask, BingoViewVerificationCandidate } from '../lib/bingo-view-types';
 import type { BingoVerificationSignal } from '../lib/bingo-verification';
-import type { BingoMode } from '../lib/types';
+import type { BingoBoardScope, BingoMode } from '../lib/types';
 import { BingoBoard, BingoStandings } from './BingoBoard';
 import { BingoMaker } from './BingoMaker';
+import { BingoManualScorekeeper } from './BingoManualScorekeeper';
 import { BingoPlanningSummary } from './BingoPlanningSummary';
 import { BingoRuneliteOrganizerPanel } from './BingoRuneliteOrganizerPanel';
 import { BingoVerificationPanel } from './BingoVerificationPanel';
@@ -21,6 +22,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   const [data, setData] = useState<BingoViewData | null>(null);
   const [title, setTitle] = useState('');
   const [mode, setMode] = useState<BingoMode>('points');
+  const [boardScope, setBoardScope] = useState<BingoBoardScope>('per_team');
   const [requiresReview, setRequiresReview] = useState(true);
   const [publicSpectator, setPublicSpectator] = useState(true);
   const [publicListed, setPublicListed] = useState(false);
@@ -54,7 +56,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
       setData(next);
       if (!initialized.current) {
         initialized.current = true;
-        setTitle(next.event.title); setMode(next.event.mode); setRequiresReview(next.event.requiresReview);
+        setTitle(next.event.title); setMode(next.event.mode); setBoardScope(next.event.boardScope); setRequiresReview(next.event.requiresReview);
         setPublicSpectator(next.event.publicSpectator); setPublicListed(next.event.publicListed); setSpectatorDelaySeconds(next.event.spectatorDelaySeconds);
         setStartAt(toLocalInput(next.event.startAt)); setEndAt(toLocalInput(next.event.endAt));
         setTemplateName(`${next.event.title} board`);
@@ -83,7 +85,7 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   async function saveSettings() {
     await run('settings', base, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        title, mode, boardScope: mode === 'lockout' ? 'shared' : 'per_team', requiresReview, publicSpectator,
+        title, mode, boardScope: mode === 'lockout' ? 'shared' : boardScope, requiresReview, publicSpectator,
         publicListed: publicSpectator && publicListed,
         spectatorDelaySeconds, startAt: toIso(startAt), endAt: toIso(endAt),
       }),
@@ -183,7 +185,8 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Event settings</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Set the rules of the hall.</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <label className="text-[10px] font-black uppercase text-[#65583f] sm:col-span-2">Event title<input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-              <label className="text-[10px] font-black uppercase text-[#65583f]">Bingo type<select className="realm-field mt-1 h-11 w-full px-3 text-sm" value={mode} disabled={structuralLocked} onChange={(event) => setMode(event.target.value as BingoMode)}><option value="points">Points hunt</option><option value="classic">Classic lines</option><option value="lockout">Shared lockout</option><option value="blackout">Blackout race</option><option value="progression">Tiered expedition</option><option value="categories">Category conquest</option></select></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Bingo type<select className="realm-field mt-1 h-11 w-full px-3 text-sm" value={mode} disabled={structuralLocked} onChange={(event) => { const next = event.target.value as BingoMode; setMode(next); if (next === 'lockout') setBoardScope('shared'); }}><option value="points">Points hunt</option><option value="classic">Classic lines</option><option value="lockout">Shared lockout</option><option value="blackout">Blackout race</option><option value="progression">Progression / center-out</option><option value="categories">Category conquest</option></select></label>
+              <label className="text-[10px] font-black uppercase text-[#65583f]">Board behavior<select className="realm-field mt-1 h-11 w-full px-3 text-sm" value={mode === 'lockout' ? 'shared' : boardScope} disabled={structuralLocked || mode === 'lockout'} onChange={(event) => setBoardScope(event.target.value as BingoBoardScope)}><option value="per_team">Separate board per team</option><option value="shared">Shared unlock frontier</option></select></label>
               <label className="text-[10px] font-black uppercase text-[#65583f]">Spectator delay (seconds)<input className="realm-field mt-1 h-11 w-full px-3 text-sm" type="number" min={0} max={3600} value={spectatorDelaySeconds} onChange={(event) => setSpectatorDelaySeconds(Number(event.target.value))} /></label>
               <label className="text-[10px] font-black uppercase text-[#65583f]">Planned start<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} /></label>
               <label className="text-[10px] font-black uppercase text-[#65583f]">Planned end<input className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} /></label>
@@ -208,13 +211,14 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
             <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">No-code custom bingo maker</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Build the clan’s game, not just a spreadsheet.</h2><p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#6e5e43]">Choose a layout, arrange OSRS presets, define who contributes, set proof sources, and add unlock rules. Advanced boards still copy cleanly to and from spreadsheets.</p></div>
             <div className="grid min-w-72 gap-2 sm:min-w-[520px] sm:grid-cols-[minmax(0,1fr)_170px]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><select aria-label="Template category" className="realm-field h-11 w-full px-3 text-xs" value={templateCategory} onChange={(event) => setTemplateCategory(event.target.value)}>{['Mixed', 'Bossing', 'Raids', 'Skilling', 'Speed', 'Progression', 'Casual', 'Competitive'].map((item) => <option key={item}>{item}</option>)}</select><input aria-label="Template summary" className="realm-field h-11 w-full px-3 text-xs normal-case sm:col-span-2" maxLength={240} value={templateSummary} onChange={(event) => setTemplateSummary(event.target.value)} placeholder="What makes this board useful?" /><input aria-label="Template tags" className="realm-field h-11 w-full px-3 text-xs normal-case" value={templateTags} onChange={(event) => setTemplateTags(event.target.value)} placeholder="raids, weekend, mixed levels" /><label className="flex items-center gap-2 rounded border border-[#8b6a32]/30 bg-white/20 px-3 text-[10px] font-black uppercase text-[#5d4b30]"><input type="checkbox" checked={templatePublic} onChange={(event) => setTemplatePublic(event.target.checked)} /> Publish publicly</label><button className="iron-button px-4 py-2.5 text-xs sm:col-span-2" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : templatePublic ? 'Publish community template' : 'Save private template'}</button>{publishedTemplatePath ? <a className="text-center text-xs font-black text-[#315b39] underline sm:col-span-2" href={publishedTemplatePath} target="_blank" rel="noreferrer">Open published template ↗</a> : null}</div>
           </div>
-          <div className="mt-5"><BingoMaker initialTasks={taskDefinitions} initialRules={data.event.rules} mode={data.event.mode} disabled={structuralLocked} saving={working === 'tasks'} teamSize={teamSize} startAt={startAt} endAt={endAt} onSave={saveBoard} /></div>
+          <div className="mt-5"><BingoMaker initialTasks={taskDefinitions} initialRules={data.event.rules} mode={data.event.mode} boardScope={data.event.boardScope} disabled={structuralLocked} saving={working === 'tasks'} teamSize={teamSize} startAt={startAt} endAt={endAt} onSave={saveBoard} /></div>
           <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>WOM baseline:</b> {data.wiseOldMan.baselineCoverage} players · <b>Last sync:</b> {data.wiseOldMan.lastSyncAt ? new Date(data.wiseOldMan.lastSyncAt).toLocaleString() : 'Not run'} · <b>Worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
         </section>
 
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
           <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} /></section>
           <aside className="space-y-5">
+            <BingoManualScorekeeper data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} />
             <BingoRuneliteOrganizerPanel base={base} onNotice={setSuccess} onError={setError} />
             <BingoWiseOldManPanel data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} />
             <BingoVerificationPanel data={data} working={working} preview={verificationPreview} onResolve={resolveCandidate} onReplay={replayVerification} onSignal={submitVerificationSignal} />

@@ -67,9 +67,9 @@ export function TemplateActions({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <button className="gold-button px-5 py-3 text-sm" type="button" onClick={chooseTemplate}>Use this board</button>
+        <Link className="gold-button px-5 py-3 text-sm" href={`/bingo/studio?template=${encodeURIComponent(slug)}`}>Customize in board studio →</Link>
+        <button className="scroll-button px-5 py-3 text-sm" type="button" onClick={chooseTemplate}>Use after a draft</button>
         <button className="scroll-button px-5 py-3 text-sm" type="button" onClick={() => void copyBoard()}>Copy task sheet</button>
-        <Link className="scroll-button px-5 py-3 text-sm" href="/">Create teams first →</Link>
       </div>
       {official ? (
         <p className="text-xs text-[#756748]">Official starter boards are maintained by Terry’s Drafting and do not accept community ratings.</p>

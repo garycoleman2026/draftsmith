@@ -1,7 +1,7 @@
 import { resolveManagerDraftId } from './access-tokens';
 import { calculateBingoStandings, claimAvailability, type BingoScoreCompletion } from './bingo-scoring';
 import { getDatabase } from './db';
-import { sanitizeBingoEventRules, sanitizeBingoTaskRule, type BingoEventRules } from './bingo-rules';
+import { bingoUnlockPrerequisites, sanitizeBingoEventRules, sanitizeBingoTaskRule, type BingoEventRules } from './bingo-rules';
 import { hashToken } from './security';
 import type { BingoBoardScope, BingoClaimStatus, BingoMode, BingoStatus, BingoVerificationMode } from './types';
 
@@ -28,6 +28,7 @@ type ClaimRow = {
   verification_source: string; verification_confidence: string; verification_candidate_id: string | null;
 };
 type CompletionRow = { id: string; task_id: string; team_id: string; claim_id: string; completion_number: number; points: number; verification_source: string; verification_confidence: string; completed_at: string };
+type ManualProgressRow = { id: string; task_id: string; team_id: string; member_id: string | null; progress_value: number; target_value: number; note: string; updated_at: string };
 type ActivityRow = { id: string; team_id: string | null; task_id: string | null; activity_type: string; message: string; metadata_json: string | null; visible_at: string; created_at: string };
 type CandidateRow = {
   id: string; task_id: string; team_id: string; member_id: string | null; source_summary: string; confidence: string;
@@ -104,8 +105,10 @@ export async function loadBingoView(input: {
   if (input.viewer === 'public' && !event.public_spectator) throw new BingoError('Public spectating is disabled for this event.', 404);
   const candidateScope = input.viewer === 'organizer' ? '' : input.viewer === 'team' ? ' AND team_id = ?' : ' AND 1 = 0';
   const candidateBindings = input.viewer === 'team' ? [event.id, input.teamId ?? ''] : [event.id];
+  const progressScope = input.viewer === 'team' ? ' AND team_id = ?' : '';
+  const progressBindings = input.viewer === 'team' ? [event.id, input.teamId ?? ''] : [event.id];
 
-  const [teamResult, memberResult, taskResult, claimResult, completionResult, activityResult, snapshotResult, candidateResult, verificationCount,
+  const [teamResult, memberResult, taskResult, claimResult, completionResult, manualProgressResult, activityResult, snapshotResult, candidateResult, verificationCount,
     womIntegration, womLatestRun, womBaselineCoverage] = await Promise.all([
     db.prepare('SELECT id, event_id, source_team_index, name, color, emblem FROM bingo_teams WHERE event_id = ? ORDER BY source_team_index')
       .bind(event.id).all<TeamRow>(),
@@ -123,6 +126,9 @@ export async function loadBingoView(input: {
     db.prepare(`SELECT id, task_id, team_id, claim_id, completion_number, points, verification_source,
                        verification_confidence, completed_at
                 FROM bingo_completions WHERE event_id = ? ORDER BY completed_at`).bind(event.id).all<CompletionRow>(),
+    db.prepare(`SELECT id, task_id, team_id, member_id, progress_value, target_value, note, updated_at
+                FROM bingo_manual_progress WHERE event_id = ?${progressScope} ORDER BY updated_at DESC`)
+      .bind(...progressBindings).all<ManualProgressRow>(),
     db.prepare(`SELECT id, team_id, task_id, activity_type, message, metadata_json, visible_at, created_at
                 FROM bingo_activity WHERE event_id = ? ORDER BY created_at DESC LIMIT 80`).bind(event.id).all<ActivityRow>(),
     db.prepare(`SELECT phase, COUNT(*) AS count, MAX(captured_at) AS captured_at
@@ -223,17 +229,25 @@ export async function loadBingoView(input: {
       const owners = completions.filter((completion) => completion.task_id === task.id).map((completion) => completion.team_id);
       const pendingTeamIds = pendingClaims.filter((claim) => claim.task_id === task.id).map((claim) => claim.team_id);
       const rule = sanitizeBingoTaskRule(parseJson(task.rule_json, {}), task.verification_mode);
-      const prerequisiteTaskIds = rule.prerequisitePositions.flatMap((position) => {
+      const unlockRule = bingoUnlockPrerequisites(task.sort_order, rule, eventRules);
+      const prerequisiteTaskIds = unlockRule.positions.flatMap((position) => {
         const prerequisite = taskResult.results.find((candidate) => candidate.sort_order === position);
         return prerequisite ? [prerequisite.id] : [];
       });
-      const prerequisiteCompleteFor = (teamId: string) => prerequisiteTaskIds.every((taskId) =>
-        completions.some((completion) => completion.task_id === taskId && completion.team_id === teamId));
-      const unlocked = !prerequisiteTaskIds.length
-        || input.viewer === 'team' && Boolean(input.teamId && prerequisiteCompleteFor(input.teamId))
-        || input.viewer === 'public' && teamResult.results.some((team) => prerequisiteCompleteFor(team.id));
+      const prerequisiteCompleteFor = (teamId: string | null) => {
+        const completed = prerequisiteTaskIds.filter((taskId) => completions.some((completion) =>
+          completion.task_id === taskId && (teamId === null || completion.team_id === teamId)));
+        return unlockRule.mode === 'any'
+          ? prerequisiteTaskIds.length === 0 || completed.length > 0
+          : completed.length === prerequisiteTaskIds.length;
+      };
+      const unlocked = input.viewer === 'team' && Boolean(input.teamId && prerequisiteCompleteFor(event.board_scope === 'shared' ? null : input.teamId))
+        || input.viewer !== 'team' && (event.board_scope === 'shared'
+          ? prerequisiteCompleteFor(null)
+          : teamResult.results.some((team) => prerequisiteCompleteFor(team.id)));
       const viewerHasCompletion = input.viewer === 'team' && input.teamId ? owners.includes(input.teamId) : owners.length > 0;
-      const concealed = Boolean(task.hidden) && input.viewer !== 'organizer' && !viewerHasCompletion && !unlocked;
+      const concealed = input.viewer !== 'organizer' && !viewerHasCompletion && !unlocked
+        && (Boolean(task.hidden) || eventRules.visibility.hideLockedTasks);
       const availability = input.viewer === 'team' && input.teamId ? claimAvailability({
         mode: event.mode,
         repeatable: Boolean(task.repeatable),
@@ -243,6 +257,9 @@ export async function loadBingoView(input: {
         completions: scoreCompletions,
         hasPendingClaim: pendingTeamIds.includes(input.teamId),
         prerequisiteTaskIds,
+        prerequisiteMode: unlockRule.mode,
+        prerequisiteTeamId: event.board_scope === 'shared' ? null : input.teamId,
+        globalLockout: event.board_scope === 'shared' && eventRules.progression.tileOwnership === 'first_team',
       }) : null;
       return {
         id: task.id,
@@ -255,6 +272,7 @@ export async function loadBingoView(input: {
         repeatable: Boolean(task.repeatable),
         maxCompletions: task.max_completions,
         hidden: Boolean(task.hidden),
+        unlocked,
         concealed,
         freeSpace: Boolean(task.free_space),
         iconKey: task.icon_key,
@@ -300,6 +318,18 @@ export async function loadBingoView(input: {
       verificationConfidence: completion.verification_confidence,
       completedAt: completion.completed_at,
     })),
+    manualProgress: manualProgressResult.results
+      .filter((progress) => input.viewer !== 'public' || progress.updated_at <= cutoff)
+      .map((progress) => ({
+      id: progress.id,
+      taskId: progress.task_id,
+      teamId: progress.team_id,
+      memberId: progress.member_id,
+      progressValue: progress.progress_value,
+      targetValue: progress.target_value,
+      note: input.viewer === 'public' ? '' : progress.note,
+        updatedAt: progress.updated_at,
+      })),
     activity: activityResult.results.filter((activity) => {
       if (input.viewer === 'organizer') return true;
       if (input.viewer === 'public') {

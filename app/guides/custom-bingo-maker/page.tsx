@@ -10,11 +10,11 @@ export const metadata: Metadata = {
 
 export default function CustomMakerGuidePage() {
   return <ContentPage eyebrow="Custom bingo maker" title="Make unusual rules without commissioning a new feature." intro="Most custom ideas can be expressed as data: a title, target, amount, contributor scope, evidence source, points value, and relationship to other tiles. Code is reserved for genuinely new kinds of game evidence.">
-    <h2>Start with drafted teams or paste the teams you already have.</h2>
-    <p>The <Link href="/bingo#create">bingo hall</Link> accepts pre-made rosters directly. Enter the event name and dates, paste the teams, then choose <strong>Customize board before launch</strong>. The complete editor opens on that same page, before any event or private link is created. Separate teams with a blank line, put the team name first, and add one OSRS name per line. The first listed player is only the displayed team lead; it does not grant extra scoring power.</p>
+    <h2>Start with the board—not an event.</h2>
+    <p>The <Link href="/bingo/studio">board studio</Link> works without teams, dates, a draft, or a live bingo. Start from an official or community template, edit the entire board, then save it privately or publish it to the marketplace. When the rules are ready, the <Link href="/bingo#create">bingo hall</Link> can launch the design with pre-made rosters, or a Terry draft can provide the teams.</p>
 
     <h2>What organizers can build today.</h2>
-    <p>The maker supports 3 × 3 through 7 × 7 boards, six built-in game styles, sixty editable OSRS presets, item or boss artwork, notes, exclusions, source links, expected-time assumptions, hidden tiles, free spaces, repeat limits, task prerequisites, shared or per-team ownership, and saved clan templates. You can paste tasks as rows for fast bulk editing or tune each rule in the visual editor.</p>
+    <p>The maker supports 3 × 3 through 7 × 7 boards, seven official starters, more than 250 editable OSRS presets, item or boss artwork, notes, exclusions, source links, expected-time assumptions, hidden tiles, free spaces, repeat limits, task prerequisites, shared or per-team progression, private saves, and public community templates. You can paste tasks as rows for fast bulk editing or tune each rule in the visual editor.</p>
 
     <h2>The anatomy of a precise tile.</h2>
     <table><thead><tr><th>Field</th><th>Question it answers</th><th>Example</th></tr></thead><tbody>
@@ -52,6 +52,7 @@ export default function CustomMakerGuidePage() {
       <tr><td>Lockout</td><td>The first approved team owns a shared square.</td><td>High interaction and active organizers.</td></tr>
       <tr><td>Blackout</td><td>Complete the whole board first.</td><td>Long events with carefully reachable tasks.</td></tr>
       <tr><td>Progression</td><td>Tasks reveal or unlock through prerequisites.</td><td>Campaign-like pacing and tiered difficulty.</td></tr>
+      <tr><td>Center-out</td><td>Begin in the middle; each completed tile opens its four orthogonal neighbors.</td><td>Exploration boards, fog-of-war, and competing frontiers.</td></tr>
       <tr><td>Categories</td><td>Score breadth across task families.</td><td>Preventing one specialty from dominating.</td></tr>
     </tbody></table>
 

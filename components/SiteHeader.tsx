@@ -18,6 +18,7 @@ export function SiteHeader({ badge }: { badge?: string }) {
           <nav aria-label="Main navigation" className="hidden items-center gap-4 xl:flex">
             <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/">Draft teams</Link>
             <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/bingo">Bingo hall</Link>
+            <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/bingo/studio">Board studio</Link>
             <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/templates">Templates</Link>
             <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/presets">Task library</Link>
             <Link className="text-xs font-black text-[#cbb77f] hover:text-[#f5df9b]" href="/clans">Clans</Link>
@@ -29,6 +30,7 @@ export function SiteHeader({ badge }: { badge?: string }) {
             <nav aria-label="Mobile navigation" className="absolute right-0 z-50 mt-2 grid w-44 gap-1 rounded border border-[#9b792f] bg-[#1c1710] p-2 shadow-2xl">
               <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/">Draft teams</Link>
               <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/bingo">Bingo hall</Link>
+              <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/bingo/studio">Board studio</Link>
               <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/templates">Templates</Link>
               <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/presets">Task library</Link>
               <Link className="rounded px-3 py-2 text-xs font-black text-[#e3cf96] hover:bg-white/10" href="/clans">Clans</Link>

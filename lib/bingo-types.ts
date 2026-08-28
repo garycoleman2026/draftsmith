@@ -1,6 +1,7 @@
 import {
   defaultBingoEventRules,
   defaultBingoTaskRule,
+  expectedIndividualHours,
   sanitizeBingoEventRules,
   sanitizeBingoTaskRule,
   verificationModeFromRule,
@@ -11,6 +12,7 @@ import {
   type BingoVerifierType,
 } from './bingo-rules';
 import type { BingoBoardScope, BingoMode, BingoVerificationMode } from './types';
+import { OSRS_BOSS_UNIQUE_DROPS } from './osrs-boss-uniques';
 
 export type BingoTaskDefinition = {
   id?: string;
@@ -166,6 +168,21 @@ export const OSRS_BINGO_PRESETS: BingoTaskDefinition[] = [
   preset('Receive an imp champion scroll', 240, 'Collection', 'item_acquired', { target: 'Imp champion scroll', difficulty: 'hard', imageKind: 'item', imageKey: 'Imp champion scroll', dropRateNumerator: 1, dropRateDenominator: 5_000, efficientKillsPerHour: 650 }),
   preset('Receive the jar of dirt from Kraken', 300, 'Collection', 'item_acquired', { target: 'Jar of dirt', difficulty: 'hard', imageKind: 'item', imageKey: 'Jar of Dirt', dropRateNumerator: 1, dropRateDenominator: 1_000, efficientKillsPerHour: 80 }),
   preset('Take a full-team victory photo at the Grand Exchange fountain', 500, 'Finale', 'manual', { target: 'Grand Exchange fountain team photo', scope: 'all_members', difficulty: 'legendary', fixedHours: 0.25, imageKind: 'item', imageKey: 'Oculus orb', exclusions: 'Every rostered member must be visible and the screenshot must be taken during the event.', sources: ['screenshot', 'organizer'] }),
+  preset('Receive an elite clue from any Dagannoth King', 95, 'Clues', 'item_acquired', { target: 'Clue scroll (elite)', difficulty: 'medium', imageKind: 'item', imageKey: 'Clue scroll (elite)', dropRateNumerator: 1, dropRateDenominator: 750, efficientKillsPerHour: 100, notes: 'Any elite clue dropped by Dagannoth Rex, Prime, or Supreme counts. The planning rate combines efficient tribrid kills across all three kings.', exclusions: 'Elite clues from other sources and clues owned before the event do not count.', sourceUrl: 'https://oldschool.runescape.wiki/w/Dagannoth_Kings' }),
+  ...OSRS_BOSS_UNIQUE_DROPS.map(({ boss, item, sourceUrl }) => preset(
+    `Receive ${item} from ${boss}`,
+    100,
+    'Boss uniques',
+    'item_acquired',
+    {
+      target: item,
+      imageKind: 'item',
+      imageKey: item,
+      notes: `Receive this boss-specific reward from ${boss} during the event. Add the current individual drop rate and efficient attempts per hour when balancing the board.`,
+      exclusions: 'Items owned before the event, bought, traded, or received from another source do not count.',
+      sourceUrl,
+    },
+  )),
 ];
 
 function tasksFor(mode: BingoMode): BingoTaskDefinition[] {
@@ -197,6 +214,32 @@ function template(key: string, name: string, description: string, mode: BingoMod
   };
 }
 
+function centerOutTemplate(): BingoTemplateDefinition {
+  const rules = defaultBingoEventRules(7, 'points');
+  rules.visibility.hideLockedTasks = true;
+  rules.progression = { unlockPattern: 'orthogonal', startPosition: 24, tileOwnership: 'each_team' };
+  const estimated = OSRS_BINGO_PRESETS.filter((task) => expectedIndividualHours(task.rule) !== null);
+  const tasks = Array.from({ length: 49 }, (_, index) => {
+    const task = structuredClone(estimated[index % estimated.length]);
+    task.points = 1;
+    task.hidden = false;
+    return task;
+  });
+  return {
+    schemaVersion: 1,
+    key: 'center-out',
+    name: 'Center-out expedition',
+    description: 'Begin at the center and unlock tiles directly above, below, left, or right as the frontier expands.',
+    mode: 'progression',
+    boardScope: 'per_team',
+    winCondition: 'points',
+    targetValue: 0,
+    gridSize: 7,
+    rules,
+    tasks,
+  };
+}
+
 export const BUILTIN_BINGO_TEMPLATES: BingoTemplateDefinition[] = [
   template('classic', 'Classic 5 × 5', 'Complete a row, column, or diagonal first.', 'classic', 'lines'),
   template('points', 'Weekend points hunt', 'Every verified tile scores its listed value.', 'points', 'points'),
@@ -204,6 +247,7 @@ export const BUILTIN_BINGO_TEMPLATES: BingoTemplateDefinition[] = [
   template('blackout', 'Blackout race', 'Complete the whole board before the other teams.', 'blackout', 'blackout'),
   template('progression', 'Tiered expedition', 'Each row unlocks after the matching task above it is complete.', 'progression', 'points'),
   template('categories', 'Category conquest', 'Complete enough tasks across the broadest set of categories.', 'categories', 'categories'),
+  centerOutTemplate(),
 ];
 
 export function getBuiltinBingoTemplate(key: unknown) {

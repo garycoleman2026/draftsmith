@@ -1,6 +1,6 @@
 import { recordAudit } from './audit';
 import { BingoError, bingoActivityInsert, parseJson } from './bingo';
-import { sanitizeBingoTaskRule } from './bingo-rules';
+import { bingoUnlockPrerequisites, sanitizeBingoEventRules, sanitizeBingoTaskRule } from './bingo-rules';
 import { claimAvailability, type BingoScoreCompletion } from './bingo-scoring';
 import { getDatabase } from './db';
 import { scheduleDiscordEvent } from './discord-webhooks';
@@ -13,6 +13,9 @@ type ReviewableClaim = {
   event_title: string;
   event_status: string;
   mode: BingoMode;
+  board_scope: string;
+  grid_size: number;
+  rules_json: string | null;
   spectator_delay_seconds: number;
   task_id: string;
   task_title: string;
@@ -44,7 +47,8 @@ export async function reviewBingoClaim(input: {
   const claim = await db.prepare(
     `SELECT bc.id, bc.event_id, bc.task_id, bc.team_id, bc.claimed_by_name, bc.evidence_upload_id,
             bc.verification_source, bc.verification_confidence, bc.verification_candidate_id, bc.status,
-            be.draft_id, be.title AS event_title, be.status AS event_status, be.mode, be.spectator_delay_seconds,
+            be.draft_id, be.title AS event_title, be.status AS event_status, be.mode, be.board_scope,
+            be.grid_size, be.rules_json, be.spectator_delay_seconds,
             bt.title AS task_title, bt.points AS task_points, bt.repeatable, bt.max_completions, bt.free_space,
             bt.verification_mode, bt.sort_order, bt.rule_json,
             bteam.name AS team_name
@@ -93,6 +97,9 @@ export async function reviewBingoClaim(input: {
   const completions: BingoScoreCompletion[] = completionRows.results.map((row) => ({
     taskId: row.task_id, teamId: row.team_id, points: row.points,
   }));
+  const taskRule = sanitizeBingoTaskRule(parseJson(claim.rule_json, {}), claim.verification_mode as 'manual' | 'screenshot' | 'stat_delta' | 'hybrid');
+  const eventRules = sanitizeBingoEventRules(parseJson(claim.rules_json, {}), claim.grid_size);
+  const unlockRule = bingoUnlockPrerequisites(claim.sort_order, taskRule, eventRules);
   const availability = claimAvailability({
     mode: claim.mode,
     repeatable: Boolean(claim.repeatable),
@@ -101,11 +108,13 @@ export async function reviewBingoClaim(input: {
     teamId: claim.team_id,
     completions,
     hasPendingClaim: false,
-    prerequisiteTaskIds: sanitizeBingoTaskRule(parseJson(claim.rule_json, {}), claim.verification_mode as 'manual' | 'screenshot' | 'stat_delta' | 'hybrid')
-      .prerequisitePositions.flatMap((position) => {
+    prerequisiteTaskIds: unlockRule.positions.flatMap((position) => {
         const prerequisite = taskRows.results.find((task) => task.sort_order === position);
         return prerequisite ? [prerequisite.id] : [];
       }),
+    prerequisiteMode: unlockRule.mode,
+    prerequisiteTeamId: claim.board_scope === 'shared' ? null : claim.team_id,
+    globalLockout: claim.board_scope === 'shared' && eventRules.progression.tileOwnership === 'first_team',
   });
   if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile is no longer available.', 409);
   const completionNumber = completions.filter((completion) => completion.teamId === claim.team_id && completion.taskId === claim.task_id).length + 1;
@@ -119,7 +128,7 @@ export async function reviewBingoClaim(input: {
            verification_source, verification_confidence, completed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), claim.event_id, claim.task_id, claim.team_id, claim.id, completionNumber,
-        claim.mode === 'lockout' ? claim.task_id : null, claim.task_points,
+        claim.mode === 'lockout' || claim.board_scope === 'shared' && eventRules.progression.tileOwnership === 'first_team' ? claim.task_id : null, claim.task_points,
         claim.verification_source, approvedConfidence, now),
       db.prepare(
         `UPDATE bingo_claims SET status = 'approved', review_note = ?, score_awarded = ?, verification_confidence = ?,

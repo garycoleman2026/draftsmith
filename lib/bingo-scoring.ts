@@ -63,14 +63,28 @@ export function claimAvailability(input: {
   completions: BingoScoreCompletion[];
   hasPendingClaim: boolean;
   prerequisiteTaskIds?: string[];
+  prerequisiteMode?: 'all' | 'any';
+  prerequisiteTeamId?: string | null;
+  globalLockout?: boolean;
 }) {
   if (input.hasPendingClaim) return { allowed: false, reason: 'Your team already has this tile under review.' };
-  const completedByTeam = new Set(input.completions.filter((completion) => completion.teamId === input.teamId)
+  const prerequisiteTeamId = input.prerequisiteTeamId === undefined ? input.teamId : input.prerequisiteTeamId;
+  const completedForUnlock = new Set(input.completions.filter((completion) => prerequisiteTeamId === null || completion.teamId === prerequisiteTeamId)
     .map((completion) => completion.taskId));
-  const missingPrerequisites = (input.prerequisiteTaskIds ?? []).filter((taskId) => !completedByTeam.has(taskId));
-  if (missingPrerequisites.length) return { allowed: false, reason: `Complete ${missingPrerequisites.length} prerequisite tile${missingPrerequisites.length === 1 ? '' : 's'} first.` };
+  const prerequisiteTaskIds = input.prerequisiteTaskIds ?? [];
+  const completedPrerequisites = prerequisiteTaskIds.filter((taskId) => completedForUnlock.has(taskId));
+  const prerequisitesSatisfied = input.prerequisiteMode === 'any'
+    ? prerequisiteTaskIds.length === 0 || completedPrerequisites.length > 0
+    : completedPrerequisites.length === prerequisiteTaskIds.length;
+  if (!prerequisitesSatisfied) {
+    const missingCount = prerequisiteTaskIds.length - completedPrerequisites.length;
+    const reason = input.prerequisiteMode === 'any'
+      ? 'Complete one adjacent unlocked tile first.'
+      : `Complete ${missingCount} prerequisite tile${missingCount === 1 ? '' : 's'} first.`;
+    return { allowed: false, reason };
+  }
   const global = input.completions.filter((completion) => completion.taskId === input.taskId);
-  if (input.mode === 'lockout' && global.length) return { allowed: false, reason: 'Another team already owns this lockout tile.' };
+  if ((input.mode === 'lockout' || input.globalLockout) && global.length) return { allowed: false, reason: 'Another team already owns this competitive tile.' };
   const team = global.filter((completion) => completion.teamId === input.teamId);
   if (!input.repeatable && team.length) return { allowed: false, reason: 'Your team already completed this tile.' };
   if (input.repeatable && team.length >= input.maxCompletions) return { allowed: false, reason: 'Your team reached this task’s completion limit.' };

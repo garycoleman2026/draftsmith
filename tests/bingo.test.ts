@@ -3,11 +3,14 @@ import { calculateBingoStandings, claimAvailability, countCompletedLines } from 
 import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, serializeBingoTaskImport } from '../lib/bingo-types';
 import {
   defaultBingoEventRules,
+  bingoUnlockPrerequisites,
   bingoTaskImageUrl,
   expectedIndividualHours,
   expectedTeamHours,
   formatTaskTime,
   sanitizeBingoTaskRule,
+  sanitizeBingoEventRules,
+  orthogonalNeighborPositions,
   validateBingoBoard,
 } from '../lib/bingo-rules';
 
@@ -75,6 +78,36 @@ describe('bingo claim constraints', () => {
       completions: [{ taskId: 'first', teamId: 'a', points: 10 }], hasPendingClaim: false,
       prerequisiteTaskIds: ['first'],
     })).toMatchObject({ allowed: true });
+  });
+
+  it('unlocks center-out boards through any orthogonal neighbor, never diagonally', () => {
+    expect(orthogonalNeighborPositions(12, 5, 5)).toEqual([7, 17, 11, 13]);
+    expect(orthogonalNeighborPositions(0, 5, 5)).toEqual([5, 1]);
+    const rules = sanitizeBingoEventRules({
+      layout: { rows: 5, columns: 5 }, progression: { unlockPattern: 'orthogonal', startPosition: 12 },
+    });
+    expect(bingoUnlockPrerequisites(12, sanitizeBingoTaskRule({}), rules)).toEqual({ positions: [], mode: 'any' });
+    expect(bingoUnlockPrerequisites(7, sanitizeBingoTaskRule({}), rules)).toEqual({ positions: [2, 12, 6, 8], mode: 'any' });
+    expect(claimAvailability({
+      mode: 'progression', repeatable: false, maxCompletions: 1, taskId: 'tile-7', teamId: 'a', hasPendingClaim: false,
+      prerequisiteTaskIds: ['tile-2', 'tile-12', 'tile-6', 'tile-8'], prerequisiteMode: 'any',
+      completions: [{ taskId: 'tile-12', teamId: 'a', points: 1 }],
+    })).toMatchObject({ allowed: true });
+  });
+
+  it('can share progression unlocks across teams on a shared board', () => {
+    expect(claimAvailability({
+      mode: 'progression', repeatable: false, maxCompletions: 1, taskId: 'next', teamId: 'b', hasPendingClaim: false,
+      prerequisiteTaskIds: ['center'], prerequisiteMode: 'any', prerequisiteTeamId: null,
+      completions: [{ taskId: 'center', teamId: 'a', points: 1 }],
+    })).toMatchObject({ allowed: true });
+  });
+
+  it('supports first-team ownership on a shared progression frontier', () => {
+    expect(claimAvailability({
+      mode: 'progression', repeatable: false, maxCompletions: 1, taskId: 'frontier', teamId: 'b', hasPendingClaim: false,
+      completions: [{ taskId: 'frontier', teamId: 'a', points: 1 }], globalLockout: true,
+    })).toMatchObject({ allowed: false });
   });
 });
 
@@ -151,12 +184,21 @@ describe('bingo task imports', () => {
   });
 
   it('ships a broad OSRS library with the requested headline presets', () => {
-    expect(OSRS_BINGO_PRESETS.length).toBeGreaterThanOrEqual(60);
+    expect(OSRS_BINGO_PRESETS.length).toBeGreaterThanOrEqual(250);
     expect(OSRS_BINGO_PRESETS.map((task) => task.title)).toEqual(expect.arrayContaining([
       'Get an Oathplate helm', 'Obtain the Baby mole pet', 'Receive a Twisted ancestral colour kit',
       'Beat the GM Theatre of Blood trio time', 'Beat the Chambers CM five-player time',
-      'Gain 10,000,000 team Agility XP',
+      'Gain 10,000,000 team Agility XP', 'Receive an elite clue from any Dagannoth King',
+      'Receive Bandos chestplate from General Graardor', 'Receive Oathplate chest from Yama',
     ]));
+  });
+
+  it('ships a seven-by-seven center-out starter with one-point tiles', () => {
+    const centerOut = BUILTIN_BINGO_TEMPLATES.find((template) => template.key === 'center-out')!;
+    expect(centerOut).toMatchObject({ mode: 'progression', boardScope: 'per_team', gridSize: 7 });
+    expect(centerOut.tasks).toHaveLength(49);
+    expect(centerOut.tasks.every((task) => task.points === 1)).toBe(true);
+    expect(centerOut.rules.progression).toEqual({ unlockPattern: 'orthogonal', startPosition: 24, tileOwnership: 'each_team' });
   });
 
   it('configures resolvable artwork keys for every official preset', () => {

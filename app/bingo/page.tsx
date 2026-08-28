@@ -53,7 +53,7 @@ export default async function BingoHallPage() {
             <h1 className="fantasy-title mt-3 max-w-4xl text-4xl font-bold leading-none text-[#f5df9b] sm:text-6xl">Run the whole clan bingo from one great hall.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#b5a888]">Design a custom OSRS bingo, run live scoring and private team claims, review evidence, and publish a spectator board—using teams Terry drafted or rosters your clan already formed.</p>
           </div>
-          <Link className="gold-button inline-flex justify-center px-5 py-3 text-sm" href="#create">Create from existing teams ↓</Link>
+          <div className="flex flex-wrap gap-2"><Link className="gold-button inline-flex justify-center px-5 py-3 text-sm" href="#create">Create from existing teams ↓</Link><Link className="scroll-button inline-flex justify-center px-5 py-3 text-sm" href="/bingo/studio">Design a board only →</Link></div>
         </div>
 
         <StandaloneBingoCreator templates={templates} />
@@ -84,8 +84,8 @@ export default async function BingoHallPage() {
             </div>
             <div className="mt-7 border-t border-white/10 pt-5">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Built-in halls</p>
-              <p className="mt-3 text-sm leading-relaxed text-[#c7b995]">Classic · Points · Lockout · Blackout · Progression · Categories</p>
-              <p className="mt-2 text-xs leading-relaxed text-[#9f9272]">Build 3 × 3 through 7 × 7 boards from 60 OSRS presets, custom proof rules, unlock paths, and reusable clan templates.</p>
+              <p className="mt-3 text-sm leading-relaxed text-[#c7b995]">Classic · Points · Lockout · Blackout · Progression · Center-out · Categories</p>
+              <p className="mt-2 text-xs leading-relaxed text-[#9f9272]">Build 3 × 3 through 7 × 7 boards from 250+ specific OSRS presets, custom proof rules, unlock paths, and reusable community templates.</p>
             </div>
           </aside>
         </div>

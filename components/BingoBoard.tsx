@@ -47,8 +47,14 @@ export function BingoBoard({
               .filter((completion) => completion.taskId === task.id && owners.includes(completion.teamId))
               .map((completion) => `${formatProofSource(completion.verificationSource)} · ${completion.verificationConfidence}`))];
             const ownPending = Boolean(teamId && task.pendingTeamIds.includes(teamId));
+            const progressRows = data.manualProgress.filter((progress) => progress.taskId === task.id && (!teamId || progress.teamId === teamId));
+            const manualProgress = [...progressRows].sort((left, right) =>
+              right.progressValue / Math.max(right.targetValue, 0.000001) - left.progressValue / Math.max(left.targetValue, 0.000001))[0];
+            const progressTeam = manualProgress ? data.teams.find((team) => team.id === manualProgress.teamId) : null;
             const selected = selectedTaskId === task.id;
-            const style = data.event.mode === 'lockout' && ownerTeams[0]
+            const competitiveOwnership = data.event.mode === 'lockout'
+              || data.event.boardScope === 'shared' && data.event.rules.progression.tileOwnership === 'first_team';
+            const style = competitiveOwnership && ownerTeams[0]
               ? { borderColor: ownerTeams[0].color, boxShadow: `inset 0 0 0 3px ${ownerTeams[0].color}55, 0 3px 0 #5c431f` }
               : undefined;
             const individualHours = task.concealed ? null : expectedIndividualHours(task.rule);
@@ -56,7 +62,7 @@ export function BingoBoard({
             return (
               <button
                 aria-label={`${task.concealed ? 'Hidden task' : task.title}. Open task details.`}
-                className={`parchment-card min-h-40 w-full p-3 text-left transition hover:-translate-y-0.5 hover:brightness-105 ${selected ? 'ring-4 ring-[#517347]/35' : ''}`}
+                className={`parchment-card min-h-40 w-full p-3 text-left transition hover:-translate-y-0.5 hover:brightness-105 ${!task.unlocked && !task.concealed ? 'opacity-75 grayscale-[35%]' : ''} ${selected ? 'ring-4 ring-[#517347]/35' : ''}`}
                 key={task.id}
                 onClick={() => setDetailTask(task)}
                 style={style}
@@ -64,7 +70,7 @@ export function BingoBoard({
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[#675331]">
-                    {task.freeSpace ? '◆ Free' : ownPending ? '⌛ Pending' : ownerTeams.length ? '✓ Complete' : task.concealed ? '???' : task.category}
+                    {task.freeSpace ? '◆ Free' : ownPending ? '⌛ Pending' : ownerTeams.length ? '✓ Complete' : task.concealed ? '???' : !task.unlocked ? '🔒 Locked' : task.category}
                   </span>
                   <span className="shrink-0 rounded bg-[#5b4526]/10 px-1.5 py-0.5 text-[10px] font-black text-[#4f3b20]">
                     {task.points === null ? '?' : task.freeSpace ? 'FREE' : `${task.points} pt${task.points === 1 ? '' : 's'}`}
@@ -81,6 +87,7 @@ export function BingoBoard({
                   </div>
                 ) : ownPending ? <p className="mt-3 text-[10px] font-black text-[#80540c]">Awaiting organizer review</p> : null}
                 {proofLabels.length ? <p className="mt-2 line-clamp-1 text-[9px] font-black uppercase tracking-[0.04em] text-[#315b39]" title={proofLabels.join(' · ')}>Proof: {proofLabels.join(' · ')}</p> : null}
+                {manualProgress && !task.concealed ? <div className="mt-2"><div className="flex justify-between gap-2 text-[9px] font-black uppercase text-[#5d4828]"><span className="truncate">{teamId ? 'Progress' : progressTeam?.name ?? 'Progress'}</span><span>{formatProgress(manualProgress.progressValue)} / {formatProgress(manualProgress.targetValue)}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded bg-[#6a512b]/15"><span className="block h-full rounded bg-[#4f7348]" style={{ width: `${Math.min(100, manualProgress.progressValue / Math.max(manualProgress.targetValue, 0.000001) * 100)}%` }} /></div></div> : null}
                 <p className="mt-3 text-[9px] font-black uppercase tracking-[0.06em] text-[#5d4828]">View rules & notes →</p>
               </button>
             );
@@ -92,7 +99,7 @@ export function BingoBoard({
         <TaskDetails
           task={detailTask}
           teamSize={teamSize}
-          canSelect={Boolean(onSelect) && !detailTask.concealed && !detailTask.freeSpace}
+          canSelect={Boolean(onSelect) && detailTask.unlocked && !detailTask.concealed && !detailTask.freeSpace}
           onClose={() => setDetailTask(null)}
           onSelect={() => { onSelect?.(detailTask); setDetailTask(null); }}
         />
@@ -117,7 +124,7 @@ function TaskDetails({
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#080805]/80 p-4" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
       <section aria-labelledby="task-detail-title" aria-modal="true" className="parchment-panel my-auto w-full max-w-2xl p-5 sm:p-7" role="dialog">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#6a511f]">Task details · {task.concealed ? 'Locked' : task.category}</p><h2 className="fantasy-title mt-2 text-3xl font-bold text-[#2d2316]" id="task-detail-title">{task.title}</h2></div>
+          <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#6a511f]">Task details · {!task.unlocked ? 'Locked' : task.category}</p><h2 className="fantasy-title mt-2 text-3xl font-bold text-[#2d2316]" id="task-detail-title">{task.title}</h2></div>
           <button aria-label="Close task details" className="scroll-button shrink-0 px-3 py-2 text-xs" onClick={onClose} type="button">Close</button>
         </div>
         {task.concealed ? <p className="mt-5 rounded border border-[#6c6254] bg-[#625746] p-5 text-sm font-bold text-[#fff0c9]">This task is intentionally concealed until its prerequisite is complete.</p> : (
@@ -180,6 +187,10 @@ function scopeLabel(task: BingoViewTask) {
 
 function formatProofSource(value: string) {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatProgress(value: number) {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
 }
 
 export function BingoStandings({ data }: { data: BingoViewData }) {

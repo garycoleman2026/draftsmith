@@ -39,6 +39,7 @@ export default async function TemplateGalleryPage({
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">Boards built for real clan events</p>
           <h1 className="fantasy-title mt-3 text-5xl font-bold text-[#f5df9b] sm:text-7xl">Find a board. Make it yours.</h1>
           <p className="mt-5 max-w-3xl text-base leading-relaxed text-[#b9ab89]">Start with Terry’s maintained game styles or reuse a board published by another clan organizer. Every task and rule remains editable before the event begins.</p>
+          <Link className="gold-button mt-5 inline-flex px-5 py-3 text-sm" href="/bingo/studio">Design and save a board →</Link>
         </div>
 
         <form className="wood-panel mt-8 grid gap-3 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_180px_180px_170px_auto]" method="get">
@@ -64,7 +65,7 @@ export default async function TemplateGalleryPage({
         </form>
 
         <div className="mt-7 flex flex-wrap items-end justify-between gap-3 border-b border-[#9b792f]/35 pb-4">
-          <div><h2 className="fantasy-title text-3xl font-bold text-[#f5df9b]">{templates.length} matching board{templates.length === 1 ? '' : 's'}</h2><p className="mt-1 text-xs text-[#a99a78]">{communityCount} community-published in this view · six official starters always available</p></div>
+          <div><h2 className="fantasy-title text-3xl font-bold text-[#f5df9b]">{templates.length} matching board{templates.length === 1 ? '' : 's'}</h2><p className="mt-1 text-xs text-[#a99a78]">{communityCount} community-published in this view · seven official starters always available</p></div>
           {(query || category !== 'All' || mode !== 'all' || sort !== 'popular') ? <Link className="text-xs font-black text-[#e3cf96] underline" href="/templates">Clear filters</Link> : null}
         </div>
         {templates.length ? <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{templates.map((template) => <TemplateCard key={template.slug} template={template} />)}</div> : <div className="parchment-panel mt-6 p-10 text-center text-[#5d4b30]"><h2 className="fantasy-title text-3xl font-bold">No board matches those filters.</h2><p className="mt-3 text-sm">Try a broader search or publish the first board for this niche from an organizer room.</p></div>}

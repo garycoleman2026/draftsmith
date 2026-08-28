@@ -660,6 +660,26 @@ export const bingoCompletions = sqliteTable(
   ],
 );
 
+export const bingoManualProgress = sqliteTable(
+  'bingo_manual_progress',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').notNull().references(() => bingoTasks.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').references(() => bingoTeamMembers.id, { onDelete: 'set null' }),
+    progressValue: real('progress_value').notNull().default(0),
+    targetValue: real('target_value').notNull().default(1),
+    note: text('note').notNull().default(''),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_manual_progress_task_team_unique').on(table.eventId, table.taskId, table.teamId),
+    index('idx_bingo_manual_progress_event_team').on(table.eventId, table.teamId),
+  ],
+);
+
 export const bingoActivity = sqliteTable(
   'bingo_activity',
   {

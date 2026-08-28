@@ -10,13 +10,14 @@ import {
 import { serializeStructuredData } from '../lib/structured-data';
 
 describe('bingo template gallery', () => {
-  it('publishes six complete official starters under stable slugs', () => {
+  it('publishes seven complete official starters under stable slugs', () => {
     const templates = builtinGalleryTemplates();
-    expect(templates).toHaveLength(6);
-    expect(new Set(templates.map((template) => template.slug)).size).toBe(6);
+    expect(templates).toHaveLength(7);
+    expect(new Set(templates.map((template) => template.slug)).size).toBe(7);
     expect(templates.every((template) => template.official)).toBe(true);
     expect(templates.every((template) => template.configuration.tasks.length === template.gridSize ** 2)).toBe(true);
     expect(templates.map((template) => template.slug)).toContain('starter-lockout');
+    expect(templates.map((template) => template.slug)).toContain('starter-center-out');
   });
 
   it('normalizes public metadata into bounded, reusable values', () => {

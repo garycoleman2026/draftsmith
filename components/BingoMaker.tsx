@@ -11,7 +11,7 @@ import {
   OSRS_BINGO_PRESETS, parseBingoTaskImport, serializeBingoTaskImport, type BingoTaskDefinition,
 } from '../lib/bingo-types';
 import { copyText } from '../lib/client';
-import type { BingoMode } from '../lib/types';
+import type { BingoBoardScope, BingoMode } from '../lib/types';
 import { BingoPlanningSummary } from './BingoPlanningSummary';
 import { BingoTaskArtwork } from './BingoTaskArtwork';
 
@@ -19,6 +19,7 @@ type Props = {
   initialTasks: BingoTaskDefinition[];
   initialRules: BingoEventRules;
   mode: BingoMode;
+  boardScope?: BingoBoardScope;
   disabled: boolean;
   saving: boolean;
   teamSize?: number;
@@ -40,7 +41,7 @@ const LABELS: Record<string, string> = {
 };
 
 export function BingoMaker({
-  initialTasks, initialRules, mode, disabled, saving, teamSize = 1, startAt, endAt, saveLabel, onSave,
+  initialTasks, initialRules, mode, boardScope = 'per_team', disabled, saving, teamSize = 1, startAt, endAt, saveLabel, onSave,
 }: Props) {
   const [tasks, setTasks] = useState(() => cloneTasks(initialTasks));
   const [rules, setRules] = useState(() => sanitizeBingoEventRules(initialRules, initialRules.layout.rows, initialRules.scoring.winCondition));
@@ -49,6 +50,7 @@ export function BingoMaker({
   const [category, setCategory] = useState('All');
   const [importText, setImportText] = useState(() => serializeBingoTaskImport(initialTasks));
   const [message, setMessage] = useState('');
+  const [onePointPerTile, setOnePointPerTile] = useState(() => initialTasks.filter((task) => !task.freeSpace).every((task) => task.points === 1));
   const validation = useMemo(() => validateBingoBoard(tasks, rules), [tasks, rules]);
   const categories = useMemo(() => ['All', ...new Set(OSRS_BINGO_PRESETS.map((preset) => preset.category))], []);
   const visiblePresets = useMemo(() => OSRS_BINGO_PRESETS.filter((preset) =>
@@ -64,7 +66,12 @@ export function BingoMaker({
   }
 
   function updateSelected(mutator: (task: BingoTaskDefinition) => BingoTaskDefinition) {
-    setTasks((current) => current.map((task, index) => index === selectedIndex ? mutator(structuredClone(task)) : task));
+    setTasks((current) => current.map((task, index) => {
+      if (index !== selectedIndex) return task;
+      const next = mutator(structuredClone(task));
+      if (next.points !== task.points) setOnePointPerTile(false);
+      return next;
+    }));
   }
 
   function updateRule(mutator: (rule: BingoTaskRule) => BingoTaskRule) {
@@ -80,6 +87,10 @@ export function BingoMaker({
     const count = size * size;
     setRules((current) => sanitizeBingoEventRules({
       ...current, layout: { kind: 'grid', rows: size, columns: size },
+      progression: {
+        ...current.progression,
+        startPosition: current.progression.unlockPattern === 'orthogonal' ? Math.floor(count / 2) : current.progression.startPosition,
+      },
     }, size, current.scoring.winCondition));
     setTasks((current) => Array.from({ length: count }, (_, index) =>
       current[index] ? structuredClone(current[index]) : structuredClone(OSRS_BINGO_PRESETS[index % OSRS_BINGO_PRESETS.length])));
@@ -89,6 +100,7 @@ export function BingoMaker({
 
   function applyProgression() {
     const size = rules.layout.rows;
+    setRules((current) => ({ ...current, progression: { ...current.progression, unlockPattern: 'custom' } }));
     setTasks((current) => current.map((task, index) => {
       const next = structuredClone(task);
       const row = Math.floor(index / size);
@@ -97,6 +109,32 @@ export function BingoMaker({
       return next;
     }));
     setMessage('Tier unlocks applied: each tile now depends on the tile directly above it.');
+  }
+
+  function applyCenterOut() {
+    const center = Math.floor(expected / 2);
+    setRules((current) => ({
+      ...current,
+      progression: { unlockPattern: 'orthogonal', startPosition: center, tileOwnership: current.progression.tileOwnership },
+      visibility: { ...current.visibility, hideLockedTasks: true },
+    }));
+    setTasks((current) => current.map((task) => ({
+      ...structuredClone(task),
+      hidden: false,
+      rule: { ...structuredClone(task.rule), prerequisitePositions: [] },
+    })));
+    setSelectedIndex(center);
+    setMessage(`Center-out unlocking applied. Tile ${center + 1} begins open; only direct neighbors unlock next.`);
+  }
+
+  function setUniformPoints(enabled: boolean) {
+    setOnePointPerTile(enabled);
+    if (enabled) {
+      setTasks((current) => current.map((task) => ({ ...task, points: task.freeSpace ? 0 : 1 })));
+      setMessage('Every non-free tile now awards one point. Turn this option off to use custom values.');
+    } else {
+      setMessage('Custom point values are enabled. Select a tile to change its score.');
+    }
   }
 
   function fillWithPresets() {
@@ -149,7 +187,10 @@ export function BingoMaker({
       rule: sanitizeBingoTaskRule(task.rule, task.verificationMode),
     }));
     setTasks(cleaned);
-    await onSave(cleaned, rules);
+    const savedRules = boardScope === 'shared'
+      ? rules
+      : { ...rules, progression: { ...rules.progression, tileOwnership: 'each_team' as const } };
+    await onSave(cleaned, savedRules);
     setImportText(serializeBingoTaskImport(cleaned));
   }
 
@@ -167,6 +208,15 @@ export function BingoMaker({
           <div className="mt-4"><BingoPlanningSummary compact tasks={tasks} teamSize={teamSize} startAt={startAt} endAt={endAt} /></div>
           {mode === 'categories' ? <label className="mt-3 block text-[10px] font-black uppercase text-[#65583f]">Tasks needed per category<input className="realm-field mt-1 h-10 w-full px-3 text-sm" type="number" min={1} max={100} disabled={disabled} value={rules.scoring.categoryTarget} onChange={(event) => setRules((current) => ({ ...current, scoring: { ...current.scoring, categoryTarget: Math.max(1, Number(event.target.value) || 1) } }))} /></label> : null}
           {mode === 'classic' ? <label className="mt-3 block text-[10px] font-black uppercase text-[#65583f]">Lines needed to win<input className="realm-field mt-1 h-10 w-full px-3 text-sm" type="number" min={1} max={20} disabled={disabled} value={rules.scoring.targetValue || 1} onChange={(event) => setRules((current) => ({ ...current, scoring: { ...current.scoring, targetValue: Math.max(1, Number(event.target.value) || 1) } }))} /></label> : null}
+          <label className="mt-3 flex items-start gap-2 rounded border border-[#8b6a32]/25 bg-white/20 p-3 text-xs font-bold text-[#4e402b]"><input className="mt-0.5" type="checkbox" disabled={disabled} checked={onePointPerTile} onChange={(event) => setUniformPoints(event.target.checked)} /><span><b className="block text-[10px] uppercase">One point per tile</b>Turn this off to edit custom point values.</span></label>
+          {mode === 'progression' ? <div className="mt-3 rounded border border-[#587044]/30 bg-[#dfe8ca]/60 p-3">
+            <p className="text-[10px] font-black uppercase text-[#425b35]">Progression layout</p>
+            <p className="mt-1 text-xs leading-relaxed text-[#3f5035]">{rules.progression.unlockPattern === 'orthogonal' ? `Center-out · starts at tile ${rules.progression.startPosition + 1}` : 'Custom prerequisite paths'}</p>
+            <button className="scroll-button mt-2 w-full px-3 py-2 text-xs" disabled={disabled} onClick={applyCenterOut} type="button">Apply center-out frontier</button>
+            <label className="mt-2 flex items-center gap-2 text-xs font-bold text-[#3f5035]"><input type="checkbox" disabled={disabled} checked={rules.visibility.hideLockedTasks} onChange={(event) => setRules((current) => ({ ...current, visibility: { hideLockedTasks: event.target.checked } }))} />Only reveal unlocked tiles</label>
+            <label className="mt-2 flex items-center gap-2 text-xs font-bold text-[#3f5035]"><input type="checkbox" disabled={disabled || boardScope !== 'shared'} checked={boardScope === 'shared' && rules.progression.tileOwnership === 'first_team'} onChange={(event) => setRules((current) => ({ ...current, progression: { ...current.progression, tileOwnership: event.target.checked ? 'first_team' : 'each_team' } }))} />First team to a tile owns it</label>
+            {boardScope !== 'shared' ? <p className="mt-1 text-[9px] leading-relaxed text-[#546746]">Separate team boards let every team complete its own copy of a tile.</p> : null}
+          </div> : null}
           <div className="mt-4 grid gap-2">
             <button className="scroll-button px-3 py-2 text-xs" disabled={disabled} onClick={fillWithPresets}>Fill from presets</button>
             <button className="scroll-button px-3 py-2 text-xs" disabled={disabled} onClick={applyProgression}>Apply tier unlocks</button>
