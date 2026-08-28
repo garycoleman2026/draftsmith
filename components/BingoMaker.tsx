@@ -3,7 +3,7 @@
 import { useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import {
   BINGO_PROOF_SOURCES, BINGO_TASK_IMAGE_KINDS, BINGO_TASK_SCOPES, BINGO_VERIFIERS, bingoRuleSummary,
-  expectedIndividualHours, expectedTeamHours, formatExpectedHours,
+  bingoSpeedTargetSeconds, expectedIndividualHours, expectedTeamHours, formatExpectedHours, formatTaskTime,
   sanitizeBingoEventRules, sanitizeBingoTaskRule, validateBingoBoard, verificationModeFromRule,
   type BingoEventRules, type BingoProofSource, type BingoTaskRule,
 } from '../lib/bingo-rules';
@@ -201,7 +201,7 @@ export function BingoMaker({
                   <BingoTaskArtwork alt="" className="mx-auto mt-1 h-10 w-10" rule={task.rule} />
                   <p className="mt-1 line-clamp-3 text-xs font-black leading-tight text-[#332616]">{task.title}</p>
                   <p className="mt-2 text-[9px] text-[#75603d]">{task.points} pts · {task.rule.verifier.type.replaceAll('_', ' ')}</p>
-                  {expectedIndividualHours(task.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">~{formatExpectedHours(expectedIndividualHours(task.rule))} solo</p> : null}
+                  {expectedIndividualHours(task.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">{taskTimeCaption(task.rule)}</p> : null}
                   {task.rule.prerequisitePositions.length ? <p className="mt-1 text-[9px] font-bold text-[#805821]">Unlocks after {task.rule.prerequisitePositions.map((position) => '#' + (position + 1)).join(', ')}</p> : null}
                 </button>
               ))}
@@ -233,7 +233,7 @@ export function BingoMaker({
                 <div className="flex gap-3"><BingoTaskArtwork alt="" className="h-12 w-12 shrink-0" rule={preset.rule} /><div className="min-w-0 flex-1"><span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#80642b]">{preset.category} · {preset.points} pts</span>
                   <p className="mt-1 text-xs font-black text-[#392b18]">{preset.title}</p>
                   <p className="mt-1 text-[9px] leading-relaxed text-[#59472f]">{bingoRuleSummary(preset.rule)}</p>
-                  {expectedIndividualHours(preset.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">Expected {formatExpectedHours(expectedIndividualHours(preset.rule))} solo</p> : null}</div></div>
+                  {expectedIndividualHours(preset.rule) !== null ? <p className="mt-1 text-[9px] font-black text-[#315b39]">{taskTimeCaption(preset.rule)}</p> : null}</div></div>
               </button>;
             })}
           </div>
@@ -268,6 +268,8 @@ function TaskEditor({ disabled, expected, selected, selectedIndex, teamSize, upd
   if (!selected) return null;
   const individualHours = expectedIndividualHours(selected.rule);
   const teamHours = expectedTeamHours(selected.rule, teamSize);
+  const isSpeedTask = selected.rule.verifier.type === 'raid_time';
+  const speedTargetSeconds = bingoSpeedTargetSeconds(selected.rule);
   return (
     <section className="rounded border border-[#8b6a32]/35 bg-[#f5e5b8]/55 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -279,11 +281,18 @@ function TaskEditor({ disabled, expected, selected, selectedIndex, teamSize, upd
         <Field label="Description" wide><textarea className="realm-field mt-1 min-h-20 w-full p-3 text-sm normal-case" disabled={disabled} value={selected.description} onChange={(event) => updateSelected((task) => ({ ...task, description: event.target.value }))} /></Field>
         <Field label="Points"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" type="number" min={0} max={10000} disabled={disabled || selected.freeSpace} value={selected.points} onChange={(event) => updateSelected((task) => ({ ...task, points: Number(event.target.value) }))} /></Field>
         <Field label="Category"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} value={selected.category} onChange={(event) => updateSelected((task) => ({ ...task, category: event.target.value }))} /></Field>
-        <Field label="Rule type"><select className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} value={selected.rule.verifier.type} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, type: event.target.value as BingoTaskRule['verifier']['type'] } }))}>{BINGO_VERIFIERS.map((item) => <option key={item} value={item}>{LABELS[item]}</option>)}</select></Field>
+        <Field label="Rule type"><select className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} value={selected.rule.verifier.type} onChange={(event) => updateRule((rule) => {
+          const type = event.target.value as BingoTaskRule['verifier']['type'];
+          return {
+            ...rule,
+            verifier: { ...rule.verifier, type, comparator: type === 'raid_time' ? 'at_most' : rule.verifier.comparator, unit: type === 'raid_time' ? rule.verifier.unit || 'seconds' : rule.verifier.unit },
+            planning: { ...rule.planning, fixedHours: type === 'raid_time' ? null : rule.planning.fixedHours },
+          };
+        })}>{BINGO_VERIFIERS.map((item) => <option key={item} value={item}>{LABELS[item]}</option>)}</select></Field>
         <Field label="Who contributes"><select className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} value={selected.rule.scope.type} onChange={(event) => updateRule((rule) => ({ ...rule, scope: { ...rule.scope, type: event.target.value as BingoTaskRule['scope']['type'] } }))}>{BINGO_TASK_SCOPES.map((item) => <option key={item} value={item}>{LABELS[item]}</option>)}</select></Field>
         <Field label="Target item, pet, raid or task"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} value={selected.rule.verifier.target} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, target: event.target.value } }))} /></Field>
         <Field label="Metric key (for XP/KC)"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="agility, giant_mole…" value={selected.rule.verifier.metric} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, metric: event.target.value } }))} /></Field>
-        <Field label="Numeric target"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0} placeholder="e.g. 10000000" value={selected.rule.verifier.amount ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, amount: event.target.value ? Number(event.target.value) : null } }))} /></Field>
+        <Field label={isSpeedTask ? 'Speed target' : 'Numeric target'}><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0} placeholder={isSpeedTask ? 'e.g. 1050 for 17:30' : 'e.g. 10000000'} value={selected.rule.verifier.amount ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, amount: event.target.value ? Number(event.target.value) : null } }))} /></Field>
         <Field label="Unit"><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="XP, KC, seconds…" value={selected.rule.verifier.unit} onChange={(event) => updateRule((rule) => ({ ...rule, verifier: { ...rule.verifier, unit: event.target.value } }))} /></Field>
         {selected.rule.scope.type === 'exact_party' ? <Field label="Required players"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled} type="number" min={2} max={100} value={selected.rule.scope.participantCount ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, scope: { ...rule.scope, participantCount: Number(event.target.value) || null } }))} /></Field> : null}
         <div className="sm:col-span-2 mt-2 rounded border border-[#8b6a32]/30 bg-[#f7e9bd]/55 p-4">
@@ -297,14 +306,14 @@ function TaskEditor({ disabled, expected, selected, selectedIndex, teamSize, upd
           </div>
         </div>
         <div className="sm:col-span-2 rounded border border-[#8b6a32]/30 bg-[#e1e8c8]/70 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#425b35]">Expected-time planner</p><p className="mt-1 text-xs normal-case text-[#3f5035]">All rates are per individual and editable. Drop estimate = rate denominator ÷ numerator ÷ efficient kills per hour.</p></div><div className="rounded bg-[#315b39] px-3 py-2 text-right text-[10px] font-black text-white"><span className="block">{formatExpectedHours(individualHours)} solo</span><span className="block opacity-80">{formatExpectedHours(teamHours)} with {teamSize}</span></div></div>
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#425b35]">Expected-time planner</p><p className="mt-1 text-xs normal-case text-[#3f5035]">{isSpeedTask ? 'Speed tasks use the clock target entered above; fixed-hour guesses are ignored.' : 'All rates are per individual and editable. Drop estimate = rate denominator ÷ numerator ÷ efficient kills per hour.'}</p></div><div className="rounded bg-[#315b39] px-3 py-2 text-right text-[10px] font-black text-white">{isSpeedTask ? <span className="block">{speedTargetSeconds === null ? 'Set a speed target' : `${formatTaskTime(selected.rule)} target`}</span> : <><span className="block">{formatExpectedHours(individualHours)} solo</span><span className="block opacity-80">{formatExpectedHours(teamHours)} with {teamSize}</span></>}</div></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <Field label="Drop-rate numerator"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="1" value={selected.rule.planning.dropRateNumerator ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, dropRateNumerator: nullableNumber(event.target.value) } }))} /></Field>
             <Field label="Drop-rate denominator"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="3000" value={selected.rule.planning.dropRateDenominator ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, dropRateDenominator: nullableNumber(event.target.value) } }))} /></Field>
             <Field label="Quantity needed"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={1} max={100} value={selected.rule.planning.quantity} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, quantity: Number(event.target.value) || 1 } }))} /></Field>
             <Field label="Efficient kills / attempts per hour"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="85" value={selected.rule.planning.efficientKillsPerHour ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, efficientKillsPerHour: nullableNumber(event.target.value) } }))} /></Field>
             <Field label="Efficient XP / units per hour"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="100000" value={selected.rule.planning.efficientUnitsPerHour ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, efficientUnitsPerHour: nullableNumber(event.target.value) } }))} /></Field>
-            <Field label="Fixed expected hours"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace} type="number" min={0.000001} step="any" placeholder="Overrides calculated estimate" value={selected.rule.planning.fixedHours ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, fixedHours: nullableNumber(event.target.value) } }))} /></Field>
+            <Field label="Fixed expected hours"><input className="realm-field mt-1 h-11 w-full px-3 text-sm" disabled={disabled || selected.freeSpace || isSpeedTask} type="number" min={0.000001} step="any" placeholder={isSpeedTask ? 'Uses the speed target above' : 'Overrides calculated estimate'} value={isSpeedTask ? '' : selected.rule.planning.fixedHours ?? ''} onChange={(event) => updateRule((rule) => ({ ...rule, planning: { ...rule.planning, fixedHours: nullableNumber(event.target.value) } }))} /></Field>
           </div>
         </div>
         <Field label="Prerequisite tile numbers" wide><input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" disabled={disabled || selected.freeSpace} placeholder="Example: 1, 6, 11" value={selected.rule.prerequisitePositions.map((position) => position + 1).join(', ')} onChange={(event) => updateRule((rule) => ({ ...rule, prerequisitePositions: parsePositions(event.target.value, expected) }))} /></Field>
@@ -331,6 +340,11 @@ function parsePositions(value: string, maximum: number) {
     .filter((position) => Number.isInteger(position) && position >= 0 && position < maximum))].sort((left, right) => left - right);
 }
 function nullableNumber(value: string) { return value ? Number(value) : null; }
+function taskTimeCaption(rule: BingoTaskRule) {
+  return bingoSpeedTargetSeconds(rule) !== null
+    ? `Speed target · ${formatTaskTime(rule)}`
+    : `~${formatTaskTime(rule)} solo`;
+}
 function toggleSource(current: BingoProofSource[], source: BingoProofSource) {
   const next = current.includes(source) ? current.filter((item) => item !== source) : [...current, source];
   return next.length ? next : ['organizer'] as BingoProofSource[];

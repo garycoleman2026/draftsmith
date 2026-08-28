@@ -3,8 +3,10 @@ import { calculateBingoStandings, claimAvailability, countCompletedLines } from 
 import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, serializeBingoTaskImport } from '../lib/bingo-types';
 import {
   defaultBingoEventRules,
+  bingoTaskImageUrl,
   expectedIndividualHours,
   expectedTeamHours,
+  formatTaskTime,
   sanitizeBingoTaskRule,
   validateBingoBoard,
 } from '../lib/bingo-rules';
@@ -126,6 +128,14 @@ describe('bingo task imports', () => {
     expect(expectedTeamHours(agility.rule, 10)).toBe(10);
   });
 
+  it('uses a speed task clock target instead of an arbitrary attempt budget', () => {
+    const tob = OSRS_BINGO_PRESETS.find((task) => task.title === 'Beat the GM Theatre of Blood trio time')!;
+    const chambers = OSRS_BINGO_PRESETS.find((task) => task.title === 'Beat the Chambers CM five-player time')!;
+    expect(expectedIndividualHours(tob.rule)).toBeCloseTo(1_050 / 3_600);
+    expect(formatTaskTime(tob.rule)).toBe('17:30');
+    expect(formatTaskTime(chambers.rule)).toBe('25:00');
+  });
+
   it('sanitizes unsafe source links and impossible planning values', () => {
     const rule = sanitizeBingoTaskRule({
       details: { sourceUrl: 'javascript:alert(1)' },
@@ -147,6 +157,23 @@ describe('bingo task imports', () => {
       'Beat the GM Theatre of Blood trio time', 'Beat the Chambers CM five-player time',
       'Gain 10,000,000 team Agility XP',
     ]));
+  });
+
+  it('configures resolvable artwork keys for every official preset', () => {
+    expect(OSRS_BINGO_PRESETS.filter((task) => task.rule.presentation.imageKind === 'none')).toEqual([]);
+    expect(Object.fromEntries(OSRS_BINGO_PRESETS.map((task) => [task.title, task.rule.presentation.imageKey])))
+      .toMatchObject({
+        'Obtain the Baby mole pet': 'Baby Mole',
+        'Receive a scythe of Vitur': 'Scythe of Vitur (uncharged)',
+        'Gain 50 Zulrah kill count': 'Zulrah (serpentine)',
+        'Complete one Barrows armour set': 'Chest (Barrows)',
+        'Receive a Tome of water from Tempoross': 'Tome of Water (empty)',
+        'Receive a tome of fire from Wintertodt': 'Tome of Fire (empty)',
+        'Receive an imp champion scroll': 'Imp champion scroll',
+        'Receive the jar of dirt from Kraken': 'Jar of Dirt',
+      });
+    expect(OSRS_BINGO_PRESETS.every((task) => bingoTaskImageUrl(task.rule)?.startsWith('https://oldschool.runescape.wiki/')))
+      .toBe(true);
   });
 
   it('gives every non-free official starter tile an editable time estimate', () => {

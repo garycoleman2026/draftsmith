@@ -15,7 +15,22 @@ export function BingoTaskArtwork({
   const url = bingoTaskImageUrl(rule);
   const [failedUrl, setFailedUrl] = useState('');
 
-  if (!url || failedUrl === url) return null;
+  if (rule.presentation.imageKind === 'none') return null;
+
+  if (!url || failedUrl === url) {
+    const label = rule.presentation.imageKind === 'boss' ? 'Boss art unavailable' : 'Item art unavailable';
+    return (
+      <span
+        aria-hidden={alt ? undefined : true}
+        aria-label={alt || undefined}
+        className={`grid place-items-center rounded border border-[#8b6a32]/35 bg-[#e2d19e]/65 text-center text-[7px] font-black uppercase leading-tight tracking-[0.05em] text-[#655338] ${className}`}
+        role={alt ? 'img' : undefined}
+        title={label}
+      >
+        {rule.presentation.imageKind === 'boss' ? 'Boss art' : 'Item art'}
+      </span>
+    );
+  }
 
   return (
     // Wiki artwork is chosen by organizers at runtime, so a fixed remote Image allowlist is not appropriate.

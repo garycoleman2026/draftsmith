@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import type { BingoViewData, BingoViewTask } from '../lib/bingo-view-types';
 import {
   bingoRuleSummary,
+  bingoSpeedTargetSeconds,
   expectedIndividualHours,
   expectedTeamHours,
   formatExpectedHours,
+  formatTaskTime,
 } from '../lib/bingo-rules';
 import { BingoTaskArtwork } from './BingoTaskArtwork';
 
@@ -50,6 +52,7 @@ export function BingoBoard({
               ? { borderColor: ownerTeams[0].color, boxShadow: `inset 0 0 0 3px ${ownerTeams[0].color}55, 0 3px 0 #5c431f` }
               : undefined;
             const individualHours = task.concealed ? null : expectedIndividualHours(task.rule);
+            const speedTargetSeconds = task.concealed ? null : bingoSpeedTargetSeconds(task.rule);
             return (
               <button
                 aria-label={`${task.concealed ? 'Hidden task' : task.title}. Open task details.`}
@@ -71,7 +74,7 @@ export function BingoBoard({
                 <p className="mt-2 text-sm font-black leading-tight text-[#332616]">{task.title}</p>
                 <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#58452d]">{task.description || (task.concealed ? 'Complete another task to reveal this square.' : task.difficulty)}</p>
                 {!task.concealed && !task.freeSpace ? <p className="mt-2 line-clamp-1 text-[9px] font-bold uppercase tracking-[0.04em] text-[#6a511f]">{bingoRuleSummary(task.rule)}</p> : null}
-                {individualHours !== null ? <p className="mt-2 text-[9px] font-black uppercase tracking-[0.05em] text-[#315b39]">Expected · {formatExpectedHours(individualHours)} solo</p> : null}
+                {individualHours !== null ? <p className="mt-2 text-[9px] font-black uppercase tracking-[0.05em] text-[#315b39]">{speedTargetSeconds !== null ? `Speed target · ${formatTaskTime(task.rule)}` : `Expected · ${formatExpectedHours(individualHours)} solo`}</p> : null}
                 {ownerTeams.length ? (
                   <div className="mt-3 flex flex-wrap gap-1">
                     {ownerTeams.map((team) => <span key={team.id} className="rounded px-1.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: team.color }}>{team.name}</span>)}
@@ -109,6 +112,7 @@ function TaskDetails({
 }) {
   const individual = task.concealed ? null : expectedIndividualHours(task.rule);
   const team = task.concealed ? null : expectedTeamHours(task.rule, teamSize);
+  const speedTargetSeconds = task.concealed ? null : bingoSpeedTargetSeconds(task.rule);
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#080805]/80 p-4" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
       <section aria-labelledby="task-detail-title" aria-modal="true" className="parchment-panel my-auto w-full max-w-2xl p-5 sm:p-7" role="dialog">
@@ -123,16 +127,18 @@ function TaskDetails({
               <div><p className="text-sm leading-relaxed text-[#4f402a]">{task.description || 'No description has been added.'}</p><p className="mt-3 text-xs font-black uppercase tracking-[0.05em] text-[#6a511f]">{bingoRuleSummary(task.rule)}</p></div>
             </div>
             <dl className="mt-5 grid gap-2 sm:grid-cols-2">
-              <Detail label="Expected for one player" value={formatExpectedHours(individual)} />
-              <Detail label={`Expected with ${teamSize} parallel players`} value={formatExpectedHours(team)} />
-              <Detail label="Individual drop rate" value={dropRateLabel(task)} />
-              <Detail label="Efficient individual rate" value={rateLabel(task)} />
+              {speedTargetSeconds !== null ? <Detail label="Required speed time" value={formatTaskTime(task.rule)} /> : <>
+                <Detail label="Expected for one player" value={formatExpectedHours(individual)} />
+                <Detail label={`Expected with ${teamSize} parallel players`} value={formatExpectedHours(team)} />
+                <Detail label="Individual drop rate" value={dropRateLabel(task)} />
+                <Detail label="Efficient individual rate" value={rateLabel(task)} />
+              </>}
               <Detail label="Accepted proof" value={task.rule.proof.sources.map(formatProofSource).join(' · ')} />
               <Detail label="Completion scope" value={scopeLabel(task)} />
             </dl>
             {task.rule.details.notes ? <Note title="Notes">{task.rule.details.notes}</Note> : null}
             {task.rule.details.exclusions ? <Note title="Exclusions">{task.rule.details.exclusions}</Note> : null}
-            <p className="mt-4 text-[10px] leading-relaxed text-[#58492f]">Time estimates are planning averages based on the organizer’s editable rates. Random drops can arrive much sooner—or much later.</p>
+            <p className="mt-4 text-[10px] leading-relaxed text-[#58492f]">{speedTargetSeconds !== null ? 'This is the required completion time, not a practice or attempt-time estimate.' : 'Time estimates are planning averages based on the organizer’s editable rates. Random drops can arrive much sooner—or much later.'}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               {canSelect ? <button className="gold-button px-5 py-3 text-sm" onClick={onSelect} type="button">Use this task for a claim →</button> : null}
               {task.rule.details.sourceUrl ? <a className="scroll-button inline-flex px-4 py-3 text-xs" href={task.rule.details.sourceUrl} rel="noreferrer" target="_blank">Open planning source ↗</a> : null}

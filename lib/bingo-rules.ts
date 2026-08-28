@@ -257,6 +257,8 @@ export function bingoRuleSummary(rule: BingoTaskRule) {
 }
 
 export function expectedIndividualHours(rule: BingoTaskRule) {
+  const speedTargetSeconds = bingoSpeedTargetSeconds(rule);
+  if (speedTargetSeconds !== null) return speedTargetSeconds / 3_600;
   if (rule.planning.fixedHours) return rule.planning.fixedHours;
   const quantity = Math.max(1, rule.planning.quantity);
   if (rule.planning.dropRateNumerator && rule.planning.dropRateDenominator && rule.planning.efficientKillsPerHour) {
@@ -292,6 +294,32 @@ export function formatExpectedHours(value: number | null) {
   if (value === null || !Number.isFinite(value)) return 'Not estimated';
   if (value < 0.1) return '<0.1 hr';
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: value < 10 ? 1 : 0 }).format(value)} hr${Math.abs(value - 1) < 0.001 ? '' : 's'}`;
+}
+
+export function bingoSpeedTargetSeconds(rule: BingoTaskRule) {
+  if (rule.verifier.type !== 'raid_time' || !rule.verifier.amount || rule.verifier.amount <= 0) return null;
+  const unit = rule.verifier.unit.trim().toLowerCase();
+  if (['hour', 'hours', 'hr', 'hrs'].includes(unit)) return rule.verifier.amount * 3_600;
+  if (['minute', 'minutes', 'min', 'mins'].includes(unit)) return rule.verifier.amount * 60;
+  return rule.verifier.amount;
+}
+
+export function formatTaskTime(rule: BingoTaskRule, teamSize?: number) {
+  const speedTargetSeconds = bingoSpeedTargetSeconds(rule);
+  if (speedTargetSeconds !== null) return formatClockDuration(speedTargetSeconds);
+  return formatExpectedHours(teamSize === undefined
+    ? expectedIndividualHours(rule)
+    : expectedTeamHours(rule, teamSize));
+}
+
+function formatClockDuration(value: number) {
+  const totalSeconds = Math.max(0, Math.round(value));
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+    : `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 export function bingoTaskImageUrl(rule: BingoTaskRule) {
