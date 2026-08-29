@@ -31,6 +31,17 @@ export function clearSessionCookie() {
   return 'terrys_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0';
 }
 
+export function redirectWithCookie(location: string, cookie: string, status = 302) {
+  return new Response(null, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+      Location: location,
+      'Set-Cookie': cookie,
+    },
+  });
+}
+
 export function safeReturnTo(value: string | null | undefined, fallback = '/dashboard') {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return fallback;
   return value.slice(0, 500);

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { decryptSecret, encryptSecret, hashToken, safeReturnTo } from '../lib/security';
+import {
+  decryptSecret,
+  encryptSecret,
+  hashToken,
+  redirectWithCookie,
+  safeReturnTo,
+} from '../lib/security';
 
 describe('credential helpers', () => {
   it('hashes credentials deterministically without retaining the raw value', async () => {
@@ -19,5 +25,16 @@ describe('credential helpers', () => {
     expect(safeReturnTo('/dashboard?tab=events')).toBe('/dashboard?tab=events');
     expect(safeReturnTo('//evil.example')).toBe('/dashboard');
     expect(safeReturnTo('https://evil.example')).toBe('/dashboard');
+  });
+
+  it('returns an OAuth redirect that carries the new session cookie', () => {
+    const response = redirectWithCookie(
+      'https://draft.example/bingo/studio',
+      'terrys_session=test-token; Path=/; HttpOnly; Secure; SameSite=Lax',
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('https://draft.example/bingo/studio');
+    expect(response.headers.get('set-cookie')).toContain('terrys_session=test-token');
   });
 });

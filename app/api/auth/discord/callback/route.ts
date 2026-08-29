@@ -1,7 +1,7 @@
 import { createSession, discordConfiguration } from '../../../../../lib/auth';
 import { recordAudit } from '../../../../../lib/audit';
 import { ensureSchema, getDatabase } from '../../../../../lib/db';
-import { hashToken, safeReturnTo } from '../../../../../lib/security';
+import { hashToken, redirectWithCookie, safeReturnTo } from '../../../../../lib/security';
 
 type DiscordToken = { access_token?: string; token_type?: string };
 type DiscordUser = {
@@ -123,9 +123,7 @@ export async function GET(request: Request) {
     }
     const session = await createSession(user.id);
     const destination = new URL(safeReturnTo(stored.return_to), origin);
-    const response = Response.redirect(destination.toString(), 302);
-    response.headers.append('Set-Cookie', session.cookie);
-    return response;
+    return redirectWithCookie(destination.toString(), session.cookie);
   } catch (error) {
     console.error('finish Discord authentication failed', error);
     return redirectError(origin, 'Discord sign-in failed. Please try again.');
