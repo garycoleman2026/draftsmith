@@ -422,6 +422,27 @@ export const webhookDeliveries = sqliteTable(
   ],
 );
 
+export const clanInvites = sqliteTable(
+  'clan_invites',
+  {
+    id: text('id').primaryKey().notNull(),
+    clanId: text('clan_id').notNull().references(() => clans.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    role: text('role').notNull().default('member'),
+    createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: text('expires_at').notNull(),
+    maxUses: integer('max_uses').notNull().default(50),
+    useCount: integer('use_count').notNull().default(0),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('clan_invites_token_hash_unique').on(table.tokenHash),
+    index('idx_clan_invites_clan_id').on(table.clanId),
+    index('idx_clan_invites_expires_at').on(table.expiresAt),
+  ],
+);
+
 export const bingoEvents = sqliteTable(
   'bingo_events',
   {

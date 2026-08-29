@@ -63,11 +63,12 @@ async function loadCommunityRows() {
       `SELECT bt.id, bt.public_slug, bt.name, bt.summary, bt.category, bt.tags_json, bt.mode,
               bt.board_scope, bt.configuration_json, bt.clone_count,
               COALESCE(tv.upvote_count, 0) AS upvote_count, COALESCE(tv.downvote_count, 0) AS downvote_count,
-              bt.published_at, bt.updated_at, c.name AS clan_name, c.slug AS clan_slug,
-              COALESCE(u.display_name, u.username) AS author_name
+              bt.published_at, bt.updated_at,
+              CASE WHEN c.public_listing = 1 THEN c.name END AS clan_name,
+              CASE WHEN c.public_listing = 1 THEN c.slug END AS clan_slug,
+              NULL AS author_name
        FROM bingo_templates bt
        LEFT JOIN clans c ON c.id = bt.clan_id
-       LEFT JOIN users u ON u.id = bt.owner_user_id
        LEFT JOIN (
          SELECT template_id,
                 SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS upvote_count,
@@ -90,11 +91,12 @@ export async function loadGalleryTemplate(slug: string) {
     `SELECT bt.id, bt.public_slug, bt.name, bt.summary, bt.category, bt.tags_json, bt.mode,
             bt.board_scope, bt.configuration_json, bt.clone_count,
             COALESCE(tv.upvote_count, 0) AS upvote_count, COALESCE(tv.downvote_count, 0) AS downvote_count,
-            bt.published_at, bt.updated_at, c.name AS clan_name, c.slug AS clan_slug,
-            COALESCE(u.display_name, u.username) AS author_name
+            bt.published_at, bt.updated_at,
+            CASE WHEN c.public_listing = 1 THEN c.name END AS clan_name,
+            CASE WHEN c.public_listing = 1 THEN c.slug END AS clan_slug,
+            NULL AS author_name
      FROM bingo_templates bt
      LEFT JOIN clans c ON c.id = bt.clan_id
-     LEFT JOIN users u ON u.id = bt.owner_user_id
      LEFT JOIN (
        SELECT template_id,
               SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS upvote_count,

@@ -62,6 +62,39 @@ export async function POST(request: Request, context: { params: Promise<{ clanId
   }
 }
 
+export async function PATCH(request: Request, context: { params: Promise<{ clanId: string }> }) {
+  try {
+    await ensureSchema();
+    const { clanId } = await context.params;
+    const { user, role: actorRole } = await requireClanRole(request, clanId, ['owner', 'admin']);
+    const body = (await request.json()) as { userId?: unknown; role?: unknown };
+    const userId = typeof body.userId === 'string' ? body.userId : '';
+    const role = typeof body.role === 'string' && ['admin', 'captain', 'member'].includes(body.role) ? body.role : '';
+    if (!userId || !role) return json({ error: 'Choose a member and role.' }, { status: 400 });
+    const db = getDatabase();
+    const target = await db
+      .prepare('SELECT role FROM clan_memberships WHERE clan_id = ? AND user_id = ?')
+      .bind(clanId, userId)
+      .first<{ role: string }>();
+    if (!target) return json({ error: 'That person is not a clan member.' }, { status: 404 });
+    if (target.role === 'owner') return json({ error: 'Clan ownership is transferred separately.' }, { status: 400 });
+    if (actorRole !== 'owner' && (target.role === 'admin' || role === 'admin')) {
+      return json({ error: 'Only the clan owner can change administrator access.' }, { status: 403 });
+    }
+    await db.prepare('UPDATE clan_memberships SET role = ? WHERE clan_id = ? AND user_id = ?').bind(role, clanId, userId).run();
+    await recordAudit(db, {
+      clanId,
+      actorUserId: user.id,
+      actorType: 'organizer',
+      eventType: 'clan.member_role_changed',
+      metadata: { memberUserId: userId, role },
+    });
+    return json({ saved: true, role });
+  } catch (error) {
+    return routeError(error, 'The clan member role could not be changed.');
+  }
+}
+
 export async function DELETE(request: Request, context: { params: Promise<{ clanId: string }> }) {
   try {
     await ensureSchema();

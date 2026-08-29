@@ -80,41 +80,24 @@ export async function GET(request: Request) {
         .run();
     } else {
       user = { id: crypto.randomUUID() };
-      const clanId = crypto.randomUUID();
-      const clanName = `${displayName}'s Clan`.slice(0, 60);
-      const slug = await uniqueClanSlug(clanName);
-      await db.batch([
-        db
-          .prepare(
-            `INSERT INTO users
-              (id, discord_id, email, username, display_name, avatar_hash, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .bind(
-            user.id,
-            discordUser.id,
-            discordUser.email ?? null,
-            discordUser.username,
-            displayName,
-            discordUser.avatar ?? null,
-            now,
-            now,
-          ),
-        db
-          .prepare(
-            `INSERT INTO clans (id, name, slug, created_by_user_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          )
-          .bind(clanId, clanName, slug, user.id, now, now),
-        db
-          .prepare(
-            `INSERT INTO clan_memberships (clan_id, user_id, role, created_at)
-             VALUES (?, ?, 'owner', ?)`,
-          )
-          .bind(clanId, user.id, now),
-      ]);
+      await db
+        .prepare(
+          `INSERT INTO users
+            (id, discord_id, email, username, display_name, avatar_hash, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          user.id,
+          discordUser.id,
+          discordUser.email ?? null,
+          discordUser.username,
+          displayName,
+          discordUser.avatar ?? null,
+          now,
+          now,
+        )
+        .run();
       await recordAudit(db, {
-        clanId,
         actorUserId: user.id,
         actorType: 'organizer',
         eventType: 'account.created',
@@ -128,22 +111,6 @@ export async function GET(request: Request) {
     console.error('finish Discord authentication failed', error);
     return redirectError(origin, 'Discord sign-in failed. Please try again.');
   }
-}
-
-async function uniqueClanSlug(name: string) {
-  const base = name
-    .toLocaleLowerCase('en-US')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 36) || 'clan';
-  const db = getDatabase();
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const suffix = attempt ? `-${attempt + 1}` : '';
-    const slug = `${base.slice(0, 40 - suffix.length)}${suffix}`;
-    const existing = await db.prepare('SELECT id FROM clans WHERE slug = ?').bind(slug).first();
-    if (!existing) return slug;
-  }
-  return `${base.slice(0, 28)}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
 function redirectError(origin: string, message: string) {
