@@ -7,7 +7,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     const body = await request.json().catch(() => ({})) as { teamId?: unknown };
     const requestedTeamId = typeof body.teamId === 'string' ? body.teamId : null;
     const query = requestedTeamId

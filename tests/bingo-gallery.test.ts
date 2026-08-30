@@ -28,7 +28,8 @@ describe('bingo template gallery', () => {
     expect(sanitizeTemplateCategory('Raids')).toBe('Raids');
     expect(sanitizeTemplateCategory('Not a category')).toBe('Mixed');
     expect(sanitizeTemplateVisibility('public')).toBe('public');
-    expect(sanitizeTemplateVisibility('unlisted')).toBe('private');
+    expect(sanitizeTemplateVisibility('unlisted')).toBe('unlisted');
+    expect(sanitizeTemplateVisibility('clan')).toBe('clan');
   });
 
   it('deduplicates and sanitizes tags without accepting an unbounded list', () => {

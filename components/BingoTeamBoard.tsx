@@ -80,7 +80,7 @@ export function BingoTeamBoard({ token }: { token: string }) {
         <div className="wood-panel mt-7 p-4 sm:p-6"><BingoStandings data={data} /></div>
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="parchment-panel min-w-0 p-4 sm:p-6">
-            <div className="mb-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">{data.event.status === 'live' ? 'Claims are open' : data.event.status === 'complete' ? 'Final board' : 'Board preview'}</p><h2 className="fantasy-title text-3xl font-bold">Choose a square.</h2></div>
+            <div className="mb-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">{data.event.status === 'live' ? 'Claims are open' : data.event.status === 'paused' ? 'Bingo paused' : data.event.status === 'complete' ? 'Final board' : 'Board preview'}</p><h2 className="fantasy-title text-3xl font-bold">Choose a square.</h2></div>
             <BingoBoard data={data} teamId={ownTeam.id} selectedTaskId={selectedTaskId} onSelect={selectTask} />
           </section>
           <aside className="space-y-5">

@@ -12,8 +12,9 @@ export async function GET(_request: Request, context: Context) {
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    await requireManagedBingoEvent(token, eventId);
-    return json(await loadBingoView({ eventId, viewer: 'organizer' }));
+    const event = await requireManagedBingoEvent(token, eventId);
+    const view = await loadBingoView({ eventId, viewer: 'organizer' });
+    return json({ ...view, viewer: { ...view.viewer, accessRole: event.access_role ?? 'owner' } });
   } catch (error) {
     const result = bingoErrorResponse(error);
     if (result.status >= 500) console.error('load managed bingo failed', error);
@@ -25,11 +26,11 @@ export async function PUT(request: Request, context: Context) {
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const title = typeof body.title === 'string' ? body.title.trim().replace(/\s+/g, ' ').slice(0, 90) : event.title;
     if (!title) throw new BingoError('Give the bingo event a title.');
-    const structuralLocked = ['live', 'complete', 'archived'].includes(event.status);
+    const structuralLocked = ['live', 'paused', 'complete', 'archived'].includes(event.status);
     const mode = structuralLocked ? event.mode : validMode(body.mode ?? event.mode);
     const boardScope = mode === 'lockout' ? 'shared' : structuralLocked ? event.board_scope : validScope(body.boardScope ?? event.board_scope);
     const startAt = validDate(body.startAt);
@@ -69,10 +70,10 @@ export async function PATCH(request: Request, context: Context) {
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     const body = await request.json().catch(() => ({})) as { action?: unknown };
-    const action = body.action === 'start' || body.action === 'complete' ? body.action : null;
-    if (!action) throw new BingoError('Choose start or complete.');
+    const action = ['start', 'pause', 'resume', 'complete'].includes(String(body.action)) ? body.action as 'start' | 'pause' | 'resume' | 'complete' : null;
+    if (!action) throw new BingoError('Choose start, pause, resume, or complete.');
     const db = getDatabase();
     const now = new Date().toISOString();
     if (action === 'start') {
@@ -93,11 +94,23 @@ export async function PATCH(request: Request, context: Context) {
         username: "Terry's Drafting",
         embeds: [{ title: `${event.title} is live`, description: 'The bingo board is open and teams can submit tile claims.', color: 0x5f7f46 }],
       });
+    } else if (action === 'pause') {
+      if (event.status !== 'live') throw new BingoError('Only a live bingo can be paused.', 409);
+      await db.batch([
+        db.prepare(`UPDATE bingo_events SET status = 'paused', paused_at = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND status = 'live'`).bind(now, now, eventId),
+        bingoActivityInsert({ eventId, type: 'event.paused', message: `${event.title} has been paused by an organizer.`, now }),
+      ]);
+    } else if (action === 'resume') {
+      if (event.status !== 'paused') throw new BingoError('Only a paused bingo can be resumed.', 409);
+      await db.batch([
+        db.prepare(`UPDATE bingo_events SET status = 'live', paused_at = NULL, revision = revision + 1, updated_at = ? WHERE id = ? AND status = 'paused'`).bind(now, eventId),
+        bingoActivityInsert({ eventId, type: 'event.resumed', message: `${event.title} has resumed. The hunt continues!`, now }),
+      ]);
     } else {
-      if (event.status !== 'live') throw new BingoError('Only a live bingo can be completed.', 409);
+      if (!['live', 'paused'].includes(event.status)) throw new BingoError('Only a live or paused bingo can be completed.', 409);
       await db.batch([
         db.prepare(`UPDATE bingo_events SET status = 'complete', ended_at = ?, end_at = COALESCE(end_at, ?),
-          revision = revision + 1, updated_at = ? WHERE id = ? AND status = 'live'`).bind(now, now, now, eventId),
+          paused_at = NULL, revision = revision + 1, updated_at = ? WHERE id = ? AND status IN ('live', 'paused')`).bind(now, now, now, eventId),
         bingoActivityInsert({ eventId, type: 'event.completed', message: `${event.title} is complete. The final scores are sealed.`, now }),
       ]);
       scheduleBingoSnapshot(eventId, 'end');
@@ -107,7 +120,7 @@ export async function PATCH(request: Request, context: Context) {
       });
     }
     await recordAudit(db, {
-      draftId: event.draft_id, actorType: 'organizer', eventType: `bingo.${action === 'start' ? 'started' : 'completed'}`,
+      draftId: event.draft_id, actorType: 'organizer', eventType: `bingo.${action === 'start' ? 'started' : action === 'complete' ? 'completed' : action === 'pause' ? 'paused' : 'resumed'}`,
       metadata: { eventId }, requestId: requestId(request), createdAt: now,
     }).catch(() => undefined);
     return json(await loadBingoView({ eventId, viewer: 'organizer' }));

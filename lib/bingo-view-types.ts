@@ -42,7 +42,7 @@ export type BingoViewData = {
     id: string; draftId: string | null; title: string; publicSlug: string; publicPath: string; mode: BingoMode;
     boardScope: BingoBoardScope; gridSize: number; status: BingoStatus; winCondition: string; targetValue: number;
     requiresReview: boolean; publicSpectator: boolean; publicListed: boolean; spectatorDelaySeconds: number; startAt: string | null;
-    endAt: string | null; startedAt: string | null; endedAt: string | null; baselineStatus: string;
+    endAt: string | null; startedAt: string | null; pausedAt: string | null; endedAt: string | null; baselineStatus: string;
     clanName: string | null; clanPath: string | null; revision: number; rules: BingoEventRules; createdAt: string; updatedAt: string;
   };
   teams: BingoViewTeam[];
@@ -58,5 +58,5 @@ export type BingoViewData = {
     baselineRunId: string | null; baselineCoverage: number; lastSyncAt: string | null; nextSyncAt: string | null;
     lastError: string | null; latestRun: BingoViewWomRun | null;
   };
-  viewer: { type: 'public' | 'team' | 'organizer'; teamId: string | null };
+  viewer: { type: 'public' | 'team' | 'organizer'; teamId: string | null; accessRole?: 'owner' | 'organizer' | 'scorekeeper' };
 };

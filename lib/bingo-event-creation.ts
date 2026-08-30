@@ -18,6 +18,8 @@ export type BingoEventSnapshotInput = {
   startAt?: string | null;
   endAt?: string | null;
   createdByUserId?: string | null;
+  publicSpectator?: boolean;
+  publicListed?: boolean;
   templateKey?: string | null;
   teamNames?: Record<number, string>;
 };
@@ -65,11 +67,13 @@ export async function createBingoEventSnapshot(input: BingoEventSnapshotInput): 
     await db.batch([
       db.prepare(`INSERT INTO bingo_events
         (id, draft_id, title, public_slug, mode, board_scope, grid_size, status, win_condition, target_value,
-         requires_review, public_spectator, spectator_delay_seconds, start_at, end_at, baseline_status,
+         requires_review, public_spectator, public_listed, spectator_delay_seconds, start_at, end_at, baseline_status,
          revision, rules_json, created_by_user_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, 1, 1, 0, ?, ?, 'idle', 0, ?, ?, ?, ?)`)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, 1, ?, ?, 0, ?, ?, 'idle', 0, ?, ?, ?, ?)`)
         .bind(eventId, input.draftId, input.title, publicSlug, input.mode, input.boardScope, gridSize, winCondition,
-          targetValue, input.startAt ?? null, input.endAt ?? null,
+          targetValue, input.publicSpectator === false ? 0 : 1,
+          input.publicSpectator === false ? 0 : input.publicListed ? 1 : 0,
+          input.startAt ?? null, input.endAt ?? null,
           JSON.stringify({ ...input.configuration.rules, templateKey: input.templateKey ?? null }),
           input.createdByUserId ?? null, now, now),
       ...teamData.map((team) => db.prepare(`INSERT INTO bingo_teams

@@ -185,6 +185,8 @@ describe('bingo task imports', () => {
 
   it('ships a broad OSRS library with the requested headline presets', () => {
     expect(OSRS_BINGO_PRESETS.length).toBeGreaterThanOrEqual(250);
+    expect(new Set(OSRS_BINGO_PRESETS.map((task) => task.id)).size).toBe(OSRS_BINGO_PRESETS.length);
+    expect(OSRS_BINGO_PRESETS.every((task) => task.id?.startsWith('terrys:'))).toBe(true);
     expect(OSRS_BINGO_PRESETS.map((task) => task.title)).toEqual(expect.arrayContaining([
       'Get an Oathplate helm', 'Obtain the Baby mole pet', 'Receive a Twisted ancestral colour kit',
       'Beat the GM Theatre of Blood trio time', 'Beat the Chambers CM five-player time',

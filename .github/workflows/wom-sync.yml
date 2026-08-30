@@ -1,0 +1,17 @@
+name: Wise Old Man checkpoints
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run due checkpoints
+        run: curl --fail-with-body --retry 2 --max-time 240 -X POST https://draftsmith-teams.companyscreeninginfo.chatgpt.site/api/cron/wom

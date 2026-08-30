@@ -25,6 +25,7 @@ type GalleryRow = {
   clan_name: string | null;
   clan_slug: string | null;
   author_name: string | null;
+  visibility: string;
 };
 
 
@@ -63,7 +64,7 @@ async function loadCommunityRows() {
       `SELECT bt.id, bt.public_slug, bt.name, bt.summary, bt.category, bt.tags_json, bt.mode,
               bt.board_scope, bt.configuration_json, bt.clone_count,
               COALESCE(tv.upvote_count, 0) AS upvote_count, COALESCE(tv.downvote_count, 0) AS downvote_count,
-              bt.published_at, bt.updated_at,
+              bt.published_at, bt.updated_at, bt.visibility,
               CASE WHEN c.public_listing = 1 THEN c.name END AS clan_name,
               CASE WHEN c.public_listing = 1 THEN c.slug END AS clan_slug,
               NULL AS author_name
@@ -91,7 +92,7 @@ export async function loadGalleryTemplate(slug: string) {
     `SELECT bt.id, bt.public_slug, bt.name, bt.summary, bt.category, bt.tags_json, bt.mode,
             bt.board_scope, bt.configuration_json, bt.clone_count,
             COALESCE(tv.upvote_count, 0) AS upvote_count, COALESCE(tv.downvote_count, 0) AS downvote_count,
-            bt.published_at, bt.updated_at,
+            bt.published_at, bt.updated_at, bt.visibility,
             CASE WHEN c.public_listing = 1 THEN c.name END AS clan_name,
             CASE WHEN c.public_listing = 1 THEN c.slug END AS clan_slug,
             NULL AS author_name
@@ -103,7 +104,7 @@ export async function loadGalleryTemplate(slug: string) {
               SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS downvote_count
        FROM bingo_template_votes GROUP BY template_id
      ) tv ON tv.template_id = bt.id
-     WHERE bt.public_slug = ? AND bt.visibility = 'public'`,
+     WHERE bt.public_slug = ? AND bt.visibility IN ('public', 'unlisted')`,
   ).bind(slug).first<GalleryRow>();
   return row ? rowToGalleryTemplate(row) : null;
 }
@@ -144,6 +145,7 @@ function rowToGalleryTemplate(row: GalleryRow): GalleryTemplate | null {
       creatorClanSlug: row.clan_slug,
       publishedAt: row.published_at ?? row.updated_at,
       official: false,
+      visibility: row.visibility === 'unlisted' ? 'unlisted' : 'public',
       configuration,
     };
   } catch {

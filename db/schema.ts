@@ -463,6 +463,7 @@ export const bingoEvents = sqliteTable(
     startAt: text('start_at'),
     endAt: text('end_at'),
     startedAt: text('started_at'),
+    pausedAt: text('paused_at'),
     endedAt: text('ended_at'),
     baselineStatus: text('baseline_status').notNull().default('idle'),
     revision: integer('revision').notNull().default(0),
@@ -475,6 +476,61 @@ export const bingoEvents = sqliteTable(
     uniqueIndex('bingo_events_public_slug_unique').on(table.publicSlug),
     index('idx_bingo_events_draft_id').on(table.draftId),
     index('idx_bingo_events_status').on(table.status),
+  ],
+);
+
+export const bingoEventCollaborators = sqliteTable(
+  'bingo_event_collaborators',
+  {
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('scorekeeper'),
+    invitedByUserId: text('invited_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.eventId, table.userId] }),
+    index('idx_bingo_event_collaborators_user').on(table.userId),
+  ],
+);
+
+export const bingoEventInvites = sqliteTable(
+  'bingo_event_invites',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    role: text('role').notNull().default('scorekeeper'),
+    createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: text('expires_at').notNull(),
+    maxUses: integer('max_uses').notNull().default(10),
+    useCount: integer('use_count').notNull().default(0),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_event_invites_token_hash_unique').on(table.tokenHash),
+    index('idx_bingo_event_invites_event').on(table.eventId),
+    index('idx_bingo_event_invites_expires').on(table.expiresAt),
+  ],
+);
+
+export const bingoEventAccessTokens = sqliteTable(
+  'bingo_event_access_tokens',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    role: text('role').notNull().default('organizer'),
+    createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: text('expires_at'),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bingo_event_access_tokens_hash_unique').on(table.tokenHash),
+    index('idx_bingo_event_access_tokens_event').on(table.eventId),
+    index('idx_bingo_event_access_tokens_expires').on(table.expiresAt),
   ],
 );
 

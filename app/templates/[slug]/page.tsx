@@ -20,6 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     alternates: { canonical: `/templates/${template.slug}` },
     openGraph: { title: template.name, description: template.summary, url: `${origin}/templates/${template.slug}`, images: [] },
     twitter: { title: template.name, description: template.summary, images: [] },
+    robots: template.visibility === 'unlisted' ? { index: false, follow: false } : undefined,
   };
 }
 
@@ -33,7 +34,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
     '@context': 'https://schema.org', '@type': 'CreativeWork', name: template.name,
     description: template.summary, url: `${origin}/templates/${template.slug}`,
     author: { '@type': 'Organization', name: template.creatorName },
-    interactionStatistic: template.official ? undefined : [
+    interactionStatistic: template.official || template.visibility === 'unlisted' ? undefined : [
       { '@type': 'InteractionCounter', interactionType: 'https://schema.org/UseAction', userInteractionCount: template.cloneCount },
       { '@type': 'InteractionCounter', interactionType: 'https://schema.org/LikeAction', userInteractionCount: template.upvoteCount },
       { '@type': 'InteractionCounter', interactionType: 'https://schema.org/DislikeAction', userInteractionCount: template.downvoteCount },
@@ -47,14 +48,14 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
         <Link className="text-xs font-black text-[#d7c48e] underline" href="/templates">← Board archives</Link>
         <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
           <div>
-            <div className="flex flex-wrap items-center gap-2"><span className="seal-badge px-3 py-1.5 text-[10px] font-black uppercase">{template.official ? 'Official starter' : template.category}</span><span className="rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-[10px] font-black uppercase text-[#ddc27b]">{modeLabel(template.mode)}</span></div>
+            <div className="flex flex-wrap items-center gap-2"><span className="seal-badge px-3 py-1.5 text-[10px] font-black uppercase">{template.official ? 'Official starter' : template.visibility === 'unlisted' ? 'Unlisted shared board' : template.category}</span><span className="rounded border border-[#8b6d2c] bg-[#2c2417] px-3 py-1.5 text-[10px] font-black uppercase text-[#ddc27b]">{modeLabel(template.mode)}</span></div>
             <h1 className="fantasy-title mt-4 text-5xl font-bold text-[#f5df9b] sm:text-7xl">{template.name}</h1>
             <p className="mt-4 max-w-3xl text-base leading-relaxed text-[#b9ab89]">{template.summary}</p>
             <p className="mt-3 text-xs text-[#9f9272]">Published by {template.creatorName}{template.publishedAt ? ` · ${new Date(template.publishedAt).toLocaleDateString()}` : ''}</p>
           </div>
           <aside className="parchment-panel p-5 text-[#342817]">
             <dl className="grid grid-cols-2 gap-3"><Metric label="Layout" value={`${template.gridSize} × ${template.gridSize}`} /><Metric label="Difficulty" value={template.difficulty} /><Metric label="Board type" value={template.boardScope === 'shared' ? 'Shared board' : 'Per team'} /><Metric label="Uses" value={template.official ? 'Terry’s starter' : String(template.cloneCount)} /></dl>
-            <div className="mt-5"><TemplateActions slug={template.slug} preferredValue={preferredValue} importText={serializeBingoTaskImport(configuration.tasks)} official={template.official} initialUpvoteCount={template.upvoteCount} initialDownvoteCount={template.downvoteCount} /></div>
+            <div className="mt-5"><TemplateActions slug={template.slug} preferredValue={preferredValue} importText={serializeBingoTaskImport(configuration.tasks)} official={template.official} voteEnabled={template.visibility === 'public'} initialUpvoteCount={template.upvoteCount} initialDownvoteCount={template.downvoteCount} /></div>
           </aside>
         </div>
 

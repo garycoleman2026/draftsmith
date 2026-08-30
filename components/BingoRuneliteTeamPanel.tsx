@@ -10,7 +10,7 @@ type Status = { enabled: boolean; scopes: RuneliteScope[]; rawChatStored: false;
 type Pairing = { code: string; memberId: string; memberName: string; expiresAt: string };
 
 const SCOPE_NAMES: Record<RuneliteScope, string> = {
-  xp: 'XP/levels', loot: 'loot/log slots', kills: 'boss kills', raids: 'raids/times', achievements: 'achievements/clues',
+  xp: 'XP/levels', loot: 'loot/log slots', kills: 'boss kills', raids: 'raids/times', achievements: 'clue completions',
 };
 
 export function BingoRuneliteTeamPanel({ token, members, onNotice, onError }: {

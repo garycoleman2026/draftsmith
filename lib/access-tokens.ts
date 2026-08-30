@@ -1,5 +1,6 @@
 import { getDatabase } from './db';
 import { hashToken, randomToken } from './security';
+import type { BingoEventRole } from './types';
 
 export async function resolveManagerDraftId(token: string) {
   const tokenHash = await hashToken(token);
@@ -104,6 +105,36 @@ export async function createTemporaryManagerToken(input: {
     )
     .run();
   return { token: credential.token, expiresAt: expiresAt.toISOString() };
+}
+
+export async function createTemporaryBingoEventToken(input: {
+  eventId: string;
+  userId: string;
+  role: BingoEventRole;
+  lifetimeSeconds?: number;
+}) {
+  const credential = await createHashedCredential();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + (input.lifetimeSeconds ?? 600) * 1000);
+  await getDatabase().prepare(
+    `INSERT INTO bingo_event_access_tokens
+      (id, event_id, token_hash, role, created_by_user_id, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), input.eventId, credential.hash, input.role, input.userId,
+    expiresAt.toISOString(), now.toISOString(),
+  ).run();
+  return { token: credential.token, role: input.role, expiresAt: expiresAt.toISOString() };
+}
+
+export async function resolveBingoEventAccess(token: string, eventId: string) {
+  const tokenHash = await hashToken(token);
+  const now = new Date().toISOString();
+  return getDatabase().prepare(
+    `SELECT event_id, role FROM bingo_event_access_tokens
+     WHERE event_id = ? AND token_hash = ? AND revoked_at IS NULL
+       AND (expires_at IS NULL OR expires_at > ?)`,
+  ).bind(eventId, tokenHash, now).first<{ event_id: string; role: BingoEventRole }>();
 }
 
 function retiredCredential() {

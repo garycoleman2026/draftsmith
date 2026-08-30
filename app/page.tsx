@@ -28,7 +28,7 @@ const paths = [
     eyebrow: 'Light the braziers',
     title: 'Run a bingo',
     body: 'Bring your teams, launch the board, review claims, and follow the score.',
-    href: '/bingo#create',
+    href: '/events/new',
     action: 'Start an event',
   },
   {

@@ -50,6 +50,15 @@ export async function POST(request: Request) {
 
     const db = getDatabase();
     const sessionUser = await getSessionUser(request);
+    const clanId = typeof body.clanId === 'string' && body.clanId ? body.clanId : null;
+    if (clanId) {
+      if (!sessionUser) throw new BingoError('Sign in before creating an event in a clan workspace.', 401);
+      const membership = await db.prepare(
+        "SELECT role FROM clan_memberships WHERE clan_id = ? AND user_id = ? AND role IN ('owner', 'admin', 'captain')",
+      ).bind(clanId, sessionUser.id).first();
+      if (!membership) throw new BingoError('You cannot create events in that clan workspace.', 403);
+    }
+    const visibility = ['private', 'unlisted', 'public'].includes(String(body.visibility)) ? String(body.visibility) : 'unlisted';
     const credential = await createHashedCredential();
     const draftId = crypto.randomUUID();
     createdDraftId = draftId;
@@ -86,10 +95,10 @@ export async function POST(request: Request) {
 
     await db.batch([
       db.prepare(`INSERT INTO drafts
-        (id, admin_token, admin_token_hash, title, public_slug, owner_user_id, draft_type, team_count,
+        (id, admin_token, admin_token_hash, title, public_slug, clan_id, owner_user_id, draft_type, team_count,
          roster_mode, registration_open, status, result_json, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'random', ?, 'import', 0, 'complete', ?, ?, ?)`)
-        .bind(draftId, credential.retired, credential.hash, title, null, sessionUser?.id ?? null,
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'random', ?, 'import', 0, 'complete', ?, ?, ?)`)
+        .bind(draftId, credential.retired, credential.hash, title, null, clanId, sessionUser?.id ?? null,
           roster.teams.length, JSON.stringify(result), now, now),
       ...playerRows.map((player) => db.prepare(`INSERT INTO players
         (id, draft_id, name, normalized_name, sort_order, source, signup_status, created_at, updated_at)
@@ -107,6 +116,8 @@ export async function POST(request: Request) {
       startAt,
       endAt,
       createdByUserId: sessionUser?.id ?? null,
+      publicSpectator: visibility !== 'private',
+      publicListed: visibility === 'public',
       templateKey: publicTemplate || customConfiguration ? null : builtin.key,
       teamNames: Object.fromEntries(roster.teams.map((team, index) => [index, team.name])),
     });
@@ -122,6 +133,7 @@ export async function POST(request: Request) {
         teamCount: roster.teams.length,
         playerCount: roster.playerCount,
         taskCount: configuration.tasks.length,
+        visibility,
       },
       requestId: requestId(request),
       createdAt: now,

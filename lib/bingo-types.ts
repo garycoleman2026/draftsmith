@@ -95,6 +95,7 @@ function preset(title: string, points: number, category: string, verifierType: B
     prerequisitePositions: [],
   });
   return {
+    id: `terrys:${stableTaskKey(title)}`,
     title,
     description: options.description ?? descriptionFor(title, rule),
     points,
@@ -329,6 +330,7 @@ export function sanitizeBingoTasks(value: unknown, expectedCount: number): Bingo
     const free = item.freeSpace === true || /^free(?:\s+space)?$/i.test(title);
     const rule = free ? defaultBingoTaskRule('manual') : sanitizeBingoTaskRule(item.rule, verificationMode);
     return [{
+      id: textValue(item.id, 120) || undefined,
       title: free ? "Terry's free space" : title,
       description: textValue(item.description, 400),
       points: free ? 0 : clampInteger(item.points, 0, 10_000, index + 1),
@@ -424,6 +426,7 @@ export function iconFor(category: string) {
 
 function freeSpace(): BingoTaskDefinition {
   return {
+    id: 'terrys:free-space',
     title: "Terry's free space", description: 'Every team begins with this square completed.', points: 0,
     category: 'Free', difficulty: 'easy', verificationMode: 'manual', repeatable: false, maxCompletions: 1,
     hidden: false, freeSpace: true, iconKey: 'scroll', rule: defaultBingoTaskRule('manual'),
@@ -439,6 +442,9 @@ function descriptionFor(title: string, rule: BingoTaskRule) {
     : rule.scope.type === 'exact_party' ? `Requires exactly ${rule.scope.participantCount ?? '?'} participating team members.`
       : rule.scope.type === 'all_members' ? 'Every rostered team member must participate.' : 'Any team member may complete this task.';
   return `${title} during the event. ${scope}`;
+}
+function stableTaskKey(value: string) {
+  return value.toLocaleLowerCase('en-US').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90);
 }
 function splitImportLine(line: string) {
   if (line.includes('\t')) return line.split('\t');

@@ -8,7 +8,7 @@ export async function PUT(request: Request, context: { params: Promise<{ token: 
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     if (!['draft', 'scheduled'].includes(event.status)) throw new BingoError('The task board is locked once the event starts.', 409);
     const existingClaim = await getDatabase().prepare('SELECT id FROM bingo_claims WHERE event_id = ? LIMIT 1').bind(eventId).first();
     if (existingClaim) throw new BingoError('The task board cannot be replaced after claims have been submitted.', 409);

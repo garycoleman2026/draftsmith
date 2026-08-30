@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   parseStandaloneBingoRoster,
@@ -27,7 +27,7 @@ type CreatedBingo = {
   teamLinks: { teamId: string; teamName: string; path: string }[];
 };
 
-export function StandaloneBingoCreator({ templates }: { templates: StandaloneBingoTemplateOption[] }) {
+export function StandaloneBingoCreator({ templates, initialClanId = '', initialVisibility = 'unlisted' }: { templates: StandaloneBingoTemplateOption[]; initialClanId?: string; initialVisibility?: 'private' | 'unlisted' | 'public' }) {
   const [title, setTitle] = useState('');
   const [template, setTemplate] = useState(templates[0]?.value ?? 'builtin:points');
   const [rosterText, setRosterText] = useState('');
@@ -35,6 +35,9 @@ export function StandaloneBingoCreator({ templates }: { templates: StandaloneBin
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
   const [hasEndDate, setHasEndDate] = useState(false);
+  const [clans, setClans] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [clanId, setClanId] = useState(initialClanId);
+  const [visibility, setVisibility] = useState<'private' | 'unlisted' | 'public'>(initialVisibility);
   const [customizing, setCustomizing] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +46,17 @@ export function StandaloneBingoCreator({ templates }: { templates: StandaloneBin
   const roster = useMemo(() => parseStandaloneBingoRoster(rosterText), [rosterText]);
   const selectedTemplate = templates.find((item) => item.value === template);
   const teamSize = Math.max(1, roster.teams.length ? Math.min(...roster.teams.map((team) => team.players.length)) : 1);
+
+  useEffect(() => {
+    void fetch('/api/auth/session', { cache: 'no-store' })
+      .then((response) => response.json() as Promise<{ clans?: { id: string; name: string; role: string }[] }>)
+      .then((session) => {
+        const manageable = (session.clans ?? []).filter((clan) => ['owner', 'admin', 'captain'].includes(clan.role));
+        setClans(manageable);
+        if (initialClanId && !manageable.some((clan) => clan.id === initialClanId)) setClanId('');
+      })
+      .catch(() => undefined);
+  }, [initialClanId]);
 
   async function createEvent(configuration?: BingoTemplateDefinition) {
     if (!title.trim()) {
@@ -69,6 +83,8 @@ export function StandaloneBingoCreator({ templates }: { templates: StandaloneBin
           configuration,
           startAt: toIso(startAt),
           endAt: hasEndDate ? toIso(endAt) : null,
+          clanId: clanId || null,
+          visibility,
           website,
         }),
       });
@@ -150,6 +166,22 @@ export function StandaloneBingoCreator({ templates }: { templates: StandaloneBin
             </div>
           </div>
 
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="text-[10px] font-black uppercase tracking-[0.09em] text-[#65583f]">Event home
+              <select className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={clanId} onChange={(event) => setClanId(event.target.value)}>
+                <option value="">My account</option>
+                {clans.map((clan) => <option key={clan.id} value={clan.id}>{clan.name}</option>)}
+              </select>
+            </label>
+            <label className="text-[10px] font-black uppercase tracking-[0.09em] text-[#65583f]">Spectator board
+              <select className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={visibility} onChange={(event) => setVisibility(event.target.value as 'private' | 'unlisted' | 'public')}>
+                <option value="private">Private · teams and organizers</option>
+                <option value="unlisted">Anyone with the link</option>
+                <option value="public">Public · listed on Terry&apos;s</option>
+              </select>
+            </label>
+          </div>
+
           <div className="mt-5 flex flex-wrap items-end justify-between gap-2">
             <label className="text-[10px] font-black uppercase tracking-[0.09em] text-[#65583f]">Team rosters</label>
             <button className="text-xs font-black text-[#587044] underline" type="button" onClick={() => setRosterText(STANDALONE_BINGO_ROSTER_EXAMPLE)}>Load an editable example</button>
@@ -220,7 +252,7 @@ export function StandaloneBingoCreator({ templates }: { templates: StandaloneBin
           <a className="gold-button px-4 py-2.5 text-xs" href={created.managePath}>Open organizer room →</a>
           <button className="scroll-button px-4 py-2.5 text-xs" onClick={() => void copy('organizer', absoluteUrl(created.managePath))}>{copied === 'organizer' ? 'Organizer link copied' : 'Copy organizer link'}</button>
           <button className="scroll-button px-4 py-2.5 text-xs" onClick={() => void copyAllLinks()}>{copied === 'all' ? 'All links copied' : 'Copy organizer + team links'}</button>
-          <a className="scroll-button px-4 py-2.5 text-xs" href={created.publicPath} target="_blank" rel="noreferrer">Preview spectator board ↗</a>
+          {visibility !== 'private' ? <a className="scroll-button px-4 py-2.5 text-xs" href={created.publicPath} target="_blank" rel="noreferrer">Preview spectator board ↗</a> : null}
         </div>
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{created.teamLinks.map((link) => <article className="rounded border border-white/10 bg-black/20 p-3" key={link.teamId}><p className="text-sm font-black text-[#eedca8]">{link.teamName}</p><div className="mt-2 flex gap-3 text-xs"><button className="text-[#cfe3a9] underline" onClick={() => void copy(link.teamId, absoluteUrl(link.path))}>{copied === link.teamId ? 'Copied' : 'Copy private link'}</button><a className="text-[#cfe3a9] underline" href={link.path} target="_blank" rel="noreferrer">Open ↗</a></div></article>)}</div>
       </section> : null}

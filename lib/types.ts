@@ -9,7 +9,8 @@ export type LiveOrder = 'snake' | 'linear' | 'random' | 'third_round_reversal';
 export type DraftLifecycle = 'registration' | 'rankings' | 'live' | 'complete' | 'archived';
 export type BingoMode = 'classic' | 'points' | 'lockout' | 'blackout' | 'progression' | 'categories';
 export type BingoBoardScope = 'shared' | 'per_team';
-export type BingoStatus = 'draft' | 'scheduled' | 'live' | 'complete' | 'archived';
+export type BingoStatus = 'draft' | 'scheduled' | 'live' | 'paused' | 'complete' | 'archived';
+export type BingoEventRole = 'owner' | 'organizer' | 'scorekeeper';
 export type BingoVerificationMode = 'manual' | 'screenshot' | 'stat_delta' | 'hybrid';
 export type BingoClaimStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 

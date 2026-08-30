@@ -20,7 +20,7 @@ export async function PUT(request: Request, context: Context) {
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     await enforceRateLimit({ request, scope: 'bingo-runelite-manage', limit: 30, windowSeconds: 3600, subject: eventId });
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const result = await configureRunelite({ eventId, enabled: body.enabled === true, scopes: body.scopes });
@@ -37,7 +37,7 @@ export async function POST(request: Request, context: Context) {
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     await enforceRateLimit({ request, scope: 'bingo-runelite-manage', limit: 30, windowSeconds: 3600, subject: eventId });
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     if (body.action !== 'revoke' || typeof body.deviceId !== 'string') throw new BingoError('Choose a RuneLite device to disconnect.');

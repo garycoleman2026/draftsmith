@@ -6,7 +6,7 @@ import { decryptSecret } from './security';
 export const DISCORD_EVENT_TYPES = [
   'registration.created', 'registration.closed', 'captain.rankings_submitted',
   'live.started', 'live.pick', 'live.auto', 'draft.generated', 'draft.complete',
-  'bingo.started', 'bingo.claim_submitted', 'bingo.claim_approved', 'bingo.completed',
+  'bingo.started', 'bingo.claim_submitted', 'bingo.claim_approved', 'bingo.announcement', 'bingo.completed',
 ] as const;
 export type DiscordEventType = typeof DISCORD_EVENT_TYPES[number];
 

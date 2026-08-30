@@ -5,7 +5,7 @@ import { getDatabase } from '../lib/db';
 
 const origin = 'https://draftsmith-teams.companyscreeninginfo.chatgpt.site';
 const routes = [
-  '', '/draft', '/bingo', '/bingo/studio', '/templates', '/clans', '/presets', '/runelite', '/guides', '/guides/osrs-clan-bingo', '/guides/custom-bingo-maker',
+  '', '/events/new', '/draft', '/bingo', '/bingo/studio', '/templates', '/clans', '/presets', '/runelite', '/guides', '/guides/osrs-clan-bingo', '/guides/custom-bingo-maker',
   '/guides/runelite-tracking', '/about', '/faq', '/privacy', '/terms', '/contact',
 ] as const;
 

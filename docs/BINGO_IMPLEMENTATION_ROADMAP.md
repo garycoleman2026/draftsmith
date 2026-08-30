@@ -6,14 +6,15 @@ Ordinary boards are self-service. Organizers compose layouts, game rules, and ta
 
 ## Delivery stages
 
-Status: stages 1 through 4, standalone event creation, and the self-service discovery product are implemented. The RuneLite source beta is public; real in-game confirmation is the remaining gate before Plugin Hub submission. Advertising activation remains account/domain work rather than an application-code shortcut.
+Status: product stages 1 through 6 are implemented. The RuneLite beta is ready for the owner’s in-game test. Stage 7—community growth and advertising—is intentionally deferred until real clans are using the service.
 
-1. **Custom maker — shipped** — variable grids, six game styles, OSRS presets, drag-and-drop editing, spreadsheet round-tripping, template cloning, validation, prerequisite enforcement, and a direct copy/paste path for clans whose teams already exist.
-2. **Verification engine — shipped** — normalized evidence events, confidence/source labels, idempotent matching, progress candidates, replay, and organizer audit controls.
-3. **Wise Old Man — shipped** — event baselines, periodic checkpoints, final reconciliation, optional group-bulk syncing, rate-safe roster syncing, and automatic XP/level/KC candidates without aggressive upstream polling or forced player updates.
-4. **RuneLite service contract — shipped** — one-time exact-RSN pairing, revocable hashed device credentials, minimal scoped event batches, rate limits, device and batch deduplication, a public data disclosure, and an ETag-aware event overlay API.
-5. **RuneLite plugin — source beta shipped, validation pending** — public standalone repository, team/board overlay, manual submission, XP and supported chat/loot events, disclosure of transmitted data, tests, and production service integration are shipped. A real in-game test must pass before Plugin Hub submission.
-6. **Discovery and growth — shipped** — public board gallery, safe organizer-room reuse, categories, search, browser-scoped up/down votes, difficulty and game-style sorting, opt-in clan history, separately opt-in event landing pages, public task presets, guides, trust pages, and search metadata. Ad code remains intentionally absent until a real publisher ID, domain decision, and required consent controls exist.
+1. **Account, clan, and ownership model — shipped** — personal and clan drafts, bingos, and boards are separate resources with private, clan-only, unlisted, and public visibility.
+2. **Guided event setup — shipped** — one launcher routes organizers into draft-only, bingo-only, or draft-then-bingo journeys without mixing account and clan settings.
+3. **Organizer operations — shipped** — readiness checks, event-scoped organizers and scorekeepers, claim notes, announcements, pause/resume, manual progress, link rotation, and final reconciliation controls.
+4. **Trusted task catalogue — shipped** — stable task keys, exact boss/item targets, difficulty and readiness filters, planning estimates, proof labels, experimental separation, and resilient OSRS Wiki artwork lookup.
+5. **RuneLite beta — ready for field test** — combat-achievement collection is removed, retry data survives restarts, queues are bound to one character, and the Java test suite passes. A real in-game test remains the gate before Plugin Hub submission.
+6. **Hosted Wise Old Man tracking — shipped** — start/final snapshots plus scheduled group checkpoints continue while the organizer room is closed, with leases, retries, and visible health timing.
+7. **Community growth — deferred** — marketplace tuning, moderation workflows, AdSense, and promotion wait for real usage and feedback. Existing public discovery remains available without ad code.
 
 ## Verification principles
 

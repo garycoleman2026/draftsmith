@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/draft' },
 };
 
-export default function DraftPage() {
-  return <CreateDraft />;
+export default async function DraftPage({ searchParams }: { searchParams: Promise<{ clanId?: string; intent?: string }> }) {
+  const query = await searchParams;
+  return <CreateDraft initialClanId={query.clanId ?? ''} bingoIntent={query.intent === 'bingo'} />;
 }

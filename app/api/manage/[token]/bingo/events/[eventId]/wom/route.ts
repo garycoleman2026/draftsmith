@@ -8,7 +8,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
   try {
     await ensureSchema();
     const { token, eventId } = await context.params;
-    const event = await requireManagedBingoEvent(token, eventId);
+    const event = await requireManagedBingoEvent(token, eventId, ['owner', 'organizer']);
     await enforceRateLimit({ request, scope: 'bingo-wom-sync', limit: 240, windowSeconds: 3600, subject: eventId });
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     if (body.action === 'configure') {

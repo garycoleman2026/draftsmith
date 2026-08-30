@@ -29,7 +29,7 @@ A completed Terry's Drafting event can become a hosted clan bingo without re-ent
 - [x] Capture versioned Wise Old Man baselines, checkpoints, and final snapshots through a group-bulk or rate-safe player queue.
 - [x] Convert in-window WOM XP, level, and boss-KC deltas into task-scoped verification candidates while retaining manual proof fallback.
 - [x] Pair RuneLite through one-use, ten-minute, exact-RSN codes and revocable device credentials whose secrets are stored only as hashes.
-- [x] Let organizers scope accepted XP, loot, kill, raid, achievement, and clue observations while rejecting unknown fields and never storing raw chat text.
+- [x] Let organizers scope accepted XP, loot, kill, raid, and clue observations while rejecting unknown fields and never storing raw chat text. The legacy `achievements` scope name remains only as a compatibility label for clue events.
 - [x] Accept bounded, rate-limited, device-namespaced, idempotent RuneLite batches and publish a private ETag-aware overlay/capture-plan API.
 
 ## Safety and operating limits
@@ -37,7 +37,7 @@ A completed Terry's Drafting event can become a hosted clan bingo without re-ent
 - Evidence is private to the organizer, limited to 5 MB, signature checked, stored in R2, and served with `nosniff`.
 - Team and organizer credentials are stored only as hashes; newly issued raw links are shown once.
 - Team claims and evidence uploads are rate limited.
-- Custom boards support 9–49 tiles in a square grid. Direct events accept 2–8 teams and up to 120 unique valid OSRS names, rejecting a player assigned to several teams. Wise Old Man syncing is organizer-driven (or automatic while an organizer room is open). RuneLite pairing and the source beta tracker are implemented; Plugin Hub release still requires owner-confirmed in-game testing.
+- Custom boards support 9–49 tiles in a square grid. Direct events accept 2–8 teams and up to 120 unique valid OSRS names, rejecting a player assigned to several teams. Wise Old Man group checkpoints run on the hosted schedule even while the organizer room is closed. RuneLite pairing and the source beta tracker are implemented; Plugin Hub release still requires owner-confirmed in-game testing.
 
 ## Verification gate
 

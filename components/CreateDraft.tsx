@@ -61,7 +61,7 @@ const DEFAULT_SURVEY: SurveyQuestion[] = [
   },
 ];
 
-export function CreateDraft() {
+export function CreateDraft({ initialClanId = '', bingoIntent = false }: { initialClanId?: string; bingoIntent?: boolean }) {
   const [step, setStep] = useState<'setup' | 'captains' | 'created'>('setup');
   const [title, setTitle] = useState("Terry's Clan Draft");
   const [draftType, setDraftType] = useState<DraftType>('balanced');
@@ -69,7 +69,7 @@ export function CreateDraft() {
   const [rosterMode, setRosterMode] = useState<RosterMode>('import');
   const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>(DEFAULT_SURVEY);
   const [clans, setClans] = useState<{ id: string; name: string; role: string }[]>([]);
-  const [clanId, setClanId] = useState('');
+  const [clanId, setClanId] = useState(initialClanId);
   const [registrationCapacity, setRegistrationCapacity] = useState(120);
   const [signupApprovalMode, setSignupApprovalMode] = useState(false);
   const [registrationDeadline, setRegistrationDeadline] = useState('');
@@ -98,13 +98,14 @@ export function CreateDraft() {
         if (!active || !session.clans) return;
         const manageable = session.clans.filter((clan) => clan.role === 'owner' || clan.role === 'admin');
         setClans(manageable);
-        if (manageable.length === 1) setClanId(manageable[0].id);
+        if (initialClanId && manageable.some((clan) => clan.id === initialClanId)) setClanId(initialClanId);
+        else if (manageable.length === 1) setClanId(manageable[0].id);
       })
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialClanId]);
 
   function importPlayers(value: string) {
     setRawList(value);
@@ -623,7 +624,7 @@ export function CreateDraft() {
             <aside className="wood-panel p-6 sm:p-8">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">Organizer link</p>
               <h2 className="fantasy-title mt-3 text-2xl font-bold">Keep this one for yourself.</h2>
-              <p className="mt-3 text-sm leading-relaxed text-[#cfc3a5]">Track captain progress, run the draft, and copy the final teams from your organizer board.</p>
+              <p className="mt-3 text-sm leading-relaxed text-[#cfc3a5]">{bingoIntent ? 'Run the draft here. When the teams are ready, choose “Open bingo setup” on the organizer board.' : 'Track captain progress, run the draft, and copy the final teams from your organizer board.'}</p>
               <a
                 href={created.adminPath}
                 className="gold-button mt-6 block px-5 py-3 text-center text-sm"

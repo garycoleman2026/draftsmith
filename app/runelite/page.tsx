@@ -56,7 +56,7 @@ export default function RunelitePage() {
               <li><b>1.</b> Install Java 11 and clone the plugin repository.</li>
               <li><b>2.</b> Run <code>gradlew.bat test</code> on Windows.</li>
               <li><b>3.</b> Run <code>gradlew.bat run</code> to open RuneLite in developer mode.</li>
-              <li><b>4.</b> Test pairing, XP, one drop, a manual claim, disconnect, and character switching.</li>
+              <li><b>4.</b> Test pairing, XP, one drop, a manual claim, restart recovery, disconnect, and character switching.</li>
             </ol>
           </div>
           <div className="parchment-panel p-6 text-[#433520] sm:p-8">
@@ -77,7 +77,7 @@ export default function RunelitePage() {
             </details>
             <details className="rounded border border-[#8b6a32]/30 bg-white/20 p-4">
               <summary className="cursor-pointer text-sm font-black">Updates and retries</summary>
-              <p className="mt-3 text-xs leading-relaxed text-[#5f5038]">The panel checks the event revision about every five seconds. New observations are batched within roughly ten seconds. Every observation keeps a stable retry key, so a reconnect does not add the same progress twice.</p>
+              <p className="mt-3 text-xs leading-relaxed text-[#5f5038]">The panel checks the event about every five seconds. New observations are batched within roughly ten seconds. A bounded local queue survives a restart, keeps stable retry keys, and is cleared if you switch characters.</p>
             </details>
             <details className="rounded border border-[#8b6a32]/30 bg-white/20 p-4">
               <summary className="cursor-pointer text-sm font-black">Pairing and security</summary>

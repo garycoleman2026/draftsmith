@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
        WHERE be.public_slug = ?`,
     ).bind(slug).first<{ title: string; mode: string; status: string; public_spectator: number; public_listed: number; clan_name: string | null }>();
     if (!event || !event.public_spectator) return { title: 'Bingo event unavailable — Terry’s Drafting', robots: { index: false, follow: false } };
-    const description = `${event.status === 'live' ? 'Live' : event.status === 'complete' ? 'Completed' : 'Upcoming'} ${event.mode} OSRS clan bingo${event.clan_name ? ` hosted by ${event.clan_name}` : ''}. View the board, standings, and verified progress.`;
+    const description = `${event.status === 'live' ? 'Live' : event.status === 'paused' ? 'Paused' : event.status === 'complete' ? 'Completed' : 'Upcoming'} ${event.mode} OSRS clan bingo${event.clan_name ? ` hosted by ${event.clan_name}` : ''}. View the board, standings, and verified progress.`;
     const index = Boolean(event.public_listed);
     return {
       title: `${event.title} — OSRS clan bingo`, description,

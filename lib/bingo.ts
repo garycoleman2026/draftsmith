@@ -1,17 +1,18 @@
-import { resolveManagerDraftId } from './access-tokens';
+import { resolveBingoEventAccess, resolveManagerDraftId } from './access-tokens';
 import { calculateBingoStandings, claimAvailability, type BingoScoreCompletion } from './bingo-scoring';
 import { getDatabase } from './db';
 import { bingoUnlockPrerequisites, sanitizeBingoEventRules, sanitizeBingoTaskRule, type BingoEventRules } from './bingo-rules';
 import { hashToken } from './security';
-import type { BingoBoardScope, BingoClaimStatus, BingoMode, BingoStatus, BingoVerificationMode } from './types';
+import type { BingoBoardScope, BingoClaimStatus, BingoEventRole, BingoMode, BingoStatus, BingoVerificationMode } from './types';
 
 export type BingoEventRow = {
   id: string; draft_id: string; title: string; public_slug: string; mode: BingoMode; board_scope: BingoBoardScope;
   grid_size: number; status: BingoStatus; win_condition: string; target_value: number; requires_review: number;
   public_spectator: number; public_listed: number; spectator_delay_seconds: number; start_at: string | null; end_at: string | null;
-  started_at: string | null; ended_at: string | null; baseline_status: string; revision: number;
+  started_at: string | null; paused_at: string | null; ended_at: string | null; baseline_status: string; revision: number;
   rules_json: string | null; created_at: string; updated_at: string;
   clan_name?: string | null; clan_slug?: string | null;
+  access_role?: BingoEventRole;
 };
 
 type TeamRow = { id: string; event_id: string; source_team_index: number; name: string; color: string; emblem: string };
@@ -50,17 +51,34 @@ export class BingoError extends Error {
   constructor(message: string, status = 400) { super(message); this.status = status; }
 }
 
-export async function requireManagedBingoEvent(token: string, eventId: string) {
+export async function requireManagedBingoEvent(
+  token: string,
+  eventId: string,
+  allowedRoles: BingoEventRole[] = ['owner', 'organizer', 'scorekeeper'],
+) {
   const draftId = await resolveManagerDraftId(token);
-  if (!draftId) throw new BingoError('This organizer link is not valid.', 404);
-  const event = await getDatabase().prepare(
+  const event = draftId ? await getDatabase().prepare(
     `SELECT id, draft_id, title, public_slug, mode, board_scope, grid_size, status, win_condition, target_value,
-            requires_review, public_spectator, public_listed, spectator_delay_seconds, start_at, end_at, started_at, ended_at,
+            requires_review, public_spectator, public_listed, spectator_delay_seconds, start_at, end_at, started_at, paused_at, ended_at,
             baseline_status, revision, rules_json, created_at, updated_at
      FROM bingo_events WHERE id = ? AND draft_id = ?`,
-  ).bind(eventId, draftId).first<BingoEventRow>();
-  if (!event) throw new BingoError('This bingo event is not available from that organizer link.', 404);
-  return event;
+  ).bind(eventId, draftId).first<BingoEventRow>() : null;
+  if (event) {
+    event.access_role = 'owner';
+    return event;
+  }
+  const scoped = await resolveBingoEventAccess(token, eventId);
+  if (!scoped || !allowedRoles.includes(scoped.role)) throw new BingoError('This organizer link is not valid for that action.', 404);
+  const scopedEvent = await getDatabase().prepare(
+    `SELECT id, draft_id, title, public_slug, mode, board_scope, grid_size, status, win_condition, target_value,
+            requires_review, public_spectator, public_listed, spectator_delay_seconds, start_at, end_at, started_at, paused_at, ended_at,
+            baseline_status, revision, rules_json, created_at, updated_at
+     FROM bingo_events WHERE id = ?`,
+  ).bind(eventId).first<BingoEventRow>();
+  if (scopedEvent) scopedEvent.access_role = scoped.role;
+  const managed = scopedEvent;
+  if (!managed) throw new BingoError('This bingo event is not available from that organizer link.', 404);
+  return managed;
 }
 
 export async function resolveBingoTeam(token: string) {
@@ -92,7 +110,7 @@ export async function loadBingoView(input: {
   const event = await db.prepare(
     `SELECT be.id, be.draft_id, be.title, be.public_slug, be.mode, be.board_scope, be.grid_size, be.status,
             be.win_condition, be.target_value, be.requires_review, be.public_spectator, be.public_listed,
-            be.spectator_delay_seconds, be.start_at, be.end_at, be.started_at, be.ended_at,
+            be.spectator_delay_seconds, be.start_at, be.end_at, be.started_at, be.paused_at, be.ended_at,
             be.baseline_status, be.revision, be.rules_json, be.created_at, be.updated_at,
             CASE WHEN c.public_listing = 1 THEN c.name END AS clan_name,
             CASE WHEN c.public_listing = 1 THEN c.slug END AS clan_slug
@@ -203,6 +221,7 @@ export async function loadBingoView(input: {
       startAt: event.start_at,
       endAt: event.end_at,
       startedAt: event.started_at,
+      pausedAt: event.paused_at,
       endedAt: event.ended_at,
       baselineStatus: event.baseline_status,
       revision: event.revision,
@@ -284,7 +303,7 @@ export async function loadBingoView(input: {
           : input.viewer === 'team' && input.teamId && pendingTeamIds.includes(input.teamId) ? [input.teamId] : [],
         claimable: event.status === 'live' && !task.free_space && (availability?.allowed ?? false),
         claimBlockedReason: event.status !== 'live'
-          ? 'Claims open when the organizer starts the event.'
+          ? event.status === 'paused' ? 'The organizer has paused this bingo.' : 'Claims open when the organizer starts the event.'
           : task.free_space ? 'The free space is already counted.' : availability?.reason ?? null,
       };
     }),

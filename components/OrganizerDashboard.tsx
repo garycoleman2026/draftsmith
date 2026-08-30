@@ -36,6 +36,7 @@ type DashboardEvent = {
   bingo_public_slug: string | null;
   bingo_public_spectator: number | null;
   bingo_public_listed: number | null;
+  bingo_access_role: string | null;
 };
 
 type SavedBoard = {
@@ -60,6 +61,7 @@ type DashboardData = {
   user: { id: string; displayName: string | null; username: string };
   clans: Clan[];
   events: DashboardEvent[];
+  bingoEvents: DashboardEvent[];
   boards: SavedBoard[];
   draftTemplates: DraftTemplate[];
 };
@@ -137,8 +139,8 @@ export function OrganizerDashboard() {
     return () => window.clearTimeout(timer);
   }, [data?.clans, loadMembers, selectedClanId]);
 
-  const draftEvents = useMemo(() => (data?.events ?? []).filter((event) => !event.bingo_id), [data?.events]);
-  const bingoEvents = useMemo(() => (data?.events ?? []).filter((event) => Boolean(event.bingo_id)), [data?.events]);
+  const draftEvents = useMemo(() => data?.events ?? [], [data?.events]);
+  const bingoEvents = useMemo(() => data?.bingoEvents ?? [], [data?.bingoEvents]);
   const privateBoards = useMemo(() => (data?.boards ?? []).filter((board) => board.visibility !== 'public'), [data?.boards]);
   const publicBoards = useMemo(() => (data?.boards ?? []).filter((board) => board.visibility === 'public'), [data?.boards]);
   const selectedClan = useMemo(() => data?.clans.find((clan) => clan.id === selectedClanId) ?? null, [data?.clans, selectedClanId]);
@@ -166,10 +168,13 @@ export function OrganizerDashboard() {
     window.location.assign(`/clans/join/${encodeURIComponent(token)}`);
   }
 
-  async function openEvent(id: string) {
-    setWorking(id); setError('');
+  async function openEvent(event: DashboardEvent) {
+    const key = event.bingo_id ?? event.id;
+    setWorking(key); setError('');
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(id)}/manage-link`, { method: 'POST' });
+      const response = await fetch(event.bingo_id
+        ? `/api/bingo/events/${encodeURIComponent(event.bingo_id)}/manage-link`
+        : `/api/events/${encodeURIComponent(event.id)}/manage-link`, { method: 'POST' });
       const next = await response.json() as { path?: string; error?: string };
       if (!response.ok || !next.path) throw new Error(next.error || 'The event could not be opened.');
       window.location.assign(next.path);
@@ -260,7 +265,7 @@ export function OrganizerDashboard() {
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#c8bb99]">Your personal account is private. Drafts, events, boards, and clans become public only when you choose a public setting for that item.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className="gold-button px-5 py-3 text-sm" href="/draft">New draft</Link>
+            <Link className="gold-button px-5 py-3 text-sm" href="/events/new">New event</Link>
             <Link className="scroll-button px-5 py-3 text-sm" href="/bingo/studio">Design board</Link>
             <Link className="iron-button px-5 py-3 text-sm" href="/bingo#create">Start bingo</Link>
           </div>
@@ -279,7 +284,7 @@ export function OrganizerDashboard() {
               <EventSection title="Bingo events" empty="No bingo events yet." events={bingoEvents} working={working} onOpen={openEvent} />
               <EventSection title="Draft events" empty="No saved draft events yet." events={draftEvents} working={working} onOpen={openEvent} />
             </div>
-            <BoardSection title="Private boards" boards={privateBoards} userId={data.user.id} empty="No private boards saved yet." />
+            <BoardSection title="Saved boards" boards={privateBoards} userId={data.user.id} empty="No private, clan, or unlisted boards saved yet." />
             <BoardSection title="Published boards" boards={publicBoards} userId={data.user.id} empty="No boards published to the marketplace yet." />
             {data.draftTemplates.length ? <DraftTemplateSection templates={data.draftTemplates} working={working} onCreate={instantiateTemplate} /> : null}
           </div>
@@ -373,16 +378,17 @@ export function OrganizerDashboard() {
   );
 }
 
-function EventSection({ title, events, empty, working, onOpen }: { title: string; events: DashboardEvent[]; empty: string; working: string; onOpen: (id: string) => Promise<void> }) {
+function EventSection({ title, events, empty, working, onOpen }: { title: string; events: DashboardEvent[]; empty: string; working: string; onOpen: (event: DashboardEvent) => Promise<void> }) {
   return <section className="mt-8"><div className="mb-4 flex items-end justify-between"><h3 className="fantasy-title text-2xl font-bold text-[#f5df9b]">{title}</h3><span className="text-xs font-black text-[#a99a78]">{events.length}</span></div>{events.length ? <div className="grid gap-4 md:grid-cols-2">{events.map((event) => {
     const visibility = dashboardEventVisibility(event);
     const publicPath = event.bingo_id && event.bingo_public_spectator && event.bingo_public_slug ? `/bingo/event/${event.bingo_public_slug}` : !event.bingo_id && event.public_slug ? `/event/${event.public_slug}` : null;
-    return <article className="parchment-card p-5" key={event.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">{dashboardEventKind(event)}</p><p className="mt-1 truncate font-black">{event.bingo_title || event.title}</p><p className="mt-1 text-xs font-bold text-[#756748]">{event.clan_name || 'Personal'}</p></div><VisibilityBadge value={visibility} /></div><p className="mt-4 text-sm text-[#665b45]">{event.player_count} players · {event.team_count} teams · {event.bingo_status || event.status}</p><div className="mt-5 flex gap-2"><button className="scroll-button flex-1 px-4 py-2.5 text-xs" type="button" disabled={working === event.id} onClick={() => void onOpen(event.id)}>{working === event.id ? 'Opening…' : 'Manage →'}</button>{publicPath ? <Link className="iron-button px-3 py-2.5 text-xs" href={publicPath} target="_blank">View ↗</Link> : null}</div></article>;
+    const key = event.bingo_id ?? event.id;
+    return <article className="parchment-card p-5" key={`${event.id}:${event.bingo_id ?? 'draft'}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">{dashboardEventKind(event)}</p><p className="mt-1 truncate font-black">{event.bingo_title || event.title}</p><p className="mt-1 text-xs font-bold text-[#756748]">{event.clan_name || 'Personal'}{event.bingo_access_role && event.bingo_access_role !== 'owner' ? ` · ${event.bingo_access_role}` : ''}</p></div><VisibilityBadge value={visibility} /></div><p className="mt-4 text-sm text-[#665b45]">{event.player_count} players · {event.team_count} teams · {event.bingo_status || event.status}</p><div className="mt-5 flex gap-2"><button className="scroll-button flex-1 px-4 py-2.5 text-xs" type="button" disabled={working === key} onClick={() => void onOpen(event)}>{working === key ? 'Opening…' : 'Manage →'}</button>{publicPath ? <Link className="iron-button px-3 py-2.5 text-xs" href={publicPath} target="_blank">View ↗</Link> : null}</div></article>;
   })}</div> : <div className="rounded border border-dashed border-[#8b6a32]/45 bg-black/10 px-5 py-8 text-center text-sm text-[#a99a78]">{empty}</div>}</section>;
 }
 
 function BoardSection({ title, boards, userId, empty }: { title: string; boards: SavedBoard[]; userId: string; empty: string }) {
-  return <section><div className="mb-4 flex items-end justify-between border-b border-[#9b792f]/30 pb-3"><h2 className="fantasy-title text-2xl font-bold text-[#f5df9b]">{title}</h2><span className="text-xs font-black text-[#a99a78]">{boards.length}</span></div>{boards.length ? <div className="grid gap-4 md:grid-cols-2">{boards.map((board) => <article className="parchment-card p-5" key={board.id}><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">{board.category} · {board.mode}</p><h3 className="fantasy-title mt-1 text-2xl font-bold">{board.name}</h3></div><VisibilityBadge value={board.visibility === 'public' ? 'Publicly listed' : 'Private'} /></div><p className="mt-3 text-xs leading-relaxed text-[#67583e]">{board.summary || 'Reusable custom bingo board.'}</p><p className="mt-3 text-[10px] font-black uppercase text-[#756748]">{board.owner_user_id === userId ? 'Personal board' : board.clan_name || 'Clan board'} · {board.board_scope}</p><div className="mt-4 flex gap-2"><Link className="scroll-button flex-1 px-3 py-2 text-center text-xs" href="/bingo/studio">Open studio</Link>{board.public_slug ? <Link className="iron-button px-3 py-2 text-xs" href={`/templates/${board.public_slug}`} target="_blank">View ↗</Link> : null}</div></article>)}</div> : <div className="rounded border border-dashed border-[#8b6a32]/45 bg-black/10 px-5 py-8 text-center text-sm text-[#a99a78]">{empty}</div>}</section>;
+  return <section><div className="mb-4 flex items-end justify-between border-b border-[#9b792f]/30 pb-3"><h2 className="fantasy-title text-2xl font-bold text-[#f5df9b]">{title}</h2><span className="text-xs font-black text-[#a99a78]">{boards.length}</span></div>{boards.length ? <div className="grid gap-4 md:grid-cols-2">{boards.map((board) => <article className="parchment-card p-5" key={board.id}><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">{board.category} · {board.mode}</p><h3 className="fantasy-title mt-1 text-2xl font-bold">{board.name}</h3></div><VisibilityBadge value={board.visibility === 'public' ? 'Publicly listed' : board.visibility === 'unlisted' ? 'Unlisted link' : board.visibility === 'clan' ? 'Clan only' : 'Private'} /></div><p className="mt-3 text-xs leading-relaxed text-[#67583e]">{board.summary || 'Reusable custom bingo board.'}</p><p className="mt-3 text-[10px] font-black uppercase text-[#756748]">{board.clan_name ? `${board.clan_name} board` : board.owner_user_id === userId ? 'Personal board' : 'Shared board'} · {board.board_scope}</p><div className="mt-4 flex gap-2"><Link className="scroll-button flex-1 px-3 py-2 text-center text-xs" href="/bingo/studio">Open studio</Link>{board.public_slug ? <Link className="iron-button px-3 py-2 text-xs" href={`/templates/${board.public_slug}`} target="_blank">View ↗</Link> : null}</div></article>)}</div> : <div className="rounded border border-dashed border-[#8b6a32]/45 bg-black/10 px-5 py-8 text-center text-sm text-[#a99a78]">{empty}</div>}</section>;
 }
 
 function DraftTemplateSection({ templates, working, onCreate }: { templates: DraftTemplate[]; working: string; onCreate: (id: string, name: string) => Promise<void> }) {

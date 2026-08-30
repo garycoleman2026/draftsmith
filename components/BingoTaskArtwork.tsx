@@ -13,11 +13,14 @@ export function BingoTaskArtwork({
   className?: string;
 }) {
   const url = bingoTaskImageUrl(rule);
-  const [failedUrl, setFailedUrl] = useState('');
+  const proxyUrl = rule.presentation.imageKey ? `/api/osrs/artwork?name=${encodeURIComponent(rule.presentation.imageKey)}` : null;
+  const urls = [proxyUrl, url].filter((item): item is string => Boolean(item));
+  const [failedUrls, setFailedUrls] = useState<string[]>([]);
+  const activeUrl = urls.find((item) => !failedUrls.includes(item));
 
   if (rule.presentation.imageKind === 'none') return null;
 
-  if (!url || failedUrl === url) {
+  if (!activeUrl) {
     const label = rule.presentation.imageKind === 'boss' ? 'Boss art unavailable' : 'Item art unavailable';
     return (
       <span
@@ -40,8 +43,8 @@ export function BingoTaskArtwork({
       className={`object-contain drop-shadow-[0_2px_1px_rgba(45,30,12,.35)] ${className}`}
       loading="lazy"
       referrerPolicy="no-referrer"
-      src={url}
-      onError={() => setFailedUrl(url)}
+      src={activeUrl}
+      onError={() => setFailedUrls((current) => [...current, activeUrl])}
     />
   );
 }

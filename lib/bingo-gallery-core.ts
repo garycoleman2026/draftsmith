@@ -9,7 +9,7 @@ export const TEMPLATE_CATEGORIES = [
 ] as const;
 
 export type TemplateCategory = typeof TEMPLATE_CATEGORIES[number];
-export type TemplateVisibility = 'private' | 'public';
+export type TemplateVisibility = 'private' | 'clan' | 'unlisted' | 'public';
 export type TemplateGallerySort = 'popular' | 'votes' | 'newest' | 'name' | 'difficulty' | 'type';
 
 export type GalleryTemplate = {
@@ -32,6 +32,7 @@ export type GalleryTemplate = {
   creatorClanSlug: string | null;
   publishedAt: string | null;
   official: boolean;
+  visibility: TemplateVisibility;
   configuration: BingoTemplateDefinition;
 };
 
@@ -62,7 +63,9 @@ export function sanitizeTemplateTags(value: unknown) {
 }
 
 export function sanitizeTemplateVisibility(value: unknown): TemplateVisibility {
-  return value === 'public' ? 'public' : 'private';
+  return ['private', 'clan', 'unlisted', 'public'].includes(String(value))
+    ? String(value) as TemplateVisibility
+    : 'private';
 }
 
 export function sanitizeGallerySort(value: unknown): TemplateGallerySort {
@@ -110,6 +113,7 @@ export function builtinGalleryTemplates(): GalleryTemplate[] {
     creatorClanSlug: null,
     publishedAt: null,
     official: true,
+    visibility: 'public',
     configuration,
   }));
 }

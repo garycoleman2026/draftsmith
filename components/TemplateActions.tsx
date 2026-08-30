@@ -17,6 +17,7 @@ export function TemplateActions({
   preferredValue,
   importText,
   official,
+  voteEnabled,
   initialUpvoteCount,
   initialDownvoteCount,
 }: {
@@ -24,6 +25,7 @@ export function TemplateActions({
   preferredValue: string;
   importText: string;
   official: boolean;
+  voteEnabled: boolean;
   initialUpvoteCount: number;
   initialDownvoteCount: number;
 }) {
@@ -34,7 +36,7 @@ export function TemplateActions({
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
-    if (official) return;
+    if (official || !voteEnabled) return;
     let active = true;
     void fetch(`/api/gallery/templates/${encodeURIComponent(slug)}/vote`, { cache: 'no-store' })
       .then(async (response) => response.ok ? response.json() as Promise<VoteResult> : null)
@@ -46,7 +48,7 @@ export function TemplateActions({
         }
       });
     return () => { active = false; };
-  }, [official, slug]);
+  }, [official, slug, voteEnabled]);
 
   function chooseTemplate() {
     window.localStorage.setItem('terrys_preferred_bingo_template', preferredValue);
@@ -85,8 +87,8 @@ export function TemplateActions({
         <button className="scroll-button px-5 py-3 text-sm" type="button" onClick={chooseTemplate}>Use after a draft</button>
         <button className="scroll-button px-5 py-3 text-sm" type="button" onClick={() => void copyBoard()}>Copy task sheet</button>
       </div>
-      {official ? (
-        <p className="text-xs text-[#756748]">This is a Terry’s starter board.</p>
+      {official || !voteEnabled ? (
+        <p className="text-xs text-[#756748]">{official ? 'This is a Terry’s starter board.' : 'This board is shared by link and is not listed for community voting.'}</p>
       ) : (
         <div className="rounded border border-[#8b6a32]/35 bg-[#f2dfae]/65 p-4">
           <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">Was this board useful?</p>

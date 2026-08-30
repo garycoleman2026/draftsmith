@@ -17,7 +17,8 @@ const views = [
   ['Spectator board', 'Let the clan watch the event without showing private proof.'],
 ] as const;
 
-export default async function BingoHallPage() {
+export default async function BingoHallPage({ searchParams }: { searchParams: Promise<{ clanId?: string; visibility?: string }> }) {
+  const query = await searchParams;
   const gallery = await listGalleryTemplates({ sort: 'popular' });
   const templates: StandaloneBingoTemplateOption[] = [...gallery]
     .sort((left, right) => {
@@ -49,7 +50,11 @@ export default async function BingoHallPage() {
           </div>
         </div>
 
-        <StandaloneBingoCreator templates={templates} />
+        <StandaloneBingoCreator
+          templates={templates}
+          initialClanId={query.clanId ?? ''}
+          initialVisibility={['private', 'public'].includes(query.visibility ?? '') ? query.visibility as 'private' | 'public' : 'unlisted'}
+        />
 
         <section className="mt-10 grid gap-5 md:grid-cols-3">
           {views.map(([title, body]) => (

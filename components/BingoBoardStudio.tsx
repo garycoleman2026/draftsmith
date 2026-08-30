@@ -17,8 +17,11 @@ export type BingoStudioStarter = {
 
 type SavedBoard = {
   id: string; name: string; summary: string; category: string; tags: string[]; visibility: string;
+  clanId: string | null; clanName: string | null;
   publicPath: string | null; configuration: BingoTemplateDefinition; updatedAt: string;
 };
+
+type BoardVisibility = 'private' | 'clan' | 'unlisted' | 'public';
 
 export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioStarter[]; initial: BingoStudioStarter }) {
   const [configuration, setConfiguration] = useState(() => structuredClone(initial.configuration));
@@ -29,7 +32,9 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
   const [summary, setSummary] = useState(initial.summary);
   const [category, setCategory] = useState('Mixed');
   const [tags, setTags] = useState('clan bingo, custom board');
-  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
+  const [visibility, setVisibility] = useState<BoardVisibility>('private');
+  const [clans, setClans] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [clanId, setClanId] = useState('');
   const [mode, setMode] = useState<BingoMode>(initial.configuration.mode);
   const [boardScope, setBoardScope] = useState<BingoBoardScope>(initial.configuration.boardScope);
   const [savedBoards, setSavedBoards] = useState<SavedBoard[]>([]);
@@ -54,6 +59,10 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadSaved(), 0);
+    void fetch('/api/auth/session', { cache: 'no-store' })
+      .then((response) => response.json() as Promise<{ clans?: { id: string; name: string; role: string }[] }>)
+      .then((session) => setClans((session.clans ?? []).filter((clan) => ['owner', 'admin', 'captain'].includes(clan.role))))
+      .catch(() => undefined);
     return () => window.clearTimeout(timer);
   }, [loadSaved]);
 
@@ -64,7 +73,8 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
     setName(metadata?.name ?? next.name); setSummary(metadata?.summary ?? next.description);
     setCategory(metadata?.category ?? (next.mode === 'progression' ? 'Progression' : 'Mixed'));
     setTags(metadata?.tags?.join(', ') ?? `clan bingo, ${next.mode}`);
-    setVisibility(metadata?.visibility === 'public' ? 'public' : 'private');
+    setVisibility(['private', 'clan', 'unlisted', 'public'].includes(metadata?.visibility ?? '') ? metadata!.visibility as BoardVisibility : 'private');
+    setClanId(metadata?.clanId ?? '');
     setError(''); setMessage(metadata?.id ? `Loaded “${metadata.name}”.` : 'Starter loaded. Your copy is independent.');
   }
 
@@ -94,13 +104,14 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
     try {
       const response = await fetch('/api/bingo/templates', {
         method: savedId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: savedId, name, summary, category, tags, visibility, configuration: next, website: '' }),
+        body: JSON.stringify({ id: savedId, name, summary, category, tags, visibility, clanId: clanId || null, configuration: next, website: '' }),
       });
       const result = await response.json() as SavedBoard & { error?: string };
       if (response.status === 401) { setSignedIn(false); throw new Error('Sign in with Discord to save private boards or publish to the gallery.'); }
       if (!response.ok || !result.id) throw new Error(result.error || 'That board could not be saved.');
       setSignedIn(true); setSavedId(result.id); setPublicPath(result.publicPath); setConfiguration(structuredClone(result.configuration));
-      setMessage(result.publicPath ? 'Board saved and published to the community gallery.' : 'Private board saved to your studio.');
+      setClanId(result.clanId ?? '');
+      setMessage(visibility === 'public' ? 'Board published to the marketplace.' : visibility === 'unlisted' ? 'Board saved with a private share link.' : visibility === 'clan' ? 'Board saved to your clan.' : 'Board saved to your account.');
       await loadSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'That board could not be saved.');
@@ -124,7 +135,7 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
 
   async function copyShareLink() {
     if (!publicPath) return;
-    await copyText(absoluteUrl(publicPath)); setMessage('Public board link copied.');
+    await copyText(absoluteUrl(publicPath)); setMessage('Board share link copied.');
   }
 
   return (
@@ -144,7 +155,8 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
             <label className="text-[10px] font-black uppercase text-[#65583f] md:col-span-2">Summary<input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" maxLength={240} value={summary} onChange={(event) => setSummary(event.target.value)} /></label>
             <label className="text-[10px] font-black uppercase text-[#65583f]">Marketplace category<select className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={category} onChange={(event) => setCategory(event.target.value)}><option>Mixed</option><option>Bossing</option><option>Raids</option><option>Skilling</option><option>Speed</option><option>Progression</option><option>Casual</option><option>Competitive</option></select></label>
             <label className="text-[10px] font-black uppercase text-[#65583f]">Tags<input className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" placeholder="weekend, raids, mixed levels" value={tags} onChange={(event) => setTags(event.target.value)} /></label>
-            <label className="text-[10px] font-black uppercase text-[#65583f]">Save visibility<select className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={visibility} onChange={(event) => setVisibility(event.target.value as 'private' | 'public')}><option value="private">Private · only in my studio</option><option value="public">Public · list in marketplace</option></select></label>
+            <label className="text-[10px] font-black uppercase text-[#65583f]">Save to<select className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={clanId} onChange={(event) => { setClanId(event.target.value); if (!event.target.value && visibility === 'clan') setVisibility('private'); }}><option value="">My account</option>{clans.map((clan) => <option key={clan.id} value={clan.id}>{clan.name}</option>)}</select></label>
+            <label className="text-[10px] font-black uppercase text-[#65583f]">Who can see it<select className="realm-field mt-1 h-11 w-full px-3 text-sm normal-case" value={visibility} onChange={(event) => setVisibility(event.target.value as BoardVisibility)}><option value="private">Only me</option>{clanId ? <option value="clan">My clan</option> : null}<option value="unlisted">Anyone with the link</option><option value="public">Everyone · marketplace</option></select></label>
           </div>
           {error ? <p className="mt-4 rounded border border-[#a75e44]/45 bg-[#efd1bd] px-4 py-3 text-sm font-bold text-[#723b2b]" role="alert">{error}</p> : null}
           {message ? <p className="mt-4 rounded border border-[#62835d]/45 bg-[#dbe6c7] px-4 py-3 text-sm font-bold text-[#355332]" role="status">{message}</p> : null}
@@ -153,14 +165,14 @@ export function BingoBoardStudio({ starters, initial }: { starters: BingoStudioS
 
         <aside className="wood-panel p-5 sm:p-6">
           <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-black uppercase tracking-[0.14em] text-[#d7ae50]">My saved boards</p><p className="mt-1 text-xs text-[#aa9d7e]">{savedBoards.length} reusable design{savedBoards.length === 1 ? '' : 's'}</p></div>{signedIn ? <Link className="text-xs font-black text-[#cfe3a9] underline" href="/dashboard">Account</Link> : null}</div>
-          <div className="mt-4 max-h-[360px] space-y-2 overflow-auto pr-1">{savedBoards.map((board) => <button className={`w-full rounded border p-3 text-left ${savedId === board.id ? 'border-[#d7ae50] bg-[#d7ae50]/15' : 'border-white/10 bg-black/20'}`} key={board.id} onClick={() => loadConfiguration(board.configuration, board)} type="button"><div className="flex justify-between gap-2"><b className="text-sm text-[#f2d98f]">{board.name}</b><span className="text-[9px] font-black uppercase text-[#c8bb99]">{board.visibility}</span></div><p className="mt-1 line-clamp-2 text-[10px] text-[#b8aa87]">{board.summary}</p><p className="mt-2 text-[9px] uppercase text-[#d7ae50]">{board.configuration.gridSize}×{board.configuration.gridSize} · {board.configuration.mode}</p></button>)}{signedIn && !savedBoards.length ? <p className="rounded border border-dashed border-white/15 p-4 text-sm text-[#ad9f7f]">Your first saved board will appear here.</p> : null}{signedIn === false ? <p className="rounded border border-dashed border-white/15 p-4 text-sm text-[#ad9f7f]">Sign in to load your private designs.</p> : null}</div>
-          {savedId ? <div className="mt-4 border-t border-white/10 pt-4"><div className="flex flex-wrap gap-2">{publicPath ? <><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copyShareLink()} type="button">Copy public link</button><a className="scroll-button px-3 py-2 text-xs" href={publicPath} target="_blank" rel="noreferrer">Open listing ↗</a></> : null}<button className="iron-button px-3 py-2 text-xs" disabled={working === 'delete'} onClick={() => void removeSavedBoard()} type="button">{working === 'delete' ? 'Removing…' : 'Remove saved board'}</button></div></div> : null}
+          <div className="mt-4 max-h-[360px] space-y-2 overflow-auto pr-1">{savedBoards.map((board) => <button className={`w-full rounded border p-3 text-left ${savedId === board.id ? 'border-[#d7ae50] bg-[#d7ae50]/15' : 'border-white/10 bg-black/20'}`} key={board.id} onClick={() => loadConfiguration(board.configuration, board)} type="button"><div className="flex justify-between gap-2"><b className="text-sm text-[#f2d98f]">{board.name}</b><span className="text-[9px] font-black uppercase text-[#c8bb99]">{board.visibility}</span></div><p className="mt-1 line-clamp-2 text-[10px] text-[#b8aa87]">{board.summary}</p><p className="mt-2 text-[9px] uppercase text-[#d7ae50]">{board.clanName ?? 'My account'} · {board.configuration.gridSize}×{board.configuration.gridSize} · {board.configuration.mode}</p></button>)}{signedIn && !savedBoards.length ? <p className="rounded border border-dashed border-white/15 p-4 text-sm text-[#ad9f7f]">Your first saved board will appear here.</p> : null}{signedIn === false ? <p className="rounded border border-dashed border-white/15 p-4 text-sm text-[#ad9f7f]">Sign in to load your private designs.</p> : null}</div>
+          {savedId ? <div className="mt-4 border-t border-white/10 pt-4"><div className="flex flex-wrap gap-2">{publicPath ? <><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copyShareLink()} type="button">Copy share link</button><a className="scroll-button px-3 py-2 text-xs" href={publicPath} target="_blank" rel="noreferrer">Open board ↗</a></> : null}<button className="iron-button px-3 py-2 text-xs" disabled={working === 'delete'} onClick={() => void removeSavedBoard()} type="button">{working === 'delete' ? 'Removing…' : 'Remove saved board'}</button></div></div> : null}
         </aside>
       </div>
 
       <section className="parchment-panel mt-6 p-4 sm:p-7 text-[#342817]">
         <div className="mb-5 border-b border-[#8b6a32]/25 pb-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#6a511f]">Board editor</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Every tile, rule, image, estimate, and unlock is editable.</h2><p className="mt-2 max-w-4xl text-xs leading-relaxed text-[#58492f]">For center-out games, choose Progression above and apply the center-out frontier. A shared frontier lets any team’s completion reveal adjacent tiles; per-team frontiers keep each team’s map independent.</p></div>
-        <BingoMaker key={editorKey} boardScope={mode === 'lockout' ? 'shared' : boardScope} disabled={false} initialRules={configuration.rules} initialTasks={configuration.tasks} mode={mode} onSave={saveBoard} saveLabel={savedId ? 'Update saved board →' : visibility === 'public' ? 'Save and publish board →' : 'Save private board →'} saving={saving} />
+        <BingoMaker key={editorKey} boardScope={mode === 'lockout' ? 'shared' : boardScope} disabled={false} initialRules={configuration.rules} initialTasks={configuration.tasks} mode={mode} onSave={saveBoard} saveLabel={savedId ? 'Update saved board →' : visibility === 'public' ? 'Save and publish board →' : 'Save board →'} saving={saving} />
       </section>
     </section>
   );

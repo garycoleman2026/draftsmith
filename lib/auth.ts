@@ -138,6 +138,33 @@ export async function canManageDraft(userId: string, draftId: string) {
   return Boolean(row);
 }
 
+export async function bingoEventRole(userId: string, eventId: string) {
+  const row = await getDatabase().prepare(
+    `SELECT CASE
+       WHEN be.created_by_user_id = ? OR d.owner_user_id = ? OR cm.role IN ('owner', 'admin') THEN 'owner'
+       ELSE bec.role
+     END AS role
+     FROM bingo_events be
+     JOIN drafts d ON d.id = be.draft_id
+     LEFT JOIN clan_memberships cm ON cm.clan_id = d.clan_id AND cm.user_id = ?
+     LEFT JOIN bingo_event_collaborators bec ON bec.event_id = be.id AND bec.user_id = ?
+     WHERE be.id = ? AND (
+       be.created_by_user_id = ? OR d.owner_user_id = ? OR cm.role IN ('owner', 'admin') OR bec.user_id IS NOT NULL
+     )`,
+  ).bind(userId, userId, userId, userId, eventId, userId, userId)
+    .first<{ role: 'owner' | 'organizer' | 'scorekeeper' }>();
+  return row?.role ?? null;
+}
+
+export async function canManageBingoEvent(
+  userId: string,
+  eventId: string,
+  allowed: Array<'owner' | 'organizer' | 'scorekeeper'> = ['owner', 'organizer', 'scorekeeper'],
+) {
+  const role = await bingoEventRole(userId, eventId);
+  return role && allowed.includes(role) ? role : null;
+}
+
 export class AuthorizationError extends Error {
   readonly status: number;
 
