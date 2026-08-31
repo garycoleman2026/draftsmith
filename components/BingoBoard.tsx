@@ -13,11 +13,12 @@ import {
 import { BingoTaskArtwork } from './BingoTaskArtwork';
 
 export function BingoBoard({
-  data, teamId, selectedTaskId, onSelect,
+  data, teamId, selectedTaskId, evidenceHref, onSelect,
 }: {
   data: BingoViewData;
   teamId?: string | null;
   selectedTaskId?: string | null;
+  evidenceHref?: (uploadId: string) => string;
   onSelect?: (task: BingoViewTask) => void;
 }) {
   const [detailTask, setDetailTask] = useState<BingoViewTask | null>(null);
@@ -97,8 +98,11 @@ export function BingoBoard({
 
       {detailTask ? (
         <TaskDetails
+          data={data}
           task={detailTask}
+          teamId={teamId}
           teamSize={teamSize}
+          evidenceHref={evidenceHref}
           canSelect={Boolean(onSelect) && detailTask.unlocked && !detailTask.concealed && !detailTask.freeSpace}
           onClose={() => setDetailTask(null)}
           onSelect={() => { onSelect?.(detailTask); setDetailTask(null); }}
@@ -109,10 +113,13 @@ export function BingoBoard({
 }
 
 function TaskDetails({
-  task, teamSize, canSelect, onClose, onSelect,
+  data, task, teamId, teamSize, evidenceHref, canSelect, onClose, onSelect,
 }: {
+  data: BingoViewData;
   task: BingoViewTask;
+  teamId?: string | null;
   teamSize: number;
+  evidenceHref?: (uploadId: string) => string;
   canSelect: boolean;
   onClose: () => void;
   onSelect: () => void;
@@ -120,6 +127,9 @@ function TaskDetails({
   const individual = task.concealed ? null : expectedIndividualHours(task.rule);
   const team = task.concealed ? null : expectedTeamHours(task.rule, teamSize);
   const speedTargetSeconds = task.concealed ? null : bingoSpeedTargetSeconds(task.rule);
+  const completions = data.completions
+    .filter((completion) => completion.taskId === task.id && (!teamId || completion.teamId === teamId))
+    .sort((left, right) => right.completedAt.localeCompare(left.completedAt));
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#080805]/80 p-4" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
       <section aria-labelledby="task-detail-title" aria-modal="true" className="parchment-panel my-auto w-full max-w-2xl p-5 sm:p-7" role="dialog">
@@ -145,6 +155,18 @@ function TaskDetails({
             </dl>
             {task.rule.details.notes ? <Note title="Notes">{task.rule.details.notes}</Note> : null}
             {task.rule.details.exclusions ? <Note title="Exclusions">{task.rule.details.exclusions}</Note> : null}
+            {completions.length ? <section className="mt-4 rounded border border-[#52704b]/35 bg-[#dfe8c8]/60 p-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.08em] text-[#3f6039]">Completion proof</h3>
+              <div className="mt-3 space-y-3">{completions.map((completion) => {
+                const claim = data.claims.find((item) => item.id === completion.claimId);
+                const completionTeam = data.teams.find((item) => item.id === completion.teamId);
+                return <article className="rounded border border-[#52704b]/25 bg-white/35 p-3" key={completion.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-black text-[#2f492b]">{completionTeam?.name ?? 'Team'} · {claim?.claimedByName ?? 'Recorded completion'}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.05em] text-[#55704f]">{formatProofSource(completion.verificationSource)} · {formatProofSource(completion.verificationConfidence)} · {new Date(completion.completedAt).toLocaleString()}</p></div><span className="rounded bg-[#52704b] px-2 py-1 text-[9px] font-black text-white">+{completion.points} pts</span></div>
+                  {claim?.note ? <p className="mt-2 text-xs leading-relaxed text-[#42563b]">{claim.note}</p> : null}
+                  <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-black">{claim?.evidenceUploadId && evidenceHref ? <a className="text-[#315b39] underline" href={evidenceHref(claim.evidenceUploadId)} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim?.evidenceUrl ? <a className="text-[#315b39] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open proof link ↗</a> : null}</div>
+                </article>;
+              })}</div>
+            </section> : null}
             <p className="mt-4 text-[10px] leading-relaxed text-[#58492f]">{speedTargetSeconds !== null ? 'This is the required completion time, not a practice or attempt-time estimate.' : 'Time estimates are planning averages based on the organizer’s editable rates. Random drops can arrive much sooner—or much later.'}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               {canSelect ? <button className="gold-button px-5 py-3 text-sm" onClick={onSelect} type="button">Use this task for a claim →</button> : null}

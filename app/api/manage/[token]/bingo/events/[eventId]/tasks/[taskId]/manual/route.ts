@@ -1,7 +1,7 @@
 import { recordAudit, requestId } from '@/lib/audit';
 import { BingoError, bingoActivityInsert, bingoErrorResponse, parseJson, requireManagedBingoEvent } from '@/lib/bingo';
 import { bingoUnlockPrerequisites, sanitizeBingoEventRules, sanitizeBingoTaskRule } from '@/lib/bingo-rules';
-import { claimAvailability, type BingoScoreCompletion } from '@/lib/bingo-scoring';
+import { claimAvailability, nextCompletionNumber, type BingoScoreCompletion } from '@/lib/bingo-scoring';
 import { ensureSchema, getDatabase, json } from '@/lib/db';
 import { enforceRateLimit, RateLimitError, rateLimitResponse } from '@/lib/rate-limit';
 import type { BingoVerificationMode } from '@/lib/types';
@@ -112,8 +112,8 @@ export async function PATCH(request: Request, context: Context) {
     if (action !== 'complete') throw new BingoError('Choose a manual scorekeeping action.');
     if (task.free_space) throw new BingoError('The free space is already counted.', 409);
     const [completionRows, taskRows, pendingClaim] = await Promise.all([
-      db.prepare('SELECT task_id, team_id, points FROM bingo_completions WHERE event_id = ?')
-        .bind(eventId).all<{ task_id: string; team_id: string; points: number }>(),
+      db.prepare('SELECT task_id, team_id, completion_number, points FROM bingo_completions WHERE event_id = ?')
+        .bind(eventId).all<{ task_id: string; team_id: string; completion_number: number; points: number }>(),
       db.prepare('SELECT id, sort_order FROM bingo_tasks WHERE event_id = ?')
         .bind(eventId).all<{ id: string; sort_order: number }>(),
       db.prepare(`SELECT id FROM bingo_claims WHERE event_id = ? AND task_id = ? AND team_id = ? AND status = 'pending'
@@ -134,7 +134,9 @@ export async function PATCH(request: Request, context: Context) {
     });
     if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile cannot be completed.', 409);
     const claimId = pendingClaim?.id ?? crypto.randomUUID();
-    const completionNumber = completions.filter((completion) => completion.taskId === taskId && completion.teamId === teamId).length + 1;
+    const completionNumber = nextCompletionNumber(completionRows.results
+      .filter((completion) => completion.task_id === taskId && completion.team_id === teamId)
+      .map((completion) => completion.completion_number));
     const claimedByName = member?.display_name ?? 'Organizer correction';
     const claimStatement = pendingClaim
       ? db.prepare(`UPDATE bingo_claims SET member_id = COALESCE(?, member_id), claimed_by_name = ?, note = ?, verification_source = 'organizer',

@@ -3,6 +3,13 @@ export type BingoScoreTask = { id: string; sortOrder: number; points: number; fr
 export type BingoScoreCompletion = { taskId: string; teamId: string; points: number };
 export type BingoRankingMode = 'points' | 'lines' | 'blackout' | 'categories';
 
+export function nextCompletionNumber(used: number[]) {
+  const numbers = new Set(used.filter((value) => Number.isInteger(value) && value > 0));
+  let next = 1;
+  while (numbers.has(next)) next += 1;
+  return next;
+}
+
 export type BingoStanding = BingoScoreTeam & {
   score: number;
   completedCount: number;

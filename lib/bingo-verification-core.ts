@@ -35,6 +35,10 @@ export type BingoVerificationMatch = {
   source: VerificationSource;
 };
 
+export function shouldAutoAcceptVerification(requiresReview: boolean, status: string) {
+  return !requiresReview && status === 'ready';
+}
+
 export function sanitizeVerificationSignal(value: unknown): BingoVerificationSignal {
   if (!value || typeof value !== 'object') throw new Error('Provide a verification signal.');
   const input = value as Record<string, unknown>;

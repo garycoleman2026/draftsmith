@@ -12,6 +12,7 @@ import { BingoCollaboratorsPanel } from './BingoCollaboratorsPanel';
 import { BingoMaker } from './BingoMaker';
 import { BingoManualScorekeeper } from './BingoManualScorekeeper';
 import { BingoPlanningSummary } from './BingoPlanningSummary';
+import { BingoReviewHall } from './BingoReviewHall';
 import { BingoRuneliteOrganizerPanel } from './BingoRuneliteOrganizerPanel';
 import { BingoVerificationPanel } from './BingoVerificationPanel';
 import { BingoWiseOldManPanel } from './BingoWiseOldManPanel';
@@ -42,7 +43,6 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [announcement, setAnnouncement] = useState('');
-  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [verificationPreview, setVerificationPreview] = useState<{
     matches?: Array<{ taskId: string; title: string; sortOrder: number }>;
     duplicate?: boolean;
@@ -124,13 +124,12 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
     }
   }
 
-  async function review(claimId: string, action: 'approve' | 'reject') {
-    const reviewNote = reviewNotes[claimId]?.trim() ?? '';
-    if (action === 'reject' && !reviewNote) { setError('Add a short note so the team knows what to fix.'); return; }
-    await run(`${action}-${claimId}`, `${base}/claims/${encodeURIComponent(claimId)}`, {
+  async function review(claimId: string, action: 'approve' | 'reject' | 'reopen', reviewNote = '') {
+    if (action === 'reject' && !reviewNote.trim()) { setError('Add a short note so the team knows what to fix.'); return false; }
+    const result = await run(`${action}-${claimId}`, `${base}/claims/${encodeURIComponent(claimId)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reviewNote }),
-    }, action === 'approve' ? 'Claim approved and the scoreboard updated.' : 'Claim returned to the team.');
-    setReviewNotes((current) => ({ ...current, [claimId]: '' }));
+    }, action === 'approve' ? 'Claim approved and the scoreboard updated.' : action === 'reject' ? 'Claim returned to the team.' : 'The decision was reversed and the claim is back in review.');
+    return Boolean(result);
   }
 
   async function postAnnouncement() {
@@ -177,7 +176,8 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
   if (!data) return <LoadingScreen error={error} />;
   const structuralLocked = ['live', 'paused', 'complete', 'archived'].includes(data.event.status);
   const canConfigure = data.viewer.accessRole !== 'scorekeeper';
-  const pendingClaims = data.claims.filter((claim) => claim.status === 'pending');
+  const needsReview = data.claims.filter((claim) => claim.status === 'pending').length
+    + data.verification.candidates.filter((candidate) => candidate.status === 'ready').length;
   const allLinks = issuedLinks.map((item) => `${item.teamName}: ${absoluteUrl(item.path)}`).join('\n');
   const taskDefinitions = tasksToDefinitions(data.tasks);
   const teamSize = Math.max(1, Math.min(...data.teams.map((team) => team.members.length)));
@@ -188,12 +188,14 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
       <section className="mx-auto max-w-[1500px] px-4 pb-20 pt-8 sm:px-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#c69b3c]">Event control room · {data.event.status}</p><h1 className="fantasy-title mt-2 text-4xl font-bold text-[#f5df9b] sm:text-6xl">{data.event.title}</h1><p className="mt-3 text-sm text-[#b7aa8a]">Configure the board, share one private link per team, review proof, and publish the live scoreboard.</p></div>
-          <div className="flex flex-wrap gap-2">{data.event.publicSpectator ? <><button className="scroll-button px-4 py-2.5 text-xs" onClick={() => void copy('public', absoluteUrl(data.event.publicPath))}>{copied === 'public' ? 'Copied spectator link' : 'Copy spectator link'}</button><a className="scroll-button px-4 py-2.5 text-xs" href={data.event.publicPath} target="_blank" rel="noreferrer">Open spectator board ↗</a></> : null}<a className="iron-button px-3 py-2.5 text-xs" href={`${base}/export?format=csv`}>Export CSV</a><a className="iron-button px-3 py-2.5 text-xs" href={`${base}/export?format=discord`}>Discord text</a>{canConfigure && data.event.status === 'live' ? <><button className="scroll-button px-4 py-2.5 text-xs" disabled={working === 'pause'} onClick={() => void lifecycle('pause')}>Pause</button><button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'complete'} onClick={() => void lifecycle('complete')}>Complete event</button></> : canConfigure && data.event.status === 'paused' ? <><button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'resume'} onClick={() => void lifecycle('resume')}>Resume bingo</button><button className="scroll-button px-4 py-2.5 text-xs" disabled={working === 'complete'} onClick={() => void lifecycle('complete')}>Complete event</button></> : canConfigure && ['draft', 'scheduled'].includes(data.event.status) ? <button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'start' || readiness.blockers.length > 0} onClick={() => void lifecycle('start')}>{working === 'start' ? 'Starting…' : 'Start bingo →'}</button> : null}</div>
+          <div className="flex flex-wrap gap-2"><a className="gold-button px-4 py-2.5 text-xs" href="#review">Review hall{needsReview ? ` · ${needsReview}` : ''}</a>{data.event.publicSpectator ? <><button className="scroll-button px-4 py-2.5 text-xs" onClick={() => void copy('public', absoluteUrl(data.event.publicPath))}>{copied === 'public' ? 'Copied spectator link' : 'Copy spectator link'}</button><a className="scroll-button px-4 py-2.5 text-xs" href={data.event.publicPath} target="_blank" rel="noreferrer">Open spectator board ↗</a></> : null}<a className="iron-button px-3 py-2.5 text-xs" href={`${base}/export?format=csv`}>Export CSV</a><a className="iron-button px-3 py-2.5 text-xs" href={`${base}/export?format=discord`}>Discord text</a>{canConfigure && data.event.status === 'live' ? <><button className="scroll-button px-4 py-2.5 text-xs" disabled={working === 'pause'} onClick={() => void lifecycle('pause')}>Pause</button><button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'complete'} onClick={() => void lifecycle('complete')}>Complete event</button></> : canConfigure && data.event.status === 'paused' ? <><button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'resume'} onClick={() => void lifecycle('resume')}>Resume bingo</button><button className="scroll-button px-4 py-2.5 text-xs" disabled={working === 'complete'} onClick={() => void lifecycle('complete')}>Complete event</button></> : canConfigure && ['draft', 'scheduled'].includes(data.event.status) ? <button className="gold-button px-4 py-2.5 text-xs" disabled={working === 'start' || readiness.blockers.length > 0} onClick={() => void lifecycle('start')}>{working === 'start' ? 'Starting…' : 'Start bingo →'}</button> : null}</div>
         </div>
         {success ? <p role="status" className="mt-5 rounded border border-[#3e775d] bg-[#dcebd9] px-4 py-3 text-sm font-bold text-[#245340]">{success}</p> : null}
         {error ? <p role="alert" className="mt-5 rounded border border-[#b75b42] bg-[#f4d5c7] px-4 py-3 text-sm font-bold text-[#7f321f]">{error}</p> : null}
 
         <div className="wood-panel mt-7 p-4 sm:p-6"><BingoStandings data={data} /></div>
+
+        <div className="mt-5"><BingoReviewHall data={data} base={base} working={working} onReview={review} onResolve={resolveCandidate} /></div>
 
         {canConfigure ? <section className="parchment-panel mt-5 p-5 text-[#392d1b] sm:p-6"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Ready check</p><h2 className="fantasy-title mt-1 text-2xl font-bold">{readiness.blockers.length ? 'A few things before the horn sounds.' : 'The hall is ready.'}</h2><div className="mt-2 flex flex-wrap gap-2 text-xs">{readiness.items.map((item) => <span className={`rounded border px-2.5 py-1 font-bold ${item.ready ? 'border-[#62835d]/40 bg-[#dbe6c7] text-[#355332]' : 'border-[#a75e44]/35 bg-[#efd1bd] text-[#723b2b]'}`} key={item.label}>{item.ready ? '✓' : '!' } {item.label}</span>)}</div>{readiness.warnings.length ? <p className="mt-3 text-xs text-[#6b5736]">Worth a look: {readiness.warnings.join(' · ')}</p> : null}</div><span className="seal-badge shrink-0 px-3 py-2 text-xs font-black">{readiness.blockers.length ? `${readiness.blockers.length} blocker${readiness.blockers.length === 1 ? '' : 's'}` : 'Ready to start'}</span></div></section> : null}
 
@@ -232,15 +234,14 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
         </section>
 
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} /></section>
+          <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} evidenceHref={(uploadId) => `${base}/evidence/${encodeURIComponent(uploadId)}`} /></section>
           <aside className="space-y-5">
             {canConfigure ? <section className="wood-panel p-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Hall announcement</p><textarea className="realm-field mt-3 min-h-24 w-full p-3 text-xs normal-case" maxLength={500} placeholder="Tell every team about a rule, break, or deadline…" value={announcement} onChange={(event) => setAnnouncement(event.target.value)} /><button className="scroll-button mt-2 w-full px-3 py-2 text-xs" disabled={!announcement.trim() || working === 'announcement'} onClick={() => void postAnnouncement()}>{working === 'announcement' ? 'Posting…' : 'Post announcement'}</button></section> : null}
             <BingoCollaboratorsPanel eventId={eventId} accessRole={data.viewer.accessRole ?? 'owner'} onNotice={setSuccess} onError={setError} />
             <BingoManualScorekeeper data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} />
             {canConfigure ? <BingoRuneliteOrganizerPanel base={base} onNotice={setSuccess} onError={setError} /> : null}
             {canConfigure ? <BingoWiseOldManPanel data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} /> : null}
-            <BingoVerificationPanel data={data} working={working} preview={verificationPreview} onResolve={resolveCandidate} onReplay={replayVerification} onSignal={submitVerificationSignal} />
-            <section className="wood-panel p-5"><div className="flex items-center justify-between"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Claim review</p><span className="rounded bg-[#d7ae50] px-2 py-1 text-[10px] font-black text-[#24180b]">{pendingClaims.length} pending</span></div><div className="mt-4 max-h-[540px] space-y-3 overflow-auto">{pendingClaims.map((claim) => { const task = data.tasks.find((item) => item.id === claim.taskId); const team = data.teams.find((item) => item.id === claim.teamId); return <article className="rounded border border-[#9d7932]/60 bg-black/20 p-3" key={claim.id}><p className="text-sm font-black text-[#f2d98f]">{task?.title ?? 'Task'}</p><p className="mt-1 text-xs text-[#c8b990]">{team?.name} · {claim.claimedByName} · {new Date(claim.submittedAt).toLocaleString()}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#d7ae50]">{claim.verificationSource.replaceAll('_', ' ')} · {claim.verificationConfidence}</p>{claim.note ? <p className="mt-2 text-xs leading-relaxed text-[#e0d1aa]">{claim.note}</p> : null}<div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">{claim.evidenceUploadId ? <a className="text-[#d9e7aa] underline" href={`${base}/evidence/${encodeURIComponent(claim.evidenceUploadId)}`} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim.evidenceUrl ? <a className="text-[#d9e7aa] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open evidence link ↗</a> : null}</div><input className="realm-field mt-3 h-9 w-full px-2 text-xs normal-case" placeholder="Review note (required when rejecting)" value={reviewNotes[claim.id] ?? ''} onChange={(event) => setReviewNotes((current) => ({ ...current, [claim.id]: event.target.value }))} /><div className="mt-2 grid grid-cols-2 gap-2"><button className="gold-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'approve')}>Approve</button><button className="scroll-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void review(claim.id, 'reject')}>Reject</button></div></article>; })}{!pendingClaims.length ? <p className="text-sm text-[#ad9f7f]">No claims await review.</p> : null}</div></section>
+            <BingoVerificationPanel hideQueue data={data} working={working} preview={verificationPreview} onResolve={resolveCandidate} onReplay={replayVerification} onSignal={submitVerificationSignal} />
             <section className="parchment-panel p-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Recent hall activity</p><div className="mt-3 space-y-3">{data.activity.slice(0, 10).map((item) => <article className="border-l-2 border-[#88682e] pl-3 text-xs" key={item.id}><p className="font-bold">{item.message}</p><p className="mt-1 text-[10px] text-[#75664b]">{new Date(item.createdAt).toLocaleString()}</p></article>)}</div></section>
           </aside>
         </div>

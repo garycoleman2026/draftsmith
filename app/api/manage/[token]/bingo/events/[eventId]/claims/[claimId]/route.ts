@@ -9,9 +9,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     const { token, eventId, claimId } = await context.params;
     await requireManagedBingoEvent(token, eventId);
     const body = await request.json().catch(() => ({})) as { action?: unknown; reviewNote?: unknown };
-    if (body.action !== 'approve' && body.action !== 'reject') throw new BingoError('Choose approve or reject.');
+    if (!['approve', 'reject', 'reopen'].includes(String(body.action))) throw new BingoError('Choose approve, reject, or reopen.');
     const result = await reviewBingoClaim({
-      claimId, eventId, action: body.action,
+      claimId, eventId, action: String(body.action) as 'approve' | 'reject' | 'reopen',
       reviewNote: typeof body.reviewNote === 'string' ? body.reviewNote : '', actorType: 'organizer',
     });
     return json({ ...result, requestId: requestId(request) });

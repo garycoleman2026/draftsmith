@@ -168,7 +168,7 @@ export function OrganizerDashboard() {
     window.location.assign(`/clans/join/${encodeURIComponent(token)}`);
   }
 
-  async function openEvent(event: DashboardEvent) {
+  async function openEvent(event: DashboardEvent, hash = '') {
     const key = event.bingo_id ?? event.id;
     setWorking(key); setError('');
     try {
@@ -177,7 +177,7 @@ export function OrganizerDashboard() {
         : `/api/events/${encodeURIComponent(event.id)}/manage-link`, { method: 'POST' });
       const next = await response.json() as { path?: string; error?: string };
       if (!response.ok || !next.path) throw new Error(next.error || 'The event could not be opened.');
-      window.location.assign(next.path);
+      window.location.assign(`${next.path}${hash}`);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'The event could not be opened.'); setWorking(''); }
   }
 
@@ -378,12 +378,12 @@ export function OrganizerDashboard() {
   );
 }
 
-function EventSection({ title, events, empty, working, onOpen }: { title: string; events: DashboardEvent[]; empty: string; working: string; onOpen: (event: DashboardEvent) => Promise<void> }) {
+function EventSection({ title, events, empty, working, onOpen }: { title: string; events: DashboardEvent[]; empty: string; working: string; onOpen: (event: DashboardEvent, hash?: string) => Promise<void> }) {
   return <section className="mt-8"><div className="mb-4 flex items-end justify-between"><h3 className="fantasy-title text-2xl font-bold text-[#f5df9b]">{title}</h3><span className="text-xs font-black text-[#a99a78]">{events.length}</span></div>{events.length ? <div className="grid gap-4 md:grid-cols-2">{events.map((event) => {
     const visibility = dashboardEventVisibility(event);
     const publicPath = event.bingo_id && event.bingo_public_spectator && event.bingo_public_slug ? `/bingo/event/${event.bingo_public_slug}` : !event.bingo_id && event.public_slug ? `/event/${event.public_slug}` : null;
     const key = event.bingo_id ?? event.id;
-    return <article className="parchment-card p-5" key={`${event.id}:${event.bingo_id ?? 'draft'}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">{dashboardEventKind(event)}</p><p className="mt-1 truncate font-black">{event.bingo_title || event.title}</p><p className="mt-1 text-xs font-bold text-[#756748]">{event.clan_name || 'Personal'}{event.bingo_access_role && event.bingo_access_role !== 'owner' ? ` · ${event.bingo_access_role}` : ''}</p></div><VisibilityBadge value={visibility} /></div><p className="mt-4 text-sm text-[#665b45]">{event.player_count} players · {event.team_count} teams · {event.bingo_status || event.status}</p><div className="mt-5 flex gap-2"><button className="scroll-button flex-1 px-4 py-2.5 text-xs" type="button" disabled={working === key} onClick={() => void onOpen(event)}>{working === key ? 'Opening…' : 'Manage →'}</button>{publicPath ? <Link className="iron-button px-3 py-2.5 text-xs" href={publicPath} target="_blank">View ↗</Link> : null}</div></article>;
+    return <article className="parchment-card p-5" key={`${event.id}:${event.bingo_id ?? 'draft'}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#80642b]">{dashboardEventKind(event)}</p><p className="mt-1 truncate font-black">{event.bingo_title || event.title}</p><p className="mt-1 text-xs font-bold text-[#756748]">{event.clan_name || 'Personal'}{event.bingo_access_role && event.bingo_access_role !== 'owner' ? ` · ${event.bingo_access_role}` : ''}</p></div><VisibilityBadge value={visibility} /></div><p className="mt-4 text-sm text-[#665b45]">{event.player_count} players · {event.team_count} teams · {event.bingo_status || event.status}</p><div className="mt-5 flex flex-wrap gap-2"><button className="scroll-button flex-1 px-4 py-2.5 text-xs" type="button" disabled={working === key} onClick={() => void onOpen(event)}>{working === key ? 'Opening…' : 'Manage →'}</button>{event.bingo_id ? <button className="gold-button px-3 py-2.5 text-xs" type="button" disabled={working === key} onClick={() => void onOpen(event, '#review')}>Review hall</button> : null}{publicPath ? <Link className="iron-button px-3 py-2.5 text-xs" href={publicPath} target="_blank">View ↗</Link> : null}</div></article>;
   })}</div> : <div className="rounded border border-dashed border-[#8b6a32]/45 bg-black/10 px-5 py-8 text-center text-sm text-[#a99a78]">{empty}</div>}</section>;
 }
 

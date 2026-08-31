@@ -1,7 +1,7 @@
 import { recordAudit } from './audit';
 import { BingoError, bingoActivityInsert, parseJson } from './bingo';
 import { bingoUnlockPrerequisites, sanitizeBingoEventRules, sanitizeBingoTaskRule } from './bingo-rules';
-import { claimAvailability, type BingoScoreCompletion } from './bingo-scoring';
+import { claimAvailability, nextCompletionNumber, type BingoScoreCompletion } from './bingo-scoring';
 import { getDatabase } from './db';
 import { scheduleDiscordEvent } from './discord-webhooks';
 import type { BingoMode } from './types';
@@ -39,7 +39,7 @@ type ReviewableClaim = {
 export async function reviewBingoClaim(input: {
   claimId: string;
   eventId: string;
-  action: 'approve' | 'reject';
+  action: 'approve' | 'reject' | 'reopen';
   reviewNote?: string;
   actorType: 'organizer' | 'system';
 }) {
@@ -59,9 +59,53 @@ export async function reviewBingoClaim(input: {
      WHERE bc.id = ? AND bc.event_id = ?`,
   ).bind(input.claimId, input.eventId).first<ReviewableClaim>();
   if (!claim) throw new BingoError('That claim no longer exists.', 404);
+  if (input.action === 'reopen') {
+    if (!['approved', 'rejected'].includes(claim.status)) throw new BingoError('Only a reviewed claim can be reopened.', 409);
+    if (claim.event_status === 'archived') throw new BingoError('Archived bingo results cannot be changed.', 409);
+    const now = new Date().toISOString();
+    const reopenedConfidence = claim.verification_candidate_id ? claim.verification_confidence : 'unverified';
+    const results = await db.batch([
+      ...(claim.status === 'approved' ? [db.prepare(
+        'DELETE FROM bingo_completions WHERE claim_id = ? AND event_id = ?',
+      ).bind(claim.id, claim.event_id)] : []),
+      db.prepare(
+        `UPDATE bingo_claims
+         SET status = 'pending', review_note = NULL, score_awarded = 0, verification_confidence = ?,
+             reviewed_at = NULL, approved_at = NULL
+         WHERE id = ? AND event_id = ? AND status IN ('approved', 'rejected')`,
+      ).bind(reopenedConfidence, claim.id, claim.event_id),
+      ...(claim.verification_candidate_id ? [db.prepare(
+        `UPDATE bingo_verification_candidates
+         SET status = 'dismissed', confidence = ?, resolved_at = ?, updated_at = ?
+         WHERE id = ? AND event_id = ?`,
+      ).bind(reopenedConfidence, now, now, claim.verification_candidate_id, claim.event_id)] : []),
+      ...(claim.verification_source === 'organizer' && !claim.verification_candidate_id ? [db.prepare(
+        'DELETE FROM bingo_manual_progress WHERE event_id = ? AND task_id = ? AND team_id = ?',
+      ).bind(claim.event_id, claim.task_id, claim.team_id)] : []),
+      bingoActivityInsert({
+        eventId: claim.event_id, teamId: claim.team_id, taskId: claim.task_id,
+        type: 'claim.reopened',
+        message: claim.status === 'approved'
+          ? `${claim.team_name}'s approval for ${claim.task_title} was reversed for another review.`
+          : `${claim.team_name}'s claim for ${claim.task_title} was reopened for review.`,
+        metadata: { previousStatus: claim.status, pointsRemoved: claim.status === 'approved' ? claim.task_points : 0 }, now,
+      }),
+      db.prepare('UPDATE bingo_events SET revision = revision + 1, updated_at = ? WHERE id = ?').bind(now, claim.event_id),
+    ]);
+    const claimUpdateIndex = claim.status === 'approved' ? 1 : 0;
+    if (!results[claimUpdateIndex]?.meta.changes) throw new BingoError('That claim changed moments ago. Refresh and try again.', 409);
+    await recordAudit(db, {
+      draftId: claim.draft_id, actorType: input.actorType, eventType: 'bingo.claim_reopened',
+      metadata: {
+        eventId: claim.event_id, claimId: claim.id, taskId: claim.task_id, teamId: claim.team_id,
+        previousStatus: claim.status, pointsRemoved: claim.status === 'approved' ? claim.task_points : 0,
+      }, createdAt: now,
+    }).catch(() => undefined);
+    return { status: 'pending' as const, scoreAwarded: 0, previousStatus: claim.status };
+  }
   if (claim.status !== 'pending') throw new BingoError('That claim has already been reviewed.', 409);
   if (input.action === 'approve' && claim.event_status !== 'live'
-    && !(claim.event_status === 'complete' && claim.verification_candidate_id)) {
+    && !(claim.event_status === 'complete' && (claim.verification_candidate_id || input.actorType === 'organizer'))) {
     throw new BingoError('Claims can only be approved while the bingo is live.', 409);
   }
 
@@ -89,8 +133,8 @@ export async function reviewBingoClaim(input: {
 
   if (claim.free_space) throw new BingoError('The free space is already counted and cannot be claimed.', 409);
   const [completionRows, taskRows] = await Promise.all([
-    db.prepare('SELECT task_id, team_id, points FROM bingo_completions WHERE event_id = ?')
-      .bind(claim.event_id).all<{ task_id: string; team_id: string; points: number }>(),
+    db.prepare('SELECT task_id, team_id, completion_number, points FROM bingo_completions WHERE event_id = ?')
+      .bind(claim.event_id).all<{ task_id: string; team_id: string; completion_number: number; points: number }>(),
     db.prepare('SELECT id, sort_order FROM bingo_tasks WHERE event_id = ?')
       .bind(claim.event_id).all<{ id: string; sort_order: number }>(),
   ]);
@@ -117,7 +161,9 @@ export async function reviewBingoClaim(input: {
     globalLockout: claim.board_scope === 'shared' && eventRules.progression.tileOwnership === 'first_team',
   });
   if (!availability.allowed) throw new BingoError(availability.reason ?? 'That tile is no longer available.', 409);
-  const completionNumber = completions.filter((completion) => completion.teamId === claim.team_id && completion.taskId === claim.task_id).length + 1;
+  const completionNumber = nextCompletionNumber(completionRows.results
+    .filter((completion) => completion.team_id === claim.team_id && completion.task_id === claim.task_id)
+    .map((completion) => completion.completion_number));
   const delay = Math.max(0, claim.spectator_delay_seconds);
   const approvedConfidence = claim.verification_confidence === 'unverified' ? 'reviewed' : claim.verification_confidence;
   try {

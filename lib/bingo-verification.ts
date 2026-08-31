@@ -4,12 +4,13 @@ import { sanitizeBingoTaskRule, type BingoTaskRule, type BingoVerifierType } fro
 import {
   computeVerificationCandidate, matchVerificationSignal,
   sanitizeVerificationSignal as sanitizeVerificationSignalCore,
+  shouldAutoAcceptVerification,
   type BingoRuleMatch, type BingoVerificationMatch, type BingoVerificationSignal,
   type VerificationConfidence, type VerificationSource,
 } from './bingo-verification-core';
 import { getDatabase } from './db';
 
-export { computeVerificationCandidate, matchVerificationSignal, VERIFICATION_SOURCES } from './bingo-verification-core';
+export { computeVerificationCandidate, matchVerificationSignal, shouldAutoAcceptVerification, VERIFICATION_SOURCES } from './bingo-verification-core';
 export type {
   BingoRuleMatch, BingoVerificationMatch, BingoVerificationSignal, VerificationConfidence,
   VerificationMeasurement, VerificationSource,
@@ -72,8 +73,8 @@ export async function ingestVerificationSignal(input: {
   const signal = sanitizeVerificationSignal(input.signal);
   const db = getDatabase();
   const event = await db.prepare(
-    'SELECT id, status, started_at, ended_at FROM bingo_events WHERE id = ?',
-  ).bind(input.eventId).first<{ id: string; status: string; started_at: string | null; ended_at: string | null }>();
+    'SELECT id, status, requires_review, started_at, ended_at FROM bingo_events WHERE id = ?',
+  ).bind(input.eventId).first<{ id: string; status: string; requires_review: number; started_at: string | null; ended_at: string | null }>();
   if (!event) throw new BingoError('That bingo event does not exist.', 404);
   const finalReconciliation = input.allowComplete && event.status === 'complete' && signal.source === 'wise_old_man';
   if (event.status !== 'live' && !finalReconciliation) {
@@ -102,7 +103,11 @@ export async function ingestVerificationSignal(input: {
       source: signal.source, signal_type: signal.signalType, payload_json: JSON.stringify(signal), observed_at: signal.observedAt,
     };
   if (!stored) throw new BingoError('The verification signal could not be recovered.', 500);
-  const candidates = await evaluateStoredVerificationEvent(stored, tasks, rosterSize, !duplicate);
+  const candidates = await autoAcceptVerificationCandidates(
+    input.eventId,
+    Boolean(event.requires_review),
+    await evaluateStoredVerificationEvent(stored, tasks, rosterSize, !duplicate),
+  );
   if (!duplicate && candidates.length) {
     await db.prepare('UPDATE bingo_events SET revision = revision + 1, updated_at = ? WHERE id = ?')
       .bind(receivedAt, input.eventId).run();
@@ -112,6 +117,9 @@ export async function ingestVerificationSignal(input: {
 
 export async function replayVerificationEvents(eventId: string) {
   const db = getDatabase();
+  const eventSettings = await db.prepare('SELECT requires_review FROM bingo_events WHERE id = ?')
+    .bind(eventId).first<{ requires_review: number }>();
+  if (!eventSettings) throw new BingoError('That bingo event does not exist.', 404);
   const events = await db.prepare(
     'SELECT id, event_id, team_id, member_id, source, signal_type, payload_json, observed_at ' +
     'FROM bingo_verification_events WHERE event_id = ? ORDER BY observed_at LIMIT 5000',
@@ -125,7 +133,11 @@ export async function replayVerificationEvents(eventId: string) {
       context = await verificationContext(eventId, event.team_id, event.member_id);
       contextByTeam.set(event.team_id, context);
     }
-    const candidates = await evaluateStoredVerificationEvent(event, context.tasks, context.rosterSize, false);
+    const candidates = await autoAcceptVerificationCandidates(
+      eventId,
+      Boolean(eventSettings.requires_review),
+      await evaluateStoredVerificationEvent(event, context.tasks, context.rosterSize, false),
+    );
     candidates.forEach((candidate) => candidateIds.add(candidate.id));
     matches += candidates.length;
   }
@@ -134,6 +146,7 @@ export async function replayVerificationEvents(eventId: string) {
 
 export async function resolveVerificationCandidate(input: {
   eventId: string; candidateId: string; action: 'accept' | 'dismiss' | 'reopen';
+  actorType?: 'organizer' | 'system';
 }) {
   const db = getDatabase();
   const candidate = await loadCandidate(input.eventId, input.candidateId);
@@ -164,6 +177,27 @@ export async function resolveVerificationCandidate(input: {
   if (!row || !['live', 'complete'].includes(row.event_status)) {
     throw new BingoError('Candidates can only be accepted while the bingo is live or reconciling its final results.', 409);
   }
+  const existingClaim = await db.prepare(
+    'SELECT id, status FROM bingo_claims WHERE event_id = ? AND verification_candidate_id = ?',
+  ).bind(row.event_id, row.id).first<{ id: string; status: string }>();
+  if (existingClaim) {
+    if (existingClaim.status === 'approved') throw new BingoError('That verification is already part of the score.', 409);
+    if (existingClaim.status === 'rejected') {
+      await reviewBingoClaim({
+        claimId: existingClaim.id, eventId: row.event_id, action: 'reopen', actorType: input.actorType ?? 'organizer',
+      });
+    } else if (existingClaim.status !== 'pending') {
+      throw new BingoError('That verification claim cannot be reopened.', 409);
+    }
+    const reviewed = await reviewBingoClaim({
+      claimId: existingClaim.id, eventId: row.event_id, action: 'approve',
+      reviewNote: input.actorType === 'system'
+        ? 'Automatically accepted because organizer review is off.'
+        : 'Accepted from the automated verification queue.',
+      actorType: input.actorType ?? 'organizer',
+    });
+    return { ...candidateToView(candidate), status: 'accepted' as const, resolvedAt: now, updatedAt: now, scoreAwarded: reviewed.scoreAwarded };
+  }
   const claimId = crypto.randomUUID();
   try {
     await db.prepare(
@@ -173,14 +207,43 @@ export async function resolveVerificationCandidate(input: {
     ).bind(claimId, row.event_id, row.task_id, row.team_id, row.member_id,
       row.display_name ?? 'Verified team progress', row.summary, row.source_summary, row.confidence, row.id, now).run();
     const reviewed = await reviewBingoClaim({
-      claimId, eventId: row.event_id, action: 'approve', reviewNote: 'Accepted from the automated verification queue.',
-      actorType: 'organizer',
+      claimId, eventId: row.event_id, action: 'approve',
+      reviewNote: input.actorType === 'system'
+        ? 'Automatically accepted because organizer review is off.'
+        : 'Accepted from the automated verification queue.',
+      actorType: input.actorType ?? 'organizer',
     });
     return { ...candidateToView(candidate), status: 'accepted' as const, resolvedAt: now, updatedAt: now, scoreAwarded: reviewed.scoreAwarded };
   } catch (error) {
     await db.prepare("DELETE FROM bingo_claims WHERE id = ? AND status = 'pending'").bind(claimId).run().catch(() => undefined);
     throw error;
   }
+}
+
+async function autoAcceptVerificationCandidates(
+  eventId: string,
+  requiresReview: boolean,
+  candidates: BingoCandidateSnapshot[],
+) {
+  const resolved: BingoCandidateSnapshot[] = [];
+  for (const candidate of candidates) {
+    if (!shouldAutoAcceptVerification(requiresReview, candidate.status)) {
+      resolved.push(candidate);
+      continue;
+    }
+    try {
+      resolved.push(await resolveVerificationCandidate({
+        eventId, candidateId: candidate.id, action: 'accept', actorType: 'system',
+      }));
+    } catch (error) {
+      if (error instanceof BingoError && error.status === 409) {
+        resolved.push(candidate);
+        continue;
+      }
+      throw error;
+    }
+  }
+  return resolved;
 }
 
 async function evaluateStoredVerificationEvent(event: VerificationEventRow, tasks: TaskRow[], rosterSize: number, revive: boolean) {

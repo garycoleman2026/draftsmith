@@ -125,6 +125,7 @@ export async function loadBingoView(input: {
   const candidateBindings = input.viewer === 'team' ? [event.id, input.teamId ?? ''] : [event.id];
   const progressScope = input.viewer === 'team' ? ' AND team_id = ?' : '';
   const progressBindings = input.viewer === 'team' ? [event.id, input.teamId ?? ''] : [event.id];
+  const claimLimit = input.viewer === 'organizer' ? 1000 : 250;
 
   const [teamResult, memberResult, taskResult, claimResult, completionResult, manualProgressResult, activityResult, snapshotResult, candidateResult, verificationCount,
     womIntegration, womLatestRun, womBaselineCoverage] = await Promise.all([
@@ -140,7 +141,7 @@ export async function loadBingoView(input: {
     db.prepare(`SELECT id, event_id, task_id, team_id, member_id, claimed_by_name, note, evidence_url,
                        evidence_upload_id, verification_source, verification_confidence, verification_candidate_id,
                        status, review_note, score_awarded, submitted_at, reviewed_at, approved_at
-                FROM bingo_claims WHERE event_id = ? ORDER BY submitted_at DESC LIMIT 250`).bind(event.id).all<ClaimRow>(),
+                FROM bingo_claims WHERE event_id = ? ORDER BY submitted_at DESC LIMIT ?`).bind(event.id, claimLimit).all<ClaimRow>(),
     db.prepare(`SELECT id, task_id, team_id, claim_id, completion_number, points, verification_source,
                        verification_confidence, completed_at
                 FROM bingo_completions WHERE event_id = ? ORDER BY completed_at`).bind(event.id).all<CompletionRow>(),
@@ -315,7 +316,7 @@ export async function loadBingoView(input: {
       claimedByName: claim.claimed_by_name,
       note: input.viewer === 'public' ? '' : claim.note,
       evidenceUrl: input.viewer === 'public' ? null : claim.evidence_url,
-      evidenceUploadId: input.viewer === 'organizer' ? claim.evidence_upload_id : null,
+      evidenceUploadId: input.viewer === 'public' ? null : claim.evidence_upload_id,
       status: claim.status,
       reviewNote: input.viewer === 'public' ? null : claim.review_note,
       verificationSource: claim.verification_source,
@@ -353,9 +354,9 @@ export async function loadBingoView(input: {
       if (input.viewer === 'organizer') return true;
       if (input.viewer === 'public') {
         return activity.visible_at <= new Date(now).toISOString()
-          && !['claim.submitted', 'claim.rejected'].includes(activity.activity_type);
+          && !['claim.submitted', 'claim.rejected', 'claim.reopened'].includes(activity.activity_type);
       }
-      return !['claim.submitted', 'claim.rejected'].includes(activity.activity_type) || activity.team_id === input.teamId;
+      return !['claim.submitted', 'claim.rejected', 'claim.reopened'].includes(activity.activity_type) || activity.team_id === input.teamId;
     }).slice(0, 40).map((activity) => ({
       id: activity.id,
       teamId: activity.team_id,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateBingoStandings, claimAvailability, countCompletedLines } from '../lib/bingo-scoring';
+import { calculateBingoStandings, claimAvailability, countCompletedLines, nextCompletionNumber } from '../lib/bingo-scoring';
 import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, sanitizeBingoTaskDifficulty, serializeBingoTaskImport } from '../lib/bingo-types';
 import {
   defaultBingoEventRules,
@@ -19,6 +19,12 @@ const tasks = Array.from({ length: 25 }, (_, index) => ({
 }));
 
 describe('bingo scoring', () => {
+  it('reuses the first open completion number after an approval is reversed', () => {
+    expect(nextCompletionNumber([1, 3, 4])).toBe(2);
+    expect(nextCompletionNumber([2, 3])).toBe(1);
+    expect(nextCompletionNumber([1, 2, 3])).toBe(4);
+  });
+
   it('counts rows, columns, and diagonals with the free center', () => {
     expect(countCompletedLines(tasks, new Set(['task-0', 'task-1', 'task-2', 'task-3', 'task-4']), 5)).toBe(1);
     expect(countCompletedLines(tasks, new Set(['task-0', 'task-6', 'task-18', 'task-24', 'task-12']), 5)).toBe(1);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeVerificationCandidate, matchVerificationSignal, sanitizeVerificationSignal,
+  shouldAutoAcceptVerification,
   type BingoVerificationMatch, type BingoVerificationSignal,
 } from '../lib/bingo-verification-core';
 import { defaultBingoTaskRule, type BingoTaskRule } from '../lib/bingo-rules';
@@ -92,6 +93,13 @@ describe('bingo verification signals', () => {
 });
 
 describe('verification candidate aggregation', () => {
+  it('auto-accepts only ready evidence when organizer review is off', () => {
+    expect(shouldAutoAcceptVerification(false, 'ready')).toBe(true);
+    expect(shouldAutoAcceptVerification(true, 'ready')).toBe(false);
+    expect(shouldAutoAcceptVerification(false, 'progress')).toBe(false);
+    expect(shouldAutoAcceptVerification(false, 'accepted')).toBe(false);
+  });
+
   it('keeps source streams independent so RuneLite and WOM do not double-count the same progress', () => {
     const xpRule = rule({
       verifier: { type: 'xp_gain', target: '', metric: 'agility', amount: 10_000_000 },

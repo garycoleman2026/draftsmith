@@ -7,10 +7,11 @@ import type { BingoVerificationSignal, VerificationSource } from '../lib/bingo-v
 
 type Preview = { matches?: Array<{ taskId: string; title: string; sortOrder: number }>; duplicate?: boolean; candidates?: BingoViewVerificationCandidate[] };
 
-export function BingoVerificationPanel({ data, working, preview, onResolve, onReplay, onSignal }: {
+export function BingoVerificationPanel({ data, working, preview, hideQueue = false, onResolve, onReplay, onSignal }: {
   data: BingoViewData;
   working: string;
   preview: Preview | null;
+  hideQueue?: boolean;
   onResolve: (candidateId: string, action: 'accept' | 'dismiss' | 'reopen') => Promise<void>;
   onReplay: () => Promise<void>;
   onSignal: (input: { teamId: string; memberId: string | null; signal: BingoVerificationSignal }, dryRun: boolean) => Promise<void>;
@@ -55,10 +56,10 @@ export function BingoVerificationPanel({ data, working, preview, onResolve, onRe
   return (
     <section className="wood-panel p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Verification queue</p><h3 className="fantasy-title mt-1 text-2xl font-bold text-[#f2d98f]">Evidence with a paper trail.</h3></div>
+        <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">{hideQueue ? 'Verification tools' : 'Verification queue'}</p><h3 className="fantasy-title mt-1 text-2xl font-bold text-[#f2d98f]">{hideQueue ? 'Check connected signals.' : 'Evidence with a paper trail.'}</h3></div>
         <button className="scroll-button px-3 py-2 text-xs" disabled={working === 'verification-replay' || !data.verification.eventCount} onClick={() => void onReplay()}>{working === 'verification-replay' ? 'Replaying…' : 'Replay signals'}</button>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase tracking-[0.06em]">
+      {!hideQueue ? <><div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase tracking-[0.06em]">
         <Metric label="Ready" value={ready.length} tone="text-[#d8c36c]" />
         <Metric label="Tracking" value={progress.length} tone="text-[#a9c798]" />
         <Metric label="Signals" value={data.verification.eventCount} tone="text-[#b8aa87]" />
@@ -82,7 +83,7 @@ export function BingoVerificationPanel({ data, working, preview, onResolve, onRe
           </article>;
         })}
         {!candidates.length ? <p className="rounded border border-dashed border-white/15 p-5 text-center text-sm text-[#ad9f7f]">No automated evidence yet. Wise Old Man and RuneLite signals will appear here without replacing manual claims.</p> : null}
-      </div>
+      </div></> : null}
 
       <details className="mt-4 rounded border border-white/10 bg-black/20 p-3">
         <summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.1em] text-[#d7ae50]">Verification lab</summary>
