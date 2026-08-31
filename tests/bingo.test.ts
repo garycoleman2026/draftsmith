@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { collectNewBingoCompletions } from '../lib/bingo-notifications';
 import { calculateBingoStandings, claimAvailability, countCompletedLines, nextCompletionNumber } from '../lib/bingo-scoring';
 import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, sanitizeBingoTaskDifficulty, serializeBingoTaskImport } from '../lib/bingo-types';
 import {
@@ -19,6 +20,12 @@ const tasks = Array.from({ length: 25 }, (_, index) => ({
 }));
 
 describe('bingo scoring', () => {
+  it('celebrates only completions that arrive after the board opens', () => {
+    const seen = new Set(['completion-1']);
+    expect(collectNewBingoCompletions([{ id: 'completion-1' }, { id: 'completion-2' }], seen)).toEqual([{ id: 'completion-2' }]);
+    expect(collectNewBingoCompletions([{ id: 'completion-1' }, { id: 'completion-2' }], seen)).toEqual([]);
+  });
+
   it('reuses the first open completion number after an approval is reversed', () => {
     expect(nextCompletionNumber([1, 3, 4])).toBe(2);
     expect(nextCompletionNumber([2, 3])).toBe(1);

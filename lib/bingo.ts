@@ -28,7 +28,7 @@ type ClaimRow = {
   review_note: string | null; score_awarded: number; submitted_at: string; reviewed_at: string | null; approved_at: string | null;
   verification_source: string; verification_confidence: string; verification_candidate_id: string | null;
 };
-type CompletionRow = { id: string; task_id: string; team_id: string; claim_id: string; completion_number: number; points: number; verification_source: string; verification_confidence: string; completed_at: string };
+type CompletionRow = { id: string; task_id: string; team_id: string; claim_id: string; claimed_by_name: string; completion_number: number; points: number; verification_source: string; verification_confidence: string; completed_at: string };
 type ManualProgressRow = { id: string; task_id: string; team_id: string; member_id: string | null; progress_value: number; target_value: number; note: string; updated_at: string };
 type ActivityRow = { id: string; team_id: string | null; task_id: string | null; activity_type: string; message: string; metadata_json: string | null; visible_at: string; created_at: string };
 type CandidateRow = {
@@ -142,9 +142,10 @@ export async function loadBingoView(input: {
                        evidence_upload_id, verification_source, verification_confidence, verification_candidate_id,
                        status, review_note, score_awarded, submitted_at, reviewed_at, approved_at
                 FROM bingo_claims WHERE event_id = ? ORDER BY submitted_at DESC LIMIT ?`).bind(event.id, claimLimit).all<ClaimRow>(),
-    db.prepare(`SELECT id, task_id, team_id, claim_id, completion_number, points, verification_source,
-                       verification_confidence, completed_at
-                FROM bingo_completions WHERE event_id = ? ORDER BY completed_at`).bind(event.id).all<CompletionRow>(),
+    db.prepare(`SELECT bc.id, bc.task_id, bc.team_id, bc.claim_id, claims.claimed_by_name,
+                       bc.completion_number, bc.points, bc.verification_source, bc.verification_confidence, bc.completed_at
+                FROM bingo_completions bc JOIN bingo_claims claims ON claims.id = bc.claim_id
+                WHERE bc.event_id = ? ORDER BY bc.completed_at`).bind(event.id).all<CompletionRow>(),
     db.prepare(`SELECT id, task_id, team_id, member_id, progress_value, target_value, note, updated_at
                 FROM bingo_manual_progress WHERE event_id = ?${progressScope} ORDER BY updated_at DESC`)
       .bind(...progressBindings).all<ManualProgressRow>(),
@@ -332,6 +333,7 @@ export async function loadBingoView(input: {
       taskId: completion.task_id,
       teamId: completion.team_id,
       claimId: completion.claim_id,
+      claimedByName: completion.claimed_by_name,
       completionNumber: completion.completion_number,
       points: completion.points,
       verificationSource: completion.verification_source,

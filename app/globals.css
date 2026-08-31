@@ -80,6 +80,87 @@ body {
     0 3px 0 rgba(63, 42, 19, 0.55);
 }
 
+.bingo-tile-complete {
+  position: relative;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(0deg, rgba(30, 67, 32, 0.035) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 18% 12%, rgba(245, 249, 204, 0.72), transparent 14rem),
+    linear-gradient(145deg, #d6e7b7 0%, #94b875 100%);
+  border-color: #426a3d;
+  box-shadow:
+    inset 0 5px 15px rgba(30, 65, 31, 0.38),
+    inset 0 0 0 2px rgba(238, 239, 190, 0.48),
+    0 1px 0 #263b22;
+  transform: translateY(3px);
+}
+
+.bingo-tile-complete::after {
+  position: absolute;
+  right: 0.45rem;
+  bottom: -0.4rem;
+  color: #244d2b;
+  content: '✓';
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 4rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.bingo-tile-complete:hover {
+  transform: translateY(3px);
+}
+
+.bingo-completion-toast {
+  animation: bingo-toast-pop 420ms cubic-bezier(0.18, 0.9, 0.24, 1.15) both;
+  backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 0 0 2px rgba(216, 196, 104, 0.18),
+    0 10px 0 rgba(5, 9, 4, 0.6),
+    0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.bingo-firework-particle {
+  position: absolute;
+  top: var(--burst-origin-y);
+  left: var(--burst-origin-x);
+  width: 0.42rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  background: var(--burst-color);
+  box-shadow: 0 0 8px var(--burst-color);
+  opacity: 0;
+  animation: bingo-firework 950ms ease-out var(--burst-delay) both;
+}
+
+@keyframes bingo-toast-pop {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bingo-firework {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.35) rotate(0deg); }
+  14% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--burst-x)), calc(-50% + var(--burst-y))) scale(0.85) rotate(520deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bingo-tile-complete,
+  .bingo-tile-complete:hover {
+    transform: none;
+  }
+
+  .bingo-completion-toast {
+    animation: none;
+  }
+
+  .bingo-firework-particle {
+    display: none;
+  }
+}
+
 .wood-panel {
   color: #f1e1b6;
   border: 2px solid #9d7932;

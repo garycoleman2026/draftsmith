@@ -10,6 +10,7 @@ import {
   formatExpectedHours,
   formatTaskTime,
 } from '../lib/bingo-rules';
+import { BingoCompletionCelebration } from './BingoCompletionCelebration';
 import { BingoTaskArtwork } from './BingoTaskArtwork';
 
 export function BingoBoard({
@@ -44,6 +45,7 @@ export function BingoBoard({
               ? task.ownerTeamIds.filter((owner) => owner === teamId)
               : task.ownerTeamIds;
             const ownerTeams = owners.flatMap((owner) => data.teams.filter((team) => team.id === owner));
+            const isComplete = ownerTeams.length > 0;
             const proofLabels = [...new Set(data.completions
               .filter((completion) => completion.taskId === task.id && owners.includes(completion.teamId))
               .map((completion) => `${formatProofSource(completion.verificationSource)} · ${completion.verificationConfidence}`))];
@@ -56,24 +58,25 @@ export function BingoBoard({
             const competitiveOwnership = data.event.mode === 'lockout'
               || data.event.boardScope === 'shared' && data.event.rules.progression.tileOwnership === 'first_team';
             const style = competitiveOwnership && ownerTeams[0]
-              ? { borderColor: ownerTeams[0].color, boxShadow: `inset 0 0 0 3px ${ownerTeams[0].color}55, 0 3px 0 #5c431f` }
+              ? { borderColor: ownerTeams[0].color }
               : undefined;
             const individualHours = task.concealed ? null : expectedIndividualHours(task.rule);
             const speedTargetSeconds = task.concealed ? null : bingoSpeedTargetSeconds(task.rule);
             return (
               <button
-                aria-label={`${task.concealed ? 'Hidden task' : task.title}. Open task details.`}
-                className={`parchment-card min-h-40 w-full p-3 text-left transition hover:-translate-y-0.5 hover:brightness-105 ${!task.unlocked && !task.concealed ? 'opacity-75 grayscale-[35%]' : ''} ${selected ? 'ring-4 ring-[#517347]/35' : ''}`}
+                aria-label={`${task.concealed ? 'Hidden task' : task.title}. ${isComplete ? 'Complete. ' : ''}Open task details.`}
+                className={`parchment-card min-h-40 w-full p-3 text-left transition hover:brightness-105 ${isComplete ? 'bingo-tile-complete' : 'hover:-translate-y-0.5'} ${!task.unlocked && !task.concealed ? 'opacity-75 grayscale-[35%]' : ''} ${selected ? 'ring-4 ring-[#517347]/35' : ''}`}
+                data-complete={isComplete || undefined}
                 key={task.id}
                 onClick={() => setDetailTask(task)}
                 style={style}
                 type="button"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[#675331]">
+                  <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isComplete ? 'rounded bg-[#315f36] px-2 py-1 text-[#f5efc9] shadow-inner' : 'text-[#675331]'}`}>
                     {task.freeSpace ? '◆ Free' : ownPending ? '⌛ Pending' : ownerTeams.length ? '✓ Complete' : task.concealed ? '???' : !task.unlocked ? '🔒 Locked' : task.category}
                   </span>
-                  <span className="shrink-0 rounded bg-[#5b4526]/10 px-1.5 py-0.5 text-[10px] font-black text-[#4f3b20]">
+                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${isComplete ? 'bg-[#244b2a] text-[#f5efc9]' : 'bg-[#5b4526]/10 text-[#4f3b20]'}`}>
                     {task.points === null ? '?' : task.freeSpace ? 'FREE' : `${task.points} pt${task.points === 1 ? '' : 's'}`}
                   </span>
                 </div>
@@ -108,6 +111,7 @@ export function BingoBoard({
           onSelect={() => { onSelect?.(detailTask); setDetailTask(null); }}
         />
       ) : null}
+      <BingoCompletionCelebration data={data} />
     </>
   );
 }
@@ -161,7 +165,7 @@ function TaskDetails({
                 const claim = data.claims.find((item) => item.id === completion.claimId);
                 const completionTeam = data.teams.find((item) => item.id === completion.teamId);
                 return <article className="rounded border border-[#52704b]/25 bg-white/35 p-3" key={completion.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-black text-[#2f492b]">{completionTeam?.name ?? 'Team'} · {claim?.claimedByName ?? 'Recorded completion'}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.05em] text-[#55704f]">{formatProofSource(completion.verificationSource)} · {formatProofSource(completion.verificationConfidence)} · {new Date(completion.completedAt).toLocaleString()}</p></div><span className="rounded bg-[#52704b] px-2 py-1 text-[9px] font-black text-white">+{completion.points} pts</span></div>
+                  <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-black text-[#2f492b]">{completionTeam?.name ?? 'Team'} · {completion.claimedByName}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.05em] text-[#55704f]">{formatProofSource(completion.verificationSource)} · {formatProofSource(completion.verificationConfidence)} · {new Date(completion.completedAt).toLocaleString()}</p></div><span className="rounded bg-[#52704b] px-2 py-1 text-[9px] font-black text-white">+{completion.points} pts</span></div>
                   {claim?.note ? <p className="mt-2 text-xs leading-relaxed text-[#42563b]">{claim.note}</p> : null}
                   <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-black">{claim?.evidenceUploadId && evidenceHref ? <a className="text-[#315b39] underline" href={evidenceHref(claim.evidenceUploadId)} target="_blank" rel="noreferrer">View screenshot ↗</a> : null}{claim?.evidenceUrl ? <a className="text-[#315b39] underline" href={claim.evidenceUrl} target="_blank" rel="noreferrer">Open proof link ↗</a> : null}</div>
                 </article>;

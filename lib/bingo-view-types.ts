@@ -48,7 +48,7 @@ export type BingoViewData = {
   teams: BingoViewTeam[];
   tasks: BingoViewTask[];
   claims: BingoViewClaim[];
-  completions: { id: string; taskId: string; teamId: string; claimId: string; completionNumber: number; points: number; verificationSource: string; verificationConfidence: VerificationConfidence; completedAt: string }[];
+  completions: { id: string; taskId: string; teamId: string; claimId: string; claimedByName: string; completionNumber: number; points: number; verificationSource: string; verificationConfidence: VerificationConfidence; completedAt: string }[];
   manualProgress: { id: string; taskId: string; teamId: string; memberId: string | null; progressValue: number; targetValue: number; note: string; updatedAt: string }[];
   activity: { id: string; teamId: string | null; taskId: string | null; type: string; message: string; metadata: Record<string, unknown>; createdAt: string }[];
   snapshots: { phase: string; count: number; capturedAt: string | null }[];
