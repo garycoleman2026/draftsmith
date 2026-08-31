@@ -11,9 +11,11 @@ import { BingoBoard, BingoStandings } from './BingoBoard';
 import { BingoCollaboratorsPanel } from './BingoCollaboratorsPanel';
 import { BingoMaker } from './BingoMaker';
 import { BingoManualScorekeeper } from './BingoManualScorekeeper';
+import { BingoOrganizerDisclosure } from './BingoOrganizerDisclosure';
 import { BingoPlanningSummary } from './BingoPlanningSummary';
 import { BingoReviewHall } from './BingoReviewHall';
 import { BingoRuneliteOrganizerPanel } from './BingoRuneliteOrganizerPanel';
+import { BingoTeamColourPicker } from './BingoTeamColourPicker';
 import { BingoVerificationPanel } from './BingoVerificationPanel';
 import { BingoWiseOldManPanel } from './BingoWiseOldManPanel';
 import { SiteHeader } from './SiteHeader';
@@ -124,6 +126,12 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
     }
   }
 
+  async function saveTeamColour(teamId: string, color: string) {
+    await run(`team-colour-${teamId}`, `${base}/teams/${encodeURIComponent(teamId)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ color }),
+    }, 'The team colour is saved and completed tiles now use it.');
+  }
+
   async function review(claimId: string, action: 'approve' | 'reject' | 'reopen', reviewNote = '') {
     if (action === 'reject' && !reviewNote.trim()) { setError('Add a short note so the team knows what to fix.'); return false; }
     const result = await run(`${action}-${claimId}`, `${base}/claims/${encodeURIComponent(claimId)}`, {
@@ -219,26 +227,36 @@ export function BingoOrganizer({ token, eventId }: { token: string; eventId: str
           {canConfigure ? <section className="parchment-panel p-5 sm:p-7">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Private team doors</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Issue the captain links.</h2></div><button className="iron-button px-3 py-2 text-xs" disabled={working === 'links'} onClick={() => void rotateLinks()}>{working === 'links' ? 'Rotating…' : 'Issue / rotate all'}</button></div>
             <p className="mt-3 text-xs leading-relaxed text-[#6e5e43]">Private links are shown once when issued. Copy them before leaving this page. Rotating a link immediately retires the older one.</p>
-            <div className="mt-4 space-y-2">{data.teams.map((team) => { const link = issuedLinks.find((item) => item.teamId === team.id); return <article className="parchment-card flex flex-wrap items-center gap-2 p-3" key={team.id}><span className="h-8 w-2 rounded" style={{ background: team.color }} /><div className="min-w-36 flex-1"><p className="font-black">{team.name}</p><p className="text-[10px] text-[#746244]">{team.members.length} members</p></div>{link ? <><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copy(team.id, absoluteUrl(link.path))}>{copied === team.id ? 'Copied' : 'Copy link'}</button><a className="scroll-button px-3 py-2 text-xs" href={link.path} target="_blank" rel="noreferrer">Open ↗</a></> : <button className="scroll-button px-3 py-2 text-xs" disabled={working === `link-${team.id}`} onClick={() => void rotateLinks(team.id)}>Issue link</button>}</article>; })}</div>
+            <div className="mt-4 space-y-2">{data.teams.map((team) => {
+              const link = issuedLinks.find((item) => item.teamId === team.id);
+              return <article className="parchment-card flex flex-wrap items-center gap-2 p-3" key={team.id}>
+                <span className="h-8 w-2 rounded" style={{ background: team.color }} />
+                <div className="min-w-36 flex-1"><p className="font-black">{team.name}</p><p className="text-[10px] text-[#746244]">{team.members.length} members</p></div>
+                {link ? <><button className="scroll-button px-3 py-2 text-xs" onClick={() => void copy(team.id, absoluteUrl(link.path))}>{copied === team.id ? 'Copied' : 'Copy link'}</button><a className="scroll-button px-3 py-2 text-xs" href={link.path} target="_blank" rel="noreferrer">Open ↗</a></> : <button className="scroll-button px-3 py-2 text-xs" disabled={working === `link-${team.id}`} onClick={() => void rotateLinks(team.id)}>Issue link</button>}
+                <BingoTeamColourPicker label={`${team.name} colour`} onSave={(color) => saveTeamColour(team.id, color)} saving={working === `team-colour-${team.id}`} value={team.color} />
+              </article>;
+            })}</div>
             <button className="iron-button mt-4 w-full px-4 py-2.5 text-xs" disabled={!allLinks} onClick={() => void copy('all', allLinks)}>{copied === 'all' ? 'Copied every link' : 'Copy all newly issued links'}</button>
           </section> : null}
         </div>
 
-        <section className="parchment-panel mt-5 p-5 sm:p-7">
-          <div className="flex flex-col gap-4 border-b border-[#8b6a32]/25 pb-5 lg:flex-row lg:items-end lg:justify-between">
-            <div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">No-code custom bingo maker</p><h2 className="fantasy-title mt-1 text-3xl font-bold">Build the clan’s game, not just a spreadsheet.</h2><p className="mt-2 max-w-3xl text-xs leading-relaxed text-[#6e5e43]">Choose a layout, arrange OSRS presets, define who contributes, set proof sources, and add unlock rules. Advanced boards still copy cleanly to and from spreadsheets.</p></div>
-            {data.viewer.accessRole === 'owner' ? <div className="grid min-w-72 gap-2 sm:min-w-[520px] sm:grid-cols-[minmax(0,1fr)_170px]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><select aria-label="Template category" className="realm-field h-11 w-full px-3 text-xs" value={templateCategory} onChange={(event) => setTemplateCategory(event.target.value)}>{['Mixed', 'Bossing', 'Raids', 'Skilling', 'Speed', 'Progression', 'Casual', 'Competitive'].map((item) => <option key={item}>{item}</option>)}</select><input aria-label="Template summary" className="realm-field h-11 w-full px-3 text-xs normal-case sm:col-span-2" maxLength={240} value={templateSummary} onChange={(event) => setTemplateSummary(event.target.value)} placeholder="What makes this board useful?" /><input aria-label="Template tags" className="realm-field h-11 w-full px-3 text-xs normal-case" value={templateTags} onChange={(event) => setTemplateTags(event.target.value)} placeholder="raids, weekend, mixed levels" /><label className="flex items-center gap-2 rounded border border-[#8b6a32]/30 bg-white/20 px-3 text-[10px] font-black uppercase text-[#5d4b30]"><input type="checkbox" checked={templatePublic} onChange={(event) => setTemplatePublic(event.target.checked)} /> Publish publicly</label><button className="iron-button px-4 py-2.5 text-xs sm:col-span-2" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : templatePublic ? 'Publish community template' : 'Save private template'}</button>{publishedTemplatePath ? <a className="text-center text-xs font-black text-[#315b39] underline sm:col-span-2" href={publishedTemplatePath} target="_blank" rel="noreferrer">Open published template ↗</a> : null}</div> : null}
-          </div>
-          <div className="mt-5"><BingoMaker initialTasks={taskDefinitions} initialRules={data.event.rules} mode={data.event.mode} boardScope={data.event.boardScope} disabled={structuralLocked || !canConfigure} saving={working === 'tasks'} teamSize={teamSize} startAt={startAt} endAt={endAt} onSave={saveBoard} /></div>
+        <BingoOrganizerDisclosure
+          className="mt-5"
+          description="Choose a layout, arrange OSRS presets, set proof, and add unlock rules."
+          eyebrow="No-code custom bingo maker"
+          title="Build the clan’s game, not just a spreadsheet."
+        >
+          {data.viewer.accessRole === 'owner' ? <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_170px]"><input aria-label="Reusable template name" className="realm-field h-11 w-full px-3 text-sm" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><select aria-label="Template category" className="realm-field h-11 w-full px-3 text-xs" value={templateCategory} onChange={(event) => setTemplateCategory(event.target.value)}>{['Mixed', 'Bossing', 'Raids', 'Skilling', 'Speed', 'Progression', 'Casual', 'Competitive'].map((item) => <option key={item}>{item}</option>)}</select><input aria-label="Template summary" className="realm-field h-11 w-full px-3 text-xs normal-case sm:col-span-2" maxLength={240} value={templateSummary} onChange={(event) => setTemplateSummary(event.target.value)} placeholder="What makes this board useful?" /><input aria-label="Template tags" className="realm-field h-11 w-full px-3 text-xs normal-case" value={templateTags} onChange={(event) => setTemplateTags(event.target.value)} placeholder="raids, weekend, mixed levels" /><label className="flex items-center gap-2 rounded border border-[#8b6a32]/30 bg-white/20 px-3 text-[10px] font-black uppercase text-[#5d4b30]"><input type="checkbox" checked={templatePublic} onChange={(event) => setTemplatePublic(event.target.checked)} /> Publish publicly</label><button className="iron-button px-4 py-2.5 text-xs sm:col-span-2" disabled={!templateName || working === 'template'} onClick={() => void saveTemplate()}>{working === 'template' ? 'Saving…' : templatePublic ? 'Publish community template' : 'Save private template'}</button>{publishedTemplatePath ? <a className="text-center text-xs font-black text-[#315b39] underline sm:col-span-2" href={publishedTemplatePath} target="_blank" rel="noreferrer">Open published template ↗</a> : null}</div> : null}
+          <div className={data.viewer.accessRole === 'owner' ? 'mt-5' : ''}><BingoMaker initialTasks={taskDefinitions} initialRules={data.event.rules} mode={data.event.mode} boardScope={data.event.boardScope} disabled={structuralLocked || !canConfigure} saving={working === 'tasks'} teamSize={teamSize} startAt={startAt} endAt={endAt} onSave={saveBoard} /></div>
           <div className="mt-5 rounded border border-[#8b6a32]/30 bg-[#f5e5b8]/70 p-4 text-xs leading-relaxed text-[#66563d]"><b>WOM baseline:</b> {data.wiseOldMan.baselineCoverage} players · <b>Last sync:</b> {data.wiseOldMan.lastSyncAt ? new Date(data.wiseOldMan.lastSyncAt).toLocaleString() : 'Not run'} · <b>Worker:</b> {data.event.baselineStatus.replace(':', ' · ')}</div>
-        </section>
+        </BingoOrganizerDisclosure>
 
         <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="parchment-panel min-w-0 p-4 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Live board preview</p><h2 className="fantasy-title text-3xl font-bold">{data.tasks.length} tiles · revision {data.event.revision}</h2></div></div><BingoBoard data={data} evidenceHref={(uploadId) => `${base}/evidence/${encodeURIComponent(uploadId)}`} /></section>
+          <BingoOrganizerDisclosure className="min-w-0" description="See the board exactly as teams and spectators see it." eyebrow="Live board preview" title={`${data.tasks.length} tiles · revision ${data.event.revision}`}><BingoBoard data={data} evidenceHref={(uploadId) => `${base}/evidence/${encodeURIComponent(uploadId)}`} /></BingoOrganizerDisclosure>
           <aside className="space-y-5">
             {canConfigure ? <section className="wood-panel p-5"><p className="text-xs font-black uppercase tracking-[0.12em] text-[#d7ae50]">Hall announcement</p><textarea className="realm-field mt-3 min-h-24 w-full p-3 text-xs normal-case" maxLength={500} placeholder="Tell every team about a rule, break, or deadline…" value={announcement} onChange={(event) => setAnnouncement(event.target.value)} /><button className="scroll-button mt-2 w-full px-3 py-2 text-xs" disabled={!announcement.trim() || working === 'announcement'} onClick={() => void postAnnouncement()}>{working === 'announcement' ? 'Posting…' : 'Post announcement'}</button></section> : null}
             <BingoCollaboratorsPanel eventId={eventId} accessRole={data.viewer.accessRole ?? 'owner'} onNotice={setSuccess} onError={setError} />
-            <BingoManualScorekeeper data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} />
+            <BingoOrganizerDisclosure description="Enter exact progress, complete tiles, or remove the latest score." eyebrow="Manual scorekeeper" title="Correct progress safely."><BingoManualScorekeeper embedded data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} /></BingoOrganizerDisclosure>
             {canConfigure ? <BingoRuneliteOrganizerPanel base={base} onNotice={setSuccess} onError={setError} /> : null}
             {canConfigure ? <BingoWiseOldManPanel data={data} base={base} onRefresh={() => load(true)} onNotice={setSuccess} onError={setError} /> : null}
             <BingoVerificationPanel hideQueue data={data} working={working} preview={verificationPreview} onResolve={resolveCandidate} onReplay={replayVerification} onSignal={submitVerificationSignal} />

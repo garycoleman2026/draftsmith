@@ -1,11 +1,12 @@
 import { createHashedCredential } from './access-tokens';
 import { bingoActivityInsert, BingoError, chunkedBatch, uniqueBingoSlug } from './bingo';
+import { BINGO_TEAM_COLOR_OPTIONS } from './bingo-team-colors';
 import type { BingoTemplateDefinition } from './bingo-types';
 import { getDatabase } from './db';
 import type { DraftResult, BingoBoardScope, BingoMode } from './types';
 import { normalizeRsn } from './validation';
 
-const TEAM_COLORS = ['#3f6a45', '#714a79', '#9b542f', '#2f6875', '#8a7330', '#88424a', '#506b8b', '#6f693c'];
+const TEAM_COLORS = BINGO_TEAM_COLOR_OPTIONS.map((option) => option.value);
 const TEAM_EMBLEMS = ['dragon', 'raven', 'stag', 'wolf', 'phoenix', 'boar', 'owl', 'lion'];
 
 export type BingoEventSnapshotInput = {

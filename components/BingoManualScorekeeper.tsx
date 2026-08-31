@@ -3,12 +3,14 @@
 import { useMemo, useState } from 'react';
 import type { BingoViewData } from '../lib/bingo-view-types';
 import type { BingoTaskImageKind } from '../lib/bingo-rules';
+import { InlineConfirmation } from './InlineConfirmation';
 
 export function BingoManualScorekeeper({
-  data, base, onRefresh, onNotice, onError,
+  data, base, embedded = false, onRefresh, onNotice, onError,
 }: {
   data: BingoViewData;
   base: string;
+  embedded?: boolean;
   onRefresh: () => Promise<void>;
   onNotice: (message: string) => void;
   onError: (message: string) => void;
@@ -23,6 +25,7 @@ export function BingoManualScorekeeper({
   const [targetValue, setTargetValue] = useState(String(initialProgress?.targetValue ?? firstTask?.rule.verifier.amount ?? 1));
   const [reason, setReason] = useState('');
   const [working, setWorking] = useState('');
+  const [confirmation, setConfirmation] = useState<'complete' | 'reopen' | null>(null);
   const [title, setTitle] = useState(firstTask?.title ?? '');
   const [description, setDescription] = useState(firstTask?.description ?? '');
   const [category, setCategory] = useState(firstTask?.category ?? '');
@@ -60,7 +63,6 @@ export function BingoManualScorekeeper({
   async function apply(action: 'set_progress' | 'complete' | 'reopen' | 'reset_progress' | 'edit_content') {
     if (!task) return;
     if (reason.trim().length < 3) { onError('Add a short organizer reason before making a manual change.'); return; }
-    if (['complete', 'reopen'].includes(action) && !window.confirm(action === 'complete' ? `Mark ${task.title} complete for ${team?.name}?` : `Reopen ${task.title} for ${team?.name} and remove its latest score?`)) return;
     setWorking(action); onError('');
     try {
       const response = await fetch(`${base}/tasks/${encodeURIComponent(task.id)}/manual`, {
@@ -83,14 +85,19 @@ export function BingoManualScorekeeper({
       if (action === 'reset_progress') setProgressValue('0');
       setReason(''); await onRefresh();
     } catch (cause) { onError(cause instanceof Error ? cause.message : 'The manual change could not be saved.'); }
-    finally { setWorking(''); }
+    finally { setWorking(''); setConfirmation(null); }
+  }
+
+  function requestConfirmation(action: 'complete' | 'reopen') {
+    if (reason.trim().length < 3) { onError('Add a short organizer reason before making a manual change.'); return; }
+    onError(''); setConfirmation(action);
   }
 
   if (!task || !team) return null;
   return (
-    <section className="parchment-panel p-5 text-[#342817]">
-      <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Manual scorekeeper</p><h2 className="fantasy-title mt-1 text-2xl font-bold">Correct progress safely.</h2></div><span className="rounded bg-[#6a512b]/10 px-2 py-1 text-[9px] font-black uppercase text-[#6a511f]">Audited</span></div>
-      <p className="mt-2 text-xs leading-relaxed text-[#6e5e43]">Set exact progress, complete a tile, or reopen the latest completion. Every action requires a reason and appears in the event history.</p>
+    <section className={`${embedded ? '' : 'parchment-panel p-5'} text-[#342817]`}>
+      {!embedded ? <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Manual scorekeeper</p><h2 className="fantasy-title mt-1 text-2xl font-bold">Correct progress safely.</h2></div><span className="rounded bg-[#6a512b]/10 px-2 py-1 text-[9px] font-black uppercase text-[#6a511f]">Audited</span></div> : null}
+      <p className={`${embedded ? '' : 'mt-2'} text-xs leading-relaxed text-[#6e5e43]`}>Set exact progress, complete a tile, or reopen the latest completion. Every action requires a reason and appears in the event history.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-[10px] font-black uppercase text-[#65583f] sm:col-span-2">Tile<select className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" value={task.id} onChange={(event) => chooseTask(event.target.value)}>{data.tasks.map((item) => <option key={item.id} value={item.id}>#{item.sortOrder + 1} · {item.title}</option>)}</select></label>
         <label className="text-[10px] font-black uppercase text-[#65583f]">Team<select className="realm-field mt-1 h-11 w-full px-3 text-xs normal-case" value={team.id} onChange={(event) => chooseTeam(event.target.value)}>{data.teams.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -100,7 +107,18 @@ export function BingoManualScorekeeper({
         <label className="text-[10px] font-black uppercase text-[#65583f] sm:col-span-2">Required organizer reason<textarea className="realm-field mt-1 min-h-20 w-full p-3 text-sm normal-case" maxLength={500} placeholder="Why is this being entered or corrected?" value={reason} onChange={(event) => setReason(event.target.value)} /></label>
       </div>
       <div className="mt-3 rounded border border-[#8b6a32]/25 bg-[#f5e5b8]/65 p-3 text-xs text-[#5c4a30]"><b>{completionCount} scored completion{completionCount === 1 ? '' : 's'}</b> · manual progress {progress ? `${progress.progressValue} / ${progress.targetValue}` : 'not set'}</div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2"><button className="gold-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || Boolean(working)} onClick={() => void apply('set_progress')} type="button">{working === 'set_progress' ? 'Saving…' : 'Save exact progress'}</button><button className="gold-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || Boolean(working) || task.freeSpace} onClick={() => void apply('complete')} type="button">{working === 'complete' ? 'Scoring…' : 'Mark complete'}</button><button className="scroll-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || !completionCount || Boolean(working)} onClick={() => void apply('reopen')} type="button">{working === 'reopen' ? 'Reopening…' : 'Reopen latest completion'}</button><button className="scroll-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || !progress || Boolean(working)} onClick={() => void apply('reset_progress')} type="button">Reset manual progress</button></div>
+      {confirmation ? <InlineConfirmation
+        busy={Boolean(working)}
+        cancelLabel="Not yet"
+        confirmLabel={confirmation === 'complete' ? 'Confirm completion' : 'Confirm reopening'}
+        description={confirmation === 'complete'
+          ? `This will score ${task.title} for ${team.name}.`
+          : `The latest score for ${task.title} will be removed from ${team.name}.`}
+        onCancel={() => setConfirmation(null)}
+        onConfirm={() => void apply(confirmation)}
+        title={confirmation === 'complete' ? 'Mark this tile complete?' : 'Reopen this completion?'}
+      /> : null}
+      <div className="mt-4 grid gap-2 sm:grid-cols-2"><button className="gold-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || Boolean(working)} onClick={() => void apply('set_progress')} type="button">{working === 'set_progress' ? 'Saving…' : 'Save exact progress'}</button><button className="gold-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || Boolean(working) || task.freeSpace} onClick={() => requestConfirmation('complete')} type="button">{working === 'complete' ? 'Scoring…' : 'Mark complete'}</button><button className="scroll-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || !completionCount || Boolean(working)} onClick={() => requestConfirmation('reopen')} type="button">{working === 'reopen' ? 'Reopening…' : 'Reopen latest completion'}</button><button className="scroll-button px-3 py-2.5 text-xs" disabled={!scorekeepingOpen || !progress || Boolean(working)} onClick={() => void apply('reset_progress')} type="button">Reset manual progress</button></div>
       {!scorekeepingOpen ? <p className="mt-3 text-[10px] font-bold text-[#7a5c26]">Progress controls open when the event starts. Tile wording can still be clarified below.</p> : null}
 
       <details className="mt-5 border-t border-[#8b6a32]/25 pt-4">

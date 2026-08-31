@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BingoViewData, BingoViewTask } from '../lib/bingo-view-types';
 import { BingoBoard, BingoStandings } from './BingoBoard';
 import { BingoRuneliteTeamPanel } from './BingoRuneliteTeamPanel';
+import { BingoTeamColourPicker } from './BingoTeamColourPicker';
 import { SiteHeader } from './SiteHeader';
 
 export function BingoTeamBoard({ token }: { token: string }) {
@@ -15,6 +16,7 @@ export function BingoTeamBoard({ token }: { token: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
   const [working, setWorking] = useState(false);
+  const [colourWorking, setColourWorking] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const load = useCallback(async (quiet = false) => {
@@ -66,6 +68,20 @@ export function BingoTeamBoard({ token }: { token: string }) {
     finally { setWorking(false); }
   }
 
+  async function saveTeamColour(color: string) {
+    setColourWorking(true); setError(''); setSuccess('');
+    try {
+      const response = await fetch(`/api/bingo/team/${encodeURIComponent(token)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ color }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'The team colour could not be saved.');
+      setSuccess('Your team colour is saved and completed tiles now use it.');
+      await load(true);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'The team colour could not be saved.'); }
+    finally { setColourWorking(false); }
+  }
+
   if (!data || !ownTeam) return <LoadingScreen error={error} />;
   return (
     <main className="realm-bg min-h-screen text-[#eadcb9]">
@@ -84,6 +100,12 @@ export function BingoTeamBoard({ token }: { token: string }) {
             <BingoBoard data={data} teamId={ownTeam.id} selectedTaskId={selectedTaskId} evidenceHref={(uploadId) => `/api/bingo/team/${encodeURIComponent(token)}/evidence?uploadId=${encodeURIComponent(uploadId)}`} onSelect={selectTask} />
           </section>
           <aside className="space-y-5">
+            <section className="parchment-panel p-5">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Captain colours</p>
+              <h2 className="fantasy-title mt-1 text-2xl font-bold">Fly your team’s colours.</h2>
+              <p className="mt-2 text-xs leading-relaxed text-[#6e5e43]">This private team link can change how your team and completed tiles appear.</p>
+              <div className="mt-4"><BingoTeamColourPicker label={`${ownTeam.name} colour`} onSave={saveTeamColour} saving={colourWorking} value={ownTeam.color} /></div>
+            </section>
             <section className="parchment-panel p-5">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[#80642b]">Tile claim</p>
               {selectedTask ? <>

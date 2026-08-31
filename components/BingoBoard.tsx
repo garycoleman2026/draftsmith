@@ -10,6 +10,7 @@ import {
   formatExpectedHours,
   formatTaskTime,
 } from '../lib/bingo-rules';
+import { completedTileStyle, readableTextColor } from '../lib/bingo-team-colors';
 import { BingoCompletionCelebration } from './BingoCompletionCelebration';
 import { BingoTaskArtwork } from './BingoTaskArtwork';
 
@@ -57,9 +58,9 @@ export function BingoBoard({
             const selected = selectedTaskId === task.id;
             const competitiveOwnership = data.event.mode === 'lockout'
               || data.event.boardScope === 'shared' && data.event.rules.progression.tileOwnership === 'first_team';
-            const style = competitiveOwnership && ownerTeams[0]
-              ? { borderColor: ownerTeams[0].color }
-              : undefined;
+            const style = isComplete
+              ? { ...completedTileStyle(ownerTeams.map((team) => team.color)), borderColor: ownerTeams[0]?.color }
+              : competitiveOwnership && ownerTeams[0] ? { borderColor: ownerTeams[0].color } : undefined;
             const individualHours = task.concealed ? null : expectedIndividualHours(task.rule);
             const speedTargetSeconds = task.concealed ? null : bingoSpeedTargetSeconds(task.rule);
             return (
@@ -73,26 +74,26 @@ export function BingoBoard({
                 type="button"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isComplete ? 'rounded bg-[#315f36] px-2 py-1 text-[#f5efc9] shadow-inner' : 'text-[#675331]'}`}>
+                  <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isComplete ? 'rounded bg-black/55 px-2 py-1 text-[#fff4cf] shadow-inner' : 'text-[#675331]'}`}>
                     {task.freeSpace ? '◆ Free' : ownPending ? '⌛ Pending' : ownerTeams.length ? '✓ Complete' : task.concealed ? '???' : !task.unlocked ? '🔒 Locked' : task.category}
                   </span>
-                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${isComplete ? 'bg-[#244b2a] text-[#f5efc9]' : 'bg-[#5b4526]/10 text-[#4f3b20]'}`}>
+                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${isComplete ? 'bg-black/55 text-[#fff4cf]' : 'bg-[#5b4526]/10 text-[#4f3b20]'}`}>
                     {task.points === null ? '?' : task.freeSpace ? 'FREE' : `${task.points} pt${task.points === 1 ? '' : 's'}`}
                   </span>
                 </div>
                 {!task.concealed ? <BingoTaskArtwork alt="" className="mx-auto mt-2 h-14 w-14" rule={task.rule} /> : null}
-                <p className="mt-2 text-sm font-black leading-tight text-[#332616]">{task.title}</p>
-                <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#58452d]">{task.description || (task.concealed ? 'Complete another task to reveal this square.' : task.difficulty)}</p>
-                {!task.concealed && !task.freeSpace ? <p className="mt-2 line-clamp-1 text-[9px] font-bold uppercase tracking-[0.04em] text-[#6a511f]">{bingoRuleSummary(task.rule)}</p> : null}
-                {individualHours !== null ? <p className="mt-2 text-[9px] font-black uppercase tracking-[0.05em] text-[#315b39]">{speedTargetSeconds !== null ? `Speed target · ${formatTaskTime(task.rule)}` : `Expected · ${formatExpectedHours(individualHours)} solo`}</p> : null}
+                <p className={`mt-2 text-sm font-black leading-tight ${isComplete ? 'bingo-complete-copy' : 'text-[#332616]'}`}>{task.title}</p>
+                <p className={`mt-2 line-clamp-2 text-[10px] leading-relaxed ${isComplete ? 'bingo-complete-copy' : 'text-[#58452d]'}`}>{task.description || (task.concealed ? 'Complete another task to reveal this square.' : task.difficulty)}</p>
+                {!task.concealed && !task.freeSpace ? <p className={`mt-2 line-clamp-1 text-[9px] font-bold uppercase tracking-[0.04em] ${isComplete ? 'bingo-complete-copy' : 'text-[#6a511f]'}`}>{bingoRuleSummary(task.rule)}</p> : null}
+                {individualHours !== null ? <p className={`mt-2 text-[9px] font-black uppercase tracking-[0.05em] ${isComplete ? 'bingo-complete-copy' : 'text-[#315b39]'}`}>{speedTargetSeconds !== null ? `Speed target · ${formatTaskTime(task.rule)}` : `Expected · ${formatExpectedHours(individualHours)} solo`}</p> : null}
                 {ownerTeams.length ? (
                   <div className="mt-3 flex flex-wrap gap-1">
-                    {ownerTeams.map((team) => <span key={team.id} className="rounded px-1.5 py-1 text-[9px] font-black text-white" style={{ backgroundColor: team.color }}>{team.name}</span>)}
+                    {ownerTeams.map((team) => <span key={team.id} className="rounded border border-white/45 px-1.5 py-1 text-[9px] font-black shadow-sm" style={{ backgroundColor: team.color, color: readableTextColor(team.color) }}>{team.name}</span>)}
                   </div>
                 ) : ownPending ? <p className="mt-3 text-[10px] font-black text-[#80540c]">Awaiting organizer review</p> : null}
-                {proofLabels.length ? <p className="mt-2 line-clamp-1 text-[9px] font-black uppercase tracking-[0.04em] text-[#315b39]" title={proofLabels.join(' · ')}>Proof: {proofLabels.join(' · ')}</p> : null}
-                {manualProgress && !task.concealed ? <div className="mt-2"><div className="flex justify-between gap-2 text-[9px] font-black uppercase text-[#5d4828]"><span className="truncate">{teamId ? 'Progress' : progressTeam?.name ?? 'Progress'}</span><span>{formatProgress(manualProgress.progressValue)} / {formatProgress(manualProgress.targetValue)}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded bg-[#6a512b]/15"><span className="block h-full rounded bg-[#4f7348]" style={{ width: `${Math.min(100, manualProgress.progressValue / Math.max(manualProgress.targetValue, 0.000001) * 100)}%` }} /></div></div> : null}
-                <p className="mt-3 text-[9px] font-black uppercase tracking-[0.06em] text-[#5d4828]">View rules & notes →</p>
+                {proofLabels.length ? <p className={`mt-2 line-clamp-1 text-[9px] font-black uppercase tracking-[0.04em] ${isComplete ? 'bingo-complete-copy' : 'text-[#315b39]'}`} title={proofLabels.join(' · ')}>Proof: {proofLabels.join(' · ')}</p> : null}
+                {manualProgress && !task.concealed ? <div className="mt-2"><div className={`flex justify-between gap-2 text-[9px] font-black uppercase ${isComplete ? 'bingo-complete-copy' : 'text-[#5d4828]'}`}><span className="truncate">{teamId ? 'Progress' : progressTeam?.name ?? 'Progress'}</span><span>{formatProgress(manualProgress.progressValue)} / {formatProgress(manualProgress.targetValue)}</span></div><div className="mt-1 h-1.5 overflow-hidden rounded bg-black/20"><span className="block h-full rounded bg-[#eef4ce]" style={{ width: `${Math.min(100, manualProgress.progressValue / Math.max(manualProgress.targetValue, 0.000001) * 100)}%` }} /></div></div> : null}
+                <p className={`mt-3 text-[9px] font-black uppercase tracking-[0.06em] ${isComplete ? 'bingo-complete-copy' : 'text-[#5d4828]'}`}>View rules & notes →</p>
               </button>
             );
           })}

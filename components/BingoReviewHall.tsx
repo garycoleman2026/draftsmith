@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import type { BingoViewClaim, BingoViewData, BingoViewVerificationCandidate } from '../lib/bingo-view-types';
+import { InlineConfirmation } from './InlineConfirmation';
 
 type ReviewTab = 'review' | 'tracking' | 'archive';
 type ClaimAction = 'approve' | 'reject' | 'reopen';
@@ -17,6 +18,7 @@ export function BingoReviewHall({ data, base, working, onReview, onResolve }: {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [archiveStatus, setArchiveStatus] = useState('all');
   const [search, setSearch] = useState('');
+  const [confirmingClaimId, setConfirmingClaimId] = useState<string | null>(null);
   const pendingClaims = data.claims.filter((claim) => claim.status === 'pending');
   const pendingCandidateIds = new Set(pendingClaims.flatMap((claim) => claim.verificationCandidateId ? [claim.verificationCandidateId] : []));
   const ready = data.verification.candidates.filter((candidate) => candidate.status === 'ready' && !pendingCandidateIds.has(candidate.id));
@@ -37,10 +39,11 @@ export function BingoReviewHall({ data, base, working, onReview, onResolve }: {
 
   async function reviewClaim(claim: BingoViewClaim, action: ClaimAction) {
     const note = notes[claim.id]?.trim() ?? '';
-    if (action === 'reopen' && claim.status === 'approved'
-      && !window.confirm('Reverse this approval? Its points will be removed and progression tiles may relock. Later completions will stay recorded.')) return;
     const saved = await onReview(claim.id, action, note);
-    if (saved) setNotes((current) => ({ ...current, [claim.id]: '' }));
+    if (saved) {
+      setNotes((current) => ({ ...current, [claim.id]: '' }));
+      setConfirmingClaimId(null);
+    }
   }
 
   return (
@@ -71,7 +74,10 @@ export function BingoReviewHall({ data, base, working, onReview, onResolve }: {
         <div className="mt-5 grid gap-3 lg:grid-cols-2">
           {pendingClaims.map((claim) => <ClaimCard
             base={base} claim={claim} data={data} key={claim.id} note={notes[claim.id] ?? ''}
+            confirmingReopen={confirmingClaimId === claim.id}
+            onCancelReopen={() => setConfirmingClaimId(null)}
             onNote={(value) => setNotes((current) => ({ ...current, [claim.id]: value }))}
+            onRequestReopen={() => setConfirmingClaimId(claim.id)}
             onReview={reviewClaim} working={working}
           />)}
           {ready.map((candidate) => <CandidateCard candidate={candidate} data={data} key={candidate.id} working={working} onResolve={onResolve} />)}
@@ -97,7 +103,10 @@ export function BingoReviewHall({ data, base, working, onReview, onResolve }: {
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             {archiveClaims.map((claim) => <ClaimCard
               archive base={base} claim={claim} data={data} key={claim.id} note={notes[claim.id] ?? ''}
+              confirmingReopen={confirmingClaimId === claim.id}
+              onCancelReopen={() => setConfirmingClaimId(null)}
               onNote={(value) => setNotes((current) => ({ ...current, [claim.id]: value }))}
+              onRequestReopen={() => setConfirmingClaimId(claim.id)}
               onReview={reviewClaim} working={working}
             />)}
             {archiveStatus === 'all' && !search.trim() ? dismissed.map((candidate) => <CandidateCard archive candidate={candidate} data={data} key={candidate.id} working={working} onResolve={onResolve} />) : null}
@@ -109,14 +118,17 @@ export function BingoReviewHall({ data, base, working, onReview, onResolve }: {
   );
 }
 
-function ClaimCard({ claim, data, base, working, note, archive = false, onNote, onReview }: {
+function ClaimCard({ claim, data, base, working, note, archive = false, confirmingReopen, onCancelReopen, onNote, onRequestReopen, onReview }: {
   claim: BingoViewClaim;
   data: BingoViewData;
   base: string;
   working: string;
   note: string;
   archive?: boolean;
+  confirmingReopen: boolean;
+  onCancelReopen: () => void;
   onNote: (value: string) => void;
+  onRequestReopen: () => void;
   onReview: (claim: BingoViewClaim, action: ClaimAction) => Promise<void>;
 }) {
   const task = data.tasks.find((item) => item.id === claim.taskId);
@@ -145,7 +157,14 @@ function ClaimCard({ claim, data, base, working, note, archive = false, onNote, 
       {pending ? <>
         <input className="realm-field mt-3 h-10 w-full px-3 text-xs normal-case" placeholder="Review note (required when rejecting)" value={note} onChange={(event) => onNote(event.target.value)} />
         <div className="mt-2 grid grid-cols-2 gap-2"><button className="gold-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void onReview(claim, 'approve')}>Approve & score</button><button className="scroll-button px-3 py-2 text-xs" disabled={working.endsWith(claim.id) || !note.trim()} onClick={() => void onReview(claim, 'reject')}>Reject</button></div>
-      </> : archive && claim.status === 'approved' ? <button className="scroll-button mt-3 w-full px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void onReview(claim, 'reopen')}>Reverse approval</button>
+      </> : archive && claim.status === 'approved' ? confirmingReopen ? <InlineConfirmation
+        busy={working.endsWith(claim.id)}
+        confirmLabel="Confirm reversal"
+        description="Its points will be removed and progression tiles may relock. Later completions stay recorded."
+        onCancel={onCancelReopen}
+        onConfirm={() => void onReview(claim, 'reopen')}
+        title="Reverse this approval?"
+      /> : <button className="scroll-button mt-3 w-full px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={onRequestReopen}>Reverse approval</button>
         : archive && claim.status === 'rejected' ? <button className="scroll-button mt-3 w-full px-3 py-2 text-xs" disabled={working.endsWith(claim.id)} onClick={() => void onReview(claim, 'reopen')}>Reopen for review</button> : null}
     </article>
   );

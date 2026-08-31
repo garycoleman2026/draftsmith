@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { collectNewBingoCompletions } from '../lib/bingo-notifications';
 import { calculateBingoStandings, claimAvailability, countCompletedLines, nextCompletionNumber } from '../lib/bingo-scoring';
+import { completedTileStyle, normalizeBingoTeamColor } from '../lib/bingo-team-colors';
 import { BUILTIN_BINGO_TEMPLATES, OSRS_BINGO_PRESETS, OSRS_DEFAULT_BOARD_PRESETS, parseBingoTaskImport, sanitizeBingoTasks, sanitizeBingoTaskDifficulty, serializeBingoTaskImport } from '../lib/bingo-types';
 import {
   defaultBingoEventRules,
@@ -20,6 +21,14 @@ const tasks = Array.from({ length: 25 }, (_, index) => ({
 }));
 
 describe('bingo scoring', () => {
+  it('uses safe assigned team colours on completed tiles', () => {
+    expect(normalizeBingoTeamColor('#A1b2C3')).toBe('#a1b2c3');
+    expect(normalizeBingoTeamColor('red')).toBeNull();
+    expect(completedTileStyle(['#3f6a45'])).toMatchObject({ backgroundColor: '#3f6a45', color: '#fff4cf' });
+    expect(completedTileStyle(['#f4df9b'])).toMatchObject({ backgroundColor: '#f4df9b', color: '#24180d' });
+    expect(completedTileStyle(['#3f6a45', '#714a79']).backgroundImage).toContain('#714a79');
+  });
+
   it('celebrates only completions that arrive after the board opens', () => {
     const seen = new Set(['completion-1']);
     expect(collectNewBingoCompletions([{ id: 'completion-1' }, { id: 'completion-2' }], seen)).toEqual([{ id: 'completion-2' }]);
