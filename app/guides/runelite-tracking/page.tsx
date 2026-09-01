@@ -25,6 +25,7 @@ export default function TrackingGuidePage() {
       <li>The player enables sharing after RuneLite shows the third-party-server warning, reviews the disclosure, and enters the code while logged into the exact character.</li>
       <li>The service returns a revocable event credential. It is not a Jagex or RuneLite account token.</li>
       <li>The plugin downloads a capture plan and ignores gameplay events that are irrelevant to the current board.</li>
+      <li>The player can press <strong>Test connection</strong>. Organizers see the test, board check time, and recent signal outcomes in one live feed.</li>
     </ol>
 
     <h2>What leaves the client—and what does not.</h2>
@@ -52,7 +53,7 @@ export default function TrackingGuidePage() {
     <ol>
       <li>Clone the <a href="https://github.com/garycoleman2026/terrys-drafting-runelite" target="_blank" rel="noreferrer">public plugin repository</a> and use Java 11.</li>
       <li>Run the unit suite with <code>./gradlew test</code>, then launch developer mode with <code>./gradlew run</code>.</li>
-      <li>Use a disposable event and test one XP task, one matching drop, one manual claim, one disconnect, and one switched-character rejection.</li>
+      <li>Use a disposable event. Press <strong>Test connection</strong>, then test one XP task, one matching drop, one no-match signal, one manual claim, one disconnect, and one switched-character rejection.</li>
       <li>Confirm the overlay in real gameplay before any Plugin Hub submission.</li>
     </ol>
     <p>See the concise <Link href="/runelite">pairing and privacy page</Link>, or return to the <Link href="/guides/osrs-clan-bingo">event organizer guide</Link>.</p>

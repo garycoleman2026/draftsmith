@@ -13,8 +13,8 @@ export const metadata: Metadata = {
 const steps = [
   ['1', 'Join the event', 'Open your private team board and ask for a pairing code.'],
   ['2', 'Pair your character', 'Enter the one-use code in the plugin while logged into that character.'],
-  ['3', 'Play normally', 'The panel shows your team, score, open tasks, and progress.'],
-  ['4', 'Review the claim', 'Matching activity reaches Terry. The organizer stays in control of approval.'],
+  ['3', 'Test the bridge', 'Press Test connection and watch it appear in the organizer’s live feed.'],
+  ['4', 'Play normally', 'Each signal says whether it scored, needs review, counted, or matched no tile.'],
 ] as const;
 
 export default function RunelitePage() {
@@ -56,7 +56,7 @@ export default function RunelitePage() {
               <li><b>1.</b> Install Java 11 and clone the plugin repository.</li>
               <li><b>2.</b> Run <code>gradlew.bat test</code> on Windows.</li>
               <li><b>3.</b> Run <code>gradlew.bat run</code> to open RuneLite in developer mode.</li>
-              <li><b>4.</b> Test pairing, XP, one drop, a manual claim, restart recovery, disconnect, and character switching.</li>
+              <li><b>4.</b> Test the connection, XP, one drop, a manual claim, restart recovery, disconnect, and character switching.</li>
             </ol>
           </div>
           <div className="parchment-panel p-6 text-[#433520] sm:p-8">

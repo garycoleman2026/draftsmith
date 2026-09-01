@@ -1,11 +1,12 @@
 import { recordAudit } from './audit';
 import { BingoError, bingoActivityInsert, loadBingoView, parseJson } from './bingo';
 import {
+  classifyRuneliteObservation,
   DEFAULT_RUNELITE_SCOPES, RUNELITE_DISCLOSURE_VERSION, canonicalRunelitePairingCode,
   makeRunelitePairingCode, parseRuneliteDeviceCredential, runeliteDeviceCredential, runelitePrivacy,
-  sanitizeRuneliteObservation, sanitizeRuneliteScopes, type RuneliteScope,
+  runeliteConnectionState, sanitizeRuneliteObservation, sanitizeRuneliteScopes, type RuneliteScope,
 } from './bingo-runelite-core';
-import { ingestVerificationSignal } from './bingo-verification';
+import { ingestVerificationSignal, type BingoVerificationSignal } from './bingo-verification';
 import { getDatabase } from './db';
 import { scheduleDiscordEvent } from './discord-webhooks';
 import { hashToken, randomToken } from './security';
@@ -22,8 +23,8 @@ type IntegrationRow = {
 type DeviceRow = {
   id: string; event_id: string; team_id: string; member_id: string; pairing_id: string;
   device_name: string; plugin_version: string; scopes_json: string; disclosure_version: number;
-  last_rsn: string; last_seen_at: string; expires_at: string; revoked_at: string | null;
-  revoked_by: string | null; created_at: string; display_name?: string;
+  last_rsn: string; last_seen_at: string; last_overlay_at: string | null; expires_at: string; revoked_at: string | null;
+  revoked_by: string | null; created_at: string; display_name?: string; last_batch_at?: string | null;
 };
 type DeviceContextRow = DeviceRow & {
   draft_id: string; event_title: string; event_status: string; public_slug: string; revision: number;
@@ -35,6 +36,20 @@ type PairingRow = {
   consumed_at: string | null; revoked_at: string | null; display_name: string; normalized_name: string;
   event_title: string; event_status: string; draft_id: string; team_name: string;
   enabled: number; scopes_json: string; disclosure_version: number;
+};
+type DiagnosticRow = {
+  id: string; event_id: string; team_id: string; member_id: string; device_id: string;
+  kind: string; status: string; summary: string; details_json: string; created_at: string;
+  display_name?: string; team_name?: string;
+};
+type RuneliteBatchCandidate = {
+  taskId: string; taskTitle?: string; status: 'progress' | 'ready' | 'accepted' | 'dismissed';
+  progressValue: number; targetValue: number; confidence: string;
+};
+type RuneliteBatchResult = {
+  clientEventId: string; signalType?: string; label?: string;
+  status: 'scored' | 'review' | 'counted' | 'ignored' | 'duplicate' | 'rejected';
+  message: string; candidates: RuneliteBatchCandidate[];
 };
 
 export type RuneliteDeviceContext = {
@@ -53,6 +68,8 @@ export type RuneliteDeviceContext = {
   pluginVersion: string;
   scopes: RuneliteScope[];
   draftId: string;
+  lastSeenAt: string;
+  lastOverlayAt: string | null;
 };
 
 export async function configureRunelite(input: { eventId: string; enabled: boolean; scopes: unknown }) {
@@ -89,23 +106,41 @@ export async function configureRunelite(input: { eventId: string; enabled: boole
 export async function getRuneliteStatus(eventId: string, teamId?: string | null) {
   const db = getDatabase();
   const now = new Date().toISOString();
-  const [integration, devices] = await Promise.all([
+  const binding = teamId ? [eventId, now, teamId] : [eventId, now];
+  const diagnosticBinding = teamId ? [eventId, teamId] : [eventId];
+  const [integration, devices, diagnostics] = await Promise.all([
     loadIntegration(eventId),
     db.prepare(
       `SELECT brd.id, brd.event_id, brd.team_id, brd.member_id, brd.pairing_id, brd.device_name,
               brd.plugin_version, brd.scopes_json, brd.disclosure_version, brd.last_rsn, brd.last_seen_at,
-              brd.expires_at, brd.revoked_at, brd.revoked_by, brd.created_at, btm.display_name
+              brd.last_overlay_at, brd.expires_at, brd.revoked_at, brd.revoked_by, brd.created_at, btm.display_name,
+              (SELECT MAX(brb.created_at) FROM bingo_runelite_batches brb WHERE brb.device_id = brd.id) AS last_batch_at
        FROM bingo_runelite_devices brd
        JOIN bingo_team_members btm ON btm.id = brd.member_id
        WHERE brd.event_id = ? AND brd.revoked_at IS NULL AND brd.expires_at > ?${teamId ? ' AND brd.team_id = ?' : ''}
        ORDER BY btm.display_name, brd.created_at DESC`,
-    ).bind(...(teamId ? [eventId, now, teamId] : [eventId, now])).all<DeviceRow>(),
+    ).bind(...binding).all<DeviceRow>(),
+    db.prepare(
+      `SELECT brx.id, brx.event_id, brx.team_id, brx.member_id, brx.device_id, brx.kind, brx.status,
+              brx.summary, brx.details_json, brx.created_at, btm.display_name, bt.name AS team_name
+       FROM bingo_runelite_diagnostics brx
+       JOIN bingo_team_members btm ON btm.id = brx.member_id
+       JOIN bingo_teams bt ON bt.id = brx.team_id
+       WHERE brx.event_id = ?${teamId ? ' AND brx.team_id = ?' : ''}
+       ORDER BY brx.created_at DESC LIMIT 80`,
+    ).bind(...diagnosticBinding).all<DiagnosticRow>(),
   ]);
   const privacy = runelitePrivacy(Boolean(integration?.enabled), parseJson(integration?.scopes_json, DEFAULT_RUNELITE_SCOPES));
+  const latestByDevice = new Map<string, DiagnosticRow>();
+  for (const diagnostic of diagnostics.results) {
+    if (!latestByDevice.has(diagnostic.device_id)) latestByDevice.set(diagnostic.device_id, diagnostic);
+  }
   return {
     ...privacy,
     activeDeviceCount: devices.results.length,
-    devices: devices.results.map(deviceView),
+    onlineDeviceCount: devices.results.filter((device) => runeliteConnectionState(device.last_seen_at) === 'online').length,
+    devices: devices.results.map((device) => deviceView(device, latestByDevice.get(device.id))),
+    activity: diagnostics.results.map(diagnosticView),
   };
 }
 
@@ -240,7 +275,7 @@ export async function redeemRunelitePairing(input: {
     privacy: runelitePrivacy(true, requestedScopes),
     endpoints: {
       events: '/api/runelite/events', overlay: '/api/runelite/overlay', claims: '/api/runelite/claims',
-      device: '/api/runelite/device',
+      device: '/api/runelite/device', diagnostics: '/api/runelite/diagnostics',
     },
   };
 }
@@ -255,7 +290,7 @@ export async function requireRuneliteDevice(request: Request, options: { require
   const row = await db.prepare(
     `SELECT brd.id, brd.event_id, brd.team_id, brd.member_id, brd.pairing_id, brd.device_name,
             brd.plugin_version, brd.scopes_json, brd.disclosure_version, brd.last_rsn, brd.last_seen_at,
-            brd.expires_at, brd.revoked_at, brd.revoked_by, brd.created_at,
+            brd.last_overlay_at, brd.expires_at, brd.revoked_at, brd.revoked_by, brd.created_at,
             be.draft_id, be.title AS event_title, be.status AS event_status, be.public_slug, be.revision,
             bt.name AS team_name, bt.color AS team_color, btm.display_name, btm.normalized_name,
             bri.enabled AS integration_enabled, bri.scopes_json AS integration_scopes_json
@@ -285,12 +320,58 @@ export async function requireRuneliteDevice(request: Request, options: { require
     memberName: row.display_name, normalizedName: row.normalized_name, eventTitle: row.event_title,
     eventStatus: row.event_status, publicSlug: row.public_slug, revision: row.revision,
     teamName: row.team_name, teamColor: row.team_color, pluginVersion: row.plugin_version,
-    scopes, draftId: row.draft_id,
+    scopes, draftId: row.draft_id, lastSeenAt: row.last_seen_at, lastOverlayAt: row.last_overlay_at,
+  };
+}
+
+export async function markRuneliteOverlaySeen(device: RuneliteDeviceContext) {
+  const now = new Date();
+  if (device.lastOverlayAt && Date.parse(device.lastOverlayAt) > now.getTime() - 30_000) return;
+  const value = now.toISOString();
+  await getDatabase().prepare(
+    'UPDATE bingo_runelite_devices SET last_seen_at = ?, last_overlay_at = ? WHERE id = ? AND event_id = ?',
+  ).bind(value, value, device.id, device.eventId).run();
+}
+
+export async function testRuneliteConnection(device: RuneliteDeviceContext) {
+  const now = new Date().toISOString();
+  const db = getDatabase();
+  const board = await db.prepare(
+    `SELECT COUNT(*) AS count FROM bingo_tasks
+     WHERE event_id = ? AND hidden = 0 AND rule_json LIKE '%"runelite"%'`,
+  ).bind(device.eventId).first<{ count: number }>();
+  const live = device.eventStatus === 'live';
+  const summary = live
+    ? `${device.memberName} passed a RuneLite connection test.`
+    : `${device.memberName} connected, but the bingo is ${device.eventStatus}.`;
+  await db.batch([
+    dbDiagnosticInsert(device, {
+      kind: 'test', status: live ? 'success' : 'waiting', summary,
+      details: { eventStatus: device.eventStatus, captureRuleCount: board?.count ?? 0 }, now,
+    }),
+    db.prepare('UPDATE bingo_runelite_devices SET last_seen_at = ? WHERE id = ?').bind(now, device.id),
+  ]);
+  await trimRuneliteDiagnostics(device.eventId).catch(() => undefined);
+  return {
+    status: live ? 'success' as const : 'waiting' as const,
+    message: live
+      ? `Connection passed. ${board?.count ?? 0} board task${board?.count === 1 ? ' is' : 's are'} configured for RuneLite signals.`
+      : `Connection passed, but gameplay signals will wait until the bingo is live.`,
+    eventStatus: device.eventStatus,
+    captureRuleCount: board?.count ?? 0,
+    serverTime: now,
   };
 }
 
 export async function ingestRuneliteBatch(device: RuneliteDeviceContext, value: unknown) {
-  if (device.eventStatus !== 'live') throw new BingoError('RuneLite observations are accepted only while the bingo is live.', 409);
+  if (device.eventStatus !== 'live') {
+    await recordRuneliteDiagnostic(device, {
+      kind: 'batch', status: 'ignored',
+      summary: `${device.memberName}'s RuneLite signals were ignored because the bingo is ${device.eventStatus}.`,
+      details: { eventStatus: device.eventStatus },
+    });
+    throw new BingoError('RuneLite observations are accepted only while the bingo is live.', 409);
+  }
   const body = objectValue(value);
   const batchKey = strictIdentifier(body.batchKey, 8, 64, 'RuneLite batches need a stable batch key.');
   if (!Array.isArray(body.observations) || !body.observations.length || body.observations.length > 25) {
@@ -303,10 +384,13 @@ export async function ingestRuneliteBatch(device: RuneliteDeviceContext, value: 
   ).bind(device.id, batchKey).first<{
     event_count: number; accepted_count: number; duplicate_count: number; rejected_count: number; created_at: string;
   }>();
-  if (existing) return { batchKey, replayed: true, ...batchSummary(existing), results: [] };
+  if (existing) return {
+    batchKey, replayed: true, ...batchSummary(existing), matchedCount: 0, ignoredCount: 0,
+    scoredCount: 0, reviewCount: 0, message: 'This batch was already received safely.', results: [],
+  };
   let acceptedCount = 0;
   let duplicateCount = 0;
-  const results: Array<Record<string, unknown>> = [];
+  const results: RuneliteBatchResult[] = [];
   for (const observation of body.observations) {
     let clientEventId = '';
     try {
@@ -319,23 +403,48 @@ export async function ingestRuneliteBatch(device: RuneliteDeviceContext, value: 
       });
       if (ingested.duplicate) duplicateCount += 1;
       else acceptedCount += 1;
+      const candidates = ingested.candidates.map((candidate) => ({
+        taskId: candidate.taskId, status: candidate.status, progressValue: candidate.progressValue,
+        targetValue: candidate.targetValue, confidence: candidate.confidence,
+      }));
+      const status = classifyRuneliteObservation(ingested.duplicate, candidates.map((candidate) => candidate.status));
+      const label = runeliteSignalLabel(normalized.signal);
       results.push({
-        clientEventId, status: ingested.duplicate ? 'duplicate' : 'accepted',
-        candidates: ingested.candidates.map((candidate) => ({
-          taskId: candidate.taskId, status: candidate.status, progressValue: candidate.progressValue,
-          targetValue: candidate.targetValue, confidence: candidate.confidence,
-        })),
+        clientEventId, signalType: normalized.signal.signalType, label, status, candidates,
+        message: '',
       });
     } catch (error) {
       results.push({
         clientEventId: clientEventId || observationIdentifier(observation), status: 'rejected',
-        error: error instanceof Error && (error instanceof BingoError ? error.status < 500 : true)
+        message: error instanceof Error && (error instanceof BingoError ? error.status < 500 : true)
           ? error.message : 'The observation could not be processed.',
+        candidates: [],
       });
     }
   }
+  const taskIds = [...new Set(results.flatMap((result) => result.candidates.map((candidate) => candidate.taskId)))];
+  const taskTitles = new Map<string, string>();
+  if (taskIds.length) {
+    const placeholders = taskIds.map(() => '?').join(',');
+    const tasks = await db.prepare(`SELECT id, title FROM bingo_tasks WHERE event_id = ? AND id IN (${placeholders})`)
+      .bind(device.eventId, ...taskIds).all<{ id: string; title: string }>();
+    tasks.results.forEach((task) => taskTitles.set(task.id, task.title));
+  }
+  for (const result of results) {
+    result.candidates.forEach((candidate) => { candidate.taskTitle = taskTitles.get(candidate.taskId) ?? 'Bingo tile'; });
+    if (!result.message) result.message = runeliteOutcomeMessage(result);
+  }
   const rejectedCount = results.length - acceptedCount - duplicateCount;
+  const matchedCount = results.filter((result) => ['counted', 'review', 'scored'].includes(result.status)).length;
+  const ignoredCount = results.filter((result) => result.status === 'ignored').length;
+  const scoredCount = results.filter((result) => result.status === 'scored').length;
+  const reviewCount = results.filter((result) => result.status === 'review').length;
   const createdAt = new Date().toISOString();
+  const summary = runeliteBatchMessage(device.memberName, {
+    eventCount: results.length, matchedCount, ignoredCount, rejectedCount, duplicateCount, scoredCount, reviewCount,
+  });
+  const diagnosticStatus = rejectedCount ? 'attention' : ignoredCount && !matchedCount ? 'ignored'
+    : scoredCount ? 'scored' : reviewCount ? 'review' : 'received';
   try {
     await db.batch([
       db.prepare(
@@ -345,6 +454,11 @@ export async function ingestRuneliteBatch(device: RuneliteDeviceContext, value: 
       ).bind(crypto.randomUUID(), device.id, batchKey, body.observations.length,
         acceptedCount, duplicateCount, rejectedCount, createdAt),
       db.prepare('UPDATE bingo_runelite_devices SET last_seen_at = ? WHERE id = ?').bind(createdAt, device.id),
+      dbDiagnosticInsert(device, {
+        kind: 'batch', status: diagnosticStatus, summary,
+        details: { batchKey, results, matchedCount, ignoredCount, rejectedCount, duplicateCount, scoredCount, reviewCount },
+        now: createdAt,
+      }),
     ]);
   } catch (error) {
     if (/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) {
@@ -354,13 +468,18 @@ export async function ingestRuneliteBatch(device: RuneliteDeviceContext, value: 
       ).bind(device.id, batchKey).first<{
         event_count: number; accepted_count: number; duplicate_count: number; rejected_count: number; created_at: string;
       }>();
-      if (replay) return { batchKey, replayed: true, ...batchSummary(replay), results: [] };
+      if (replay) return {
+        batchKey, replayed: true, ...batchSummary(replay), matchedCount: 0, ignoredCount: 0,
+        scoredCount: 0, reviewCount: 0, message: 'This batch was already received safely.', results: [],
+      };
     }
     throw error;
   }
+  await trimRuneliteDiagnostics(device.eventId).catch(() => undefined);
   return {
     batchKey, replayed: false, eventCount: body.observations.length,
-    acceptedCount, duplicateCount, rejectedCount, createdAt, results,
+    acceptedCount, duplicateCount, rejectedCount, matchedCount, ignoredCount, scoredCount, reviewCount,
+    message: summary, createdAt, results,
   };
 }
 
@@ -485,14 +604,89 @@ export async function revokeRuneliteDevice(input: {
 function loadIntegration(eventId: string) {
   return getDatabase().prepare('SELECT * FROM bingo_runelite_integrations WHERE event_id = ?').bind(eventId).first<IntegrationRow>();
 }
-function deviceView(device: DeviceRow) {
+function deviceView(device: DeviceRow, latest?: DiagnosticRow) {
   return {
     id: device.id, teamId: device.team_id, memberId: device.member_id,
     memberName: device.display_name ?? device.last_rsn, deviceName: device.device_name,
     pluginVersion: device.plugin_version, scopes: sanitizeRuneliteScopes(parseJson(device.scopes_json, []), []),
     disclosureVersion: device.disclosure_version, lastRsn: device.last_rsn,
-    lastSeenAt: device.last_seen_at, expiresAt: device.expires_at, createdAt: device.created_at,
+    connectionState: runeliteConnectionState(device.last_seen_at),
+    lastSeenAt: device.last_seen_at, lastBoardSeenAt: device.last_overlay_at,
+    lastBatchAt: device.last_batch_at ?? null, expiresAt: device.expires_at, createdAt: device.created_at,
+    lastResult: latest ? diagnosticView(latest) : null,
   };
+}
+function diagnosticView(row: DiagnosticRow) {
+  return {
+    id: row.id, deviceId: row.device_id, teamId: row.team_id, memberId: row.member_id,
+    memberName: row.display_name ?? 'Paired player', teamName: row.team_name ?? 'Team',
+    kind: row.kind, status: row.status, summary: row.summary,
+    details: parseJson<Record<string, unknown>>(row.details_json, {}), createdAt: row.created_at,
+  };
+}
+function dbDiagnosticInsert(device: RuneliteDeviceContext, input: {
+  kind: string; status: string; summary: string; details?: Record<string, unknown>; now: string;
+}) {
+  return getDatabase().prepare(
+    `INSERT INTO bingo_runelite_diagnostics
+      (id, event_id, team_id, member_id, device_id, kind, status, summary, details_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(crypto.randomUUID(), device.eventId, device.teamId, device.memberId, device.id,
+    input.kind, input.status, textValue(input.summary, 300), JSON.stringify(input.details ?? {}), input.now);
+}
+async function recordRuneliteDiagnostic(device: RuneliteDeviceContext, input: {
+  kind: string; status: string; summary: string; details?: Record<string, unknown>;
+}) {
+  const now = new Date().toISOString();
+  const db = getDatabase();
+  await db.batch([
+    dbDiagnosticInsert(device, { ...input, now }),
+    db.prepare('UPDATE bingo_runelite_devices SET last_seen_at = ? WHERE id = ?').bind(now, device.id),
+  ]);
+  await trimRuneliteDiagnostics(device.eventId).catch(() => undefined);
+}
+function trimRuneliteDiagnostics(eventId: string) {
+  return getDatabase().prepare(
+    `DELETE FROM bingo_runelite_diagnostics WHERE event_id = ? AND id IN (
+       SELECT id FROM bingo_runelite_diagnostics WHERE event_id = ? ORDER BY created_at DESC LIMIT -1 OFFSET 500
+     )`,
+  ).bind(eventId, eventId).run();
+}
+function runeliteSignalLabel(signal: BingoVerificationSignal) {
+  const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(signal.value ?? 1);
+  if (signal.signalType === 'xp_gain') return `${number} ${signal.metric || 'skill'} XP`;
+  if (signal.signalType === 'level_reached') return `${signal.metric || 'skill'} level ${number}`;
+  if (signal.signalType === 'item_acquired') return `${signal.target || 'item'} drop`;
+  if (signal.signalType === 'pet_obtained') return `${signal.target || 'pet'} drop`;
+  if (signal.signalType === 'boss_kc') return `${signal.metric || signal.target || 'boss'} kill`;
+  if (signal.signalType === 'raid_time') return `${signal.target || 'raid'} time`;
+  if (signal.signalType === 'raid_complete') return `${signal.target || 'raid'} completion`;
+  if (signal.signalType === 'clue_complete') return `${signal.target || 'clue'} completion`;
+  return signal.target || signal.metric || signal.signalType.replaceAll('_', ' ');
+}
+function runeliteOutcomeMessage(result: RuneliteBatchResult) {
+  const label = result.label ?? 'RuneLite signal';
+  const titles = [...new Set(result.candidates.map((candidate) => candidate.taskTitle ?? 'Bingo tile'))];
+  if (result.status === 'ignored') return `${label} was received, but no open board tile matched it.`;
+  if (result.status === 'duplicate') return `${label} was already received and was not counted twice.`;
+  if (result.status === 'scored') return `${label} completed ${titles.join(', ')}.`;
+  if (result.status === 'review') return `${label} is ready for organizer review on ${titles.join(', ')}.`;
+  return `${label} counted toward ${titles.join(', ')}.`;
+}
+function runeliteBatchMessage(memberName: string, counts: {
+  eventCount: number; matchedCount: number; ignoredCount: number; rejectedCount: number;
+  duplicateCount: number; scoredCount: number; reviewCount: number;
+}) {
+  const parts = [
+    counts.scoredCount ? `${counts.scoredCount} scored` : '',
+    counts.reviewCount ? `${counts.reviewCount} ready for review` : '',
+    counts.matchedCount - counts.scoredCount - counts.reviewCount > 0
+      ? `${counts.matchedCount - counts.scoredCount - counts.reviewCount} counted` : '',
+    counts.ignoredCount ? `${counts.ignoredCount} had no matching tile` : '',
+    counts.rejectedCount ? `${counts.rejectedCount} rejected` : '',
+    counts.duplicateCount ? `${counts.duplicateCount} duplicate` : '',
+  ].filter(Boolean);
+  return `${memberName} sent ${counts.eventCount} RuneLite signal${counts.eventCount === 1 ? '' : 's'}${parts.length ? ` — ${parts.join(', ')}` : ''}.`;
 }
 function batchSummary(row: {
   event_count: number; accepted_count: number; duplicate_count: number; rejected_count: number; created_at: string;

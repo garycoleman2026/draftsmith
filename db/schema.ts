@@ -922,6 +922,7 @@ export const bingoRuneliteDevices = sqliteTable(
     disclosureVersion: integer('disclosure_version').notNull().default(1),
     lastRsn: text('last_rsn').notNull(),
     lastSeenAt: text('last_seen_at').notNull(),
+    lastOverlayAt: text('last_overlay_at'),
     expiresAt: text('expires_at').notNull(),
     revokedAt: text('revoked_at'),
     revokedBy: text('revoked_by'),
@@ -952,6 +953,26 @@ export const bingoRuneliteBatches = sqliteTable(
   (table) => [
     uniqueIndex('bingo_runelite_batches_device_key_unique').on(table.deviceId, table.batchKey),
     index('idx_bingo_runelite_batches_device_created').on(table.deviceId, table.createdAt),
+  ],
+);
+
+export const bingoRuneliteDiagnostics = sqliteTable(
+  'bingo_runelite_diagnostics',
+  {
+    id: text('id').primaryKey().notNull(),
+    eventId: text('event_id').notNull().references(() => bingoEvents.id, { onDelete: 'cascade' }),
+    teamId: text('team_id').notNull().references(() => bingoTeams.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').notNull().references(() => bingoTeamMembers.id, { onDelete: 'cascade' }),
+    deviceId: text('device_id').notNull().references(() => bingoRuneliteDevices.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    status: text('status').notNull(),
+    summary: text('summary').notNull(),
+    detailsJson: text('details_json').notNull().default('{}'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_bingo_runelite_diagnostics_event_created').on(table.eventId, table.createdAt),
+    index('idx_bingo_runelite_diagnostics_device_created').on(table.deviceId, table.createdAt),
   ],
 );
 

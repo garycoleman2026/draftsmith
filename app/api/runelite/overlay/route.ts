@@ -1,5 +1,5 @@
 import { bingoErrorResponse } from '@/lib/bingo';
-import { buildRuneliteOverlay, requireRuneliteDevice } from '@/lib/bingo-runelite';
+import { buildRuneliteOverlay, markRuneliteOverlaySeen, requireRuneliteDevice } from '@/lib/bingo-runelite';
 import { ensureSchema, json } from '@/lib/db';
 import { enforceRateLimit, RateLimitError, rateLimitResponse } from '@/lib/rate-limit';
 
@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     await ensureSchema();
     const device = await requireRuneliteDevice(request);
     await enforceRateLimit({ request, scope: 'runelite-overlay', limit: 150, windowSeconds: 600, subject: device.id });
+    await markRuneliteOverlaySeen(device);
     const etag = `W/\"rl-${device.eventId}-${device.teamId}-${device.revision}\"`;
     if (request.headers.get('if-none-match') === etag) {
       return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': 'private, no-cache' } });

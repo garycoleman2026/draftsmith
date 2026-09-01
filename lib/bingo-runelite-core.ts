@@ -25,6 +25,29 @@ export type RuneliteObservationResult = {
   signal: BingoVerificationSignal;
 };
 
+export type RuneliteConnectionState = 'online' | 'idle' | 'offline' | 'waiting';
+export type RuneliteObservationOutcome = 'scored' | 'review' | 'counted' | 'ignored' | 'duplicate';
+
+export function runeliteConnectionState(lastContactAt: string | null | undefined, now = Date.now()): RuneliteConnectionState {
+  if (!lastContactAt) return 'waiting';
+  const age = now - Date.parse(lastContactAt);
+  if (!Number.isFinite(age) || age < 0) return 'waiting';
+  if (age <= 60_000) return 'online';
+  if (age <= 5 * 60_000) return 'idle';
+  return 'offline';
+}
+
+export function classifyRuneliteObservation(
+  duplicate: boolean,
+  candidateStatuses: Array<'progress' | 'ready' | 'accepted' | 'dismissed'>,
+): RuneliteObservationOutcome {
+  if (duplicate) return 'duplicate';
+  if (!candidateStatuses.length) return 'ignored';
+  if (candidateStatuses.includes('accepted')) return 'scored';
+  if (candidateStatuses.includes('ready')) return 'review';
+  return 'counted';
+}
+
 export function sanitizeRuneliteScopes(value: unknown, fallback: RuneliteScope[] = DEFAULT_RUNELITE_SCOPES) {
   if (!Array.isArray(value)) return [...fallback];
   return [...new Set(value.filter((scope): scope is RuneliteScope =>

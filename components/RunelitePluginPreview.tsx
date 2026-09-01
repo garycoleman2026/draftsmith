@@ -46,7 +46,10 @@ export function RunelitePluginPreview() {
           <div className="rounded border border-[#51452f] bg-[#1c1b18] p-4 text-[10px] text-[#a8a195]">
             <p className="font-bold uppercase tracking-[0.1em] text-[#d5bd79]">Paired character</p>
             <p className="mt-2 text-sm font-bold text-[#e1ddd2]">TerryTheMole</p>
-            <p className="mt-1">Event data only · disconnect anytime</p>
+            <p className="mt-1 text-[#9ed37f]">● Connected · board checked just now</p>
+            <p className="mt-2 rounded bg-black/25 p-2 leading-relaxed">Latest: 2 Mining XP counted toward Gain 10m team Mining XP.</p>
+            <span className="mt-2 block rounded border border-[#7a632f] bg-[#574317] px-3 py-2 text-center font-bold text-[#f2d484]">Test connection</span>
+            <p className="mt-2">Event data only · disconnect anytime</p>
           </div>
         </aside>
       </div>

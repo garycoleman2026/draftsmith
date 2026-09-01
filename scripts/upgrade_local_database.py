@@ -21,6 +21,8 @@ def main() -> None:
     columns = {row[1] for row in connection.execute("PRAGMA table_info(drafts)")}
     task_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_tasks)")} if "bingo_tasks" in tables else set()
     template_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_templates)")} if "bingo_templates" in tables else set()
+    event_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_events)")} if "bingo_events" in tables else set()
+    runelite_device_columns = {row[1] for row in connection.execute("PRAGMA table_info(bingo_runelite_devices)")} if "bingo_runelite_devices" in tables else set()
     verification_index_columns = (
         [row[2] for row in connection.execute("PRAGMA index_info(bingo_verification_events_idempotency_unique)")]
         if "bingo_verification_events" in tables else []
@@ -51,6 +53,12 @@ def main() -> None:
         migrations.append(ROOT / "drizzle" / "0010_motionless_siren.sql")
     if "bingo_template_votes" not in tables:
         migrations.append(ROOT / "drizzle" / "0011_chunky_molly_hayes.sql")
+    if "clan_invites" not in tables:
+        migrations.append(ROOT / "drizzle" / "0012_eager_nemesis.sql")
+    if "bingo_event_access_tokens" not in tables or "paused_at" not in event_columns:
+        migrations.append(ROOT / "drizzle" / "0013_tough_bill_hollister.sql")
+    if "bingo_runelite_diagnostics" not in tables or "last_overlay_at" not in runelite_device_columns:
+        migrations.append(ROOT / "drizzle" / "0014_fresh_marten_broadcloak.sql")
     if not migrations:
         connection.close()
         print(f"Local database is already current: {database}")

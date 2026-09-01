@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   RUNELITE_DISCLOSURE_VERSION, canonicalRunelitePairingCode, makeRunelitePairingCode,
+  classifyRuneliteObservation, runeliteConnectionState,
   parseRuneliteDeviceCredential, readBoundedJson, runeliteDeviceCredential,
   runelitePrivacy, sanitizeRuneliteObservation,
 } from '../lib/bingo-runelite-core';
@@ -13,6 +14,22 @@ const context = {
 };
 
 describe('RuneLite privacy and credentials', () => {
+  it('turns recent server contact into a useful connection state', () => {
+    const now = Date.parse('2026-08-31T20:00:00.000Z');
+    expect(runeliteConnectionState('2026-08-31T19:59:30.000Z', now)).toBe('online');
+    expect(runeliteConnectionState('2026-08-31T19:57:00.000Z', now)).toBe('idle');
+    expect(runeliteConnectionState('2026-08-31T19:40:00.000Z', now)).toBe('offline');
+    expect(runeliteConnectionState(null, now)).toBe('waiting');
+  });
+
+  it('distinguishes scored, review, counted, duplicate, and unmatched signals', () => {
+    expect(classifyRuneliteObservation(false, ['accepted'])).toBe('scored');
+    expect(classifyRuneliteObservation(false, ['ready'])).toBe('review');
+    expect(classifyRuneliteObservation(false, ['progress'])).toBe('counted');
+    expect(classifyRuneliteObservation(true, ['progress'])).toBe('duplicate');
+    expect(classifyRuneliteObservation(false, [])).toBe('ignored');
+  });
+
   it('generates a human pairing code without storing formatting in its canonical form', () => {
     const code = makeRunelitePairingCode();
     expect(code).toMatch(/^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
